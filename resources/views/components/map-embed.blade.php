@@ -34,17 +34,17 @@
 @php
     $isSinglePin  = $lat !== null && $lng !== null;
     $hasMarkers   = count($markers) > 0;
-    $defaultLat   = -28.2293;   // Eastern Freestate centre (Senekal area)
-    $defaultLng   = 28.3194;
-    $defaultZoom  = 8;
+    $defaultLat   = -28.2319;   // Bethlehem, Free State
+    $defaultLng   = 28.3093;
+    $defaultZoom  = 9;
 @endphp
 
-{{-- Leaflet CSS — loaded o@once
+{{-- Leaflet CSS — loaded once per page --}}
+@once
 @push('styles')
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.min.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 <style>
     .leaflet-container {
         font-family: inherit;
@@ -83,15 +83,14 @@
 
 {{-- Map container --}}
 <div id="{{ $mapId }}"
-     style="height: {{ $height }}; width: 100%; border-radius: inherit; background: var(--surface);"
+     style="height: {{ $height }}; width: 100%; border-radius: inherit; background: var(--surface); position: relative; overflow: hidden;"
      aria-label="Interactive map"></div>
 
 {{-- Leaflet JS + init — loaded once per page --}}
 @once
 @push('scripts')
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.min.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZU0=" crossorigin=""></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 @endpush
 @endonce
 
@@ -171,6 +170,16 @@
         } else {
             map.setView([defaultLat, defaultLng], defaultZoom);
         }
+
+        // Fix for maps starting in hidden/dynamic containers
+        setTimeout(function() {
+            map.invalidateSize();
+        }, 1000);
+        
+        // Fallback for slower loads
+        setTimeout(function() {
+            map.invalidateSize();
+        }, 3000);
     }
 
     // Run after DOM is ready

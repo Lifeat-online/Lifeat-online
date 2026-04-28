@@ -53,6 +53,29 @@
                 background: #0f172a;
                 color: #e5eefb;
             }
+
+            /* Global Dark Mode Overrides */
+            html[data-theme="dark"] body { color: #e2e8f0; }
+            html[data-theme="dark"] .bg-white { background-color: #111827 !important; color: #e2e8f0 !important; }
+            html[data-theme="dark"] .text-gray-800 { color: #f8fafc !important; }
+            html[data-theme="dark"] .text-gray-700 { color: #cbd5e1 !important; }
+            html[data-theme="dark"] .text-gray-600 { color: #94a3b8 !important; }
+            html[data-theme="dark"] .text-gray-900 { color: #ffffff !important; }
+            
+            html[data-theme="dark"] input:not([type="submit"]):not([type="button"]), 
+            html[data-theme="dark"] select, 
+            html[data-theme="dark"] textarea {
+                background-color: #0f172a !important;
+                color: #ffffff !important;
+                border-color: #334155 !important;
+            }
+            html[data-theme="dark"] input::placeholder { color: #475569 !important; }
+            
+            html[data-theme="dark"] .shadow, 
+            html[data-theme="dark"] .shadow-sm { 
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.2) !important;
+                border: 1px solid #1f2937;
+            }
         </style>
 
         <!-- Favicon -->
@@ -65,6 +88,7 @@
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @stack('styles')
     </head>
     <body class="font-sans antialiased">
         <div class="min-h-screen app-shell-bg">
@@ -116,5 +140,6 @@
                 });
             })();
         </script>
+        @stack('scripts')
     </body>
 </html>

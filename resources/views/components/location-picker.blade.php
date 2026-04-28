@@ -20,14 +20,13 @@
 
 @php
     $mapId = 'location-picker-' . uniqid();
-    $defaultLat = -28.2293;
-    $defaultLng = 28.3194;
+    $defaultLat = -28.2319; // Bethlehem
+    $defaultLng = 28.3093;
 @endphp
 
 @once
 @push('styles')
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.min.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" />
 <style>
     .leaflet-container { font-family: inherit; border-radius: 12px; }
     html[data-theme="dark"] .leaflet-tile-pane {
@@ -54,8 +53,7 @@
 
 @once
 @push('scripts')
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.min.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZU0=" crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
 @endpush
 @endonce
 
@@ -74,7 +72,7 @@
 
         var startLat = initialLat || defaultLat;
         var startLng = initialLng || defaultLng;
-        var startZoom = initialLat ? 16 : 8;
+        var startZoom = initialLat ? 16 : 9;
 
         var map = L.map(el).setView([startLat, startLng], startZoom);
 
@@ -117,6 +115,11 @@
                 updateInputs(pos.lat, pos.lng);
             });
         }
+
+        // Fix for maps starting in hidden/dynamic containers
+        setTimeout(function() {
+            map.invalidateSize();
+        }, 1000);
     }
 
     if (document.readyState === 'loading') {

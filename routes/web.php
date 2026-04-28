@@ -112,7 +112,9 @@ Route::post('/checkout/orders/{order}/payfast/retry', [CheckoutController::class
 Route::post('/checkout/orders/{order}/invoice/send', [CheckoutController::class, 'sendInvoice'])->middleware('auth')->name('checkout.invoice.send');
 Route::post('/checkout/payfast/callback', [CheckoutController::class, 'payfastCallback'])->name('checkout.payfast.callback');
 
-Route::view('/dashboard', 'dashboard')->middleware(['auth'])->name('dashboard');
+use App\Http\Controllers\DashboardController;
+
+Route::get('/dashboard', DashboardController::class)->middleware(['auth'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -123,6 +125,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/my-classifieds', [ClassifiedSubmissionController::class, 'store'])->name('classifieds.manage.store');
     Route::get('/my-classifieds/{classified}/edit', [ClassifiedSubmissionController::class, 'edit'])->name('classifieds.manage.edit');
     Route::put('/my-classifieds/{classified}', [ClassifiedSubmissionController::class, 'update'])->name('classifieds.manage.update');
+});
+
+Route::middleware(['auth', 'role:admin,editor,staff,writer'])->group(function () {
+    Route::get('/staff/dashboard', \App\Http\Controllers\StaffDashboardController::class)->name('staff.dashboard');
 });
 
 Route::middleware(['auth', 'role:writer'])->prefix('writer')->name('writer.')->group(function () {
