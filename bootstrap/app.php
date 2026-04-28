@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('push-campaigns:dispatch-due')->everyFifteenMinutes();
     })
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->trustProxies(at: '*');
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
         ]);
