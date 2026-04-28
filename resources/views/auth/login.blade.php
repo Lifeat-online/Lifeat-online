@@ -1,47 +1,58 @@
 <x-guest-layout>
-    <!-- Session Status -->
-    <x-auth-session-status class="mb-4" :status="session('status')" />
+<div style="margin-bottom: 2rem;">
+    <h1 style="margin: 0; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.025em;">Welcome back</h1>
+    <p style="margin: 0.5rem 0 0; color: var(--muted); font-size: 0.95rem;">Enter your credentials to access your account.</p>
+</div>
 
-    <form method="POST" action="{{ route('login') }}">
-        @csrf
+<!-- Session Status -->
+<x-auth-session-status class="mb-4" :status="session('status')" />
 
-        <!-- Email Address -->
-        <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus autocomplete="username" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
+<form method="POST" action="{{ route('login') }}">
+    @csrf
 
-        <!-- Password -->
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
+    <!-- Email Address -->
+    <div class="auth-form-group">
+        <label for="email" class="auth-label">Email Address</label>
+        <input id="email" class="auth-input" type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="username" placeholder="name@company.com">
+        @if($errors->has('email'))
+            <ul class="error-list">
+                @foreach($errors->get('email') as $message)
+                    <li>{{ $message }}</li>
+                @endforeach
+            </ul>
+        @endif
+    </div>
 
-            <x-text-input id="password" class="block mt-1 w-full"
-                            type="password"
-                            name="password"
-                            required autocomplete="current-password" />
-
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
-
-        <!-- Remember Me -->
-        <div class="block mt-4">
-            <label for="remember_me" class="inline-flex items-center">
-                <input id="remember_me" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" name="remember">
-                <span class="ms-2 text-sm text-gray-600">{{ __('Remember me') }}</span>
-            </label>
-        </div>
-
-        <div class="flex items-center justify-end mt-4">
+    <!-- Password -->
+    <div class="auth-form-group">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <label for="password" class="auth-label">Password</label>
             @if (Route::has('password.request'))
-                <a class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" href="{{ route('password.request') }}">
-                    {{ __('Forgot your password?') }}
-                </a>
+                <a href="{{ route('password.request') }}" style="font-size: 0.8rem; color: var(--primary); font-weight: 600;">Forgot password?</a>
             @endif
-
-            <x-primary-button class="ms-3">
-                {{ __('Log in') }}
-            </x-primary-button>
         </div>
-    </form>
+        <input id="password" class="auth-input" type="password" name="password" required autocomplete="current-password" placeholder="••••••••">
+        @if($errors->has('password'))
+            <ul class="error-list">
+                @foreach($errors->get('password') as $message)
+                    <li>{{ $message }}</li>
+                @endforeach
+            </ul>
+        @endif
+    </div>
+
+    <!-- Remember Me -->
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem;">
+        <input id="remember_me" type="checkbox" name="remember" style="width: auto; margin: 0;">
+        <label for="remember_me" style="margin: 0; font-size: 0.85rem; color: var(--muted); font-weight: 500;">Remember me for 30 days</label>
+    </div>
+
+    <button type="submit" class="auth-btn">
+        Sign in to platform
+    </button>
+</form>
+
+<div class="auth-links">
+    Don't have an account yet? <a href="{{ route('register') }}">Create account</a>
+</div>
 </x-guest-layout>
