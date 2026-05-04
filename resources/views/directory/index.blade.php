@@ -217,7 +217,7 @@
                 </div>
                 <div>
                     <button class="button" type="submit">Search Directory</button>
-                    <button type="button" class="chip-link" id="btn-near-me" style="margin-top:0.5rem; width:100%; justify-content:center; border-style:dashed;">
+                    <button type="button" class="chip-link" id="btn-near-me" style="margin-top:0.5rem; width:100%; justify-content:center;">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:1.2rem; height:1.2rem; margin-right:0.4rem;">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                           <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
@@ -400,10 +400,10 @@
 
                         <div class="contact-stack">
                             @if ($listing->phone)
-                                <span>Phone: {{ $listing->phone }}</span>
+                                <span>Phone: <a href="tel:{{ preg_replace('/\s+/', '', $listing->phone) }}" class="hover:underline" style="color:var(--primary-dark);">{{ $listing->phone }}</a></span>
                             @endif
                             @if ($listing->email)
-                                <span>Email: {{ $listing->email }}</span>
+                                <span>Email: <a href="mailto:{{ $listing->email }}" class="hover:underline" style="color:var(--primary-dark);">{{ $listing->email }}</a></span>
                             @endif
                             @if ($listing->address_line)
                                 <span>Address: {{ $listing->address_line }}</span>
@@ -417,6 +417,14 @@
                             @endif
                         </div>
                     </article>
+
+                    @if ($loop->iteration % 4 == 0 && isset($inlineAdCampaigns) && $inlineAdCampaigns->isNotEmpty())
+                        @php $ad = $inlineAdCampaigns->shift(); @endphp
+                        @if($ad)
+                            <x-ad-campaign-card :campaign="$ad" />
+                        @endif
+                    @endif
+
                     @if ($loop->last)</div>@endif
                 @empty
                     <div class="empty-state">No listings match your current filters.</div>

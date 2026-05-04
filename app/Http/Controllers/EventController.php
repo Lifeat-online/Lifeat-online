@@ -134,6 +134,11 @@ class EventController extends Controller
                 'location' => $location,
                 'upcoming' => $upcomingOnly,
             ],
+            'sidebarAdCampaigns' => \App\Models\AdCampaign::where('status', 'active')
+                ->whereNotNull('creative_image')
+                ->inRandomOrder()
+                ->limit(2)
+                ->get(),
             'mapMarkers' => $mapMarkers,
         ]);
     }
@@ -165,6 +170,11 @@ class EventController extends Controller
                 'ends' => $event->end_at,
                 'is_all_day' => $event->is_all_day,
             ],
+            'sidebarAdCampaigns' => \App\Models\AdCampaign::where('status', 'active')
+                ->whereNotNull('creative_image')
+                ->inRandomOrder()
+                ->limit(2)
+                ->get(),
         ]);
     }
 }

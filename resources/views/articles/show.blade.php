@@ -51,6 +51,10 @@
                     <p class="muted">No related articles found yet.</p>
                 @endforelse
             </article>
+
+            @foreach ($sidebarAdCampaigns as $ad)
+                <x-ad-campaign-card :campaign="$ad" />
+            @endforeach
         </aside>
     </section>
 @endsection

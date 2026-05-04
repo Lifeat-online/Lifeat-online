@@ -77,6 +77,31 @@
     .marker-cluster-medium div { background-color: rgba(240, 194, 12, 0.6); }
     .marker-cluster-large { background-color: rgba(253, 156, 115, 0.6); }
     .marker-cluster-large div { background-color: rgba(241, 128, 23, 0.6); }
+
+    /* Near me / Locate control */
+    .leaflet-control-locate {
+        background: #fff;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        border-radius: 4px;
+        border: 2px solid rgba(0,0,0,0.2);
+        background-clip: padding-box;
+        color: #444;
+        transition: all 0.2s;
+    }
+    .leaflet-control-locate:hover {
+        background-color: #f4f4f4;
+        color: #000;
+    }
+    html[data-theme="dark"] .leaflet-control-locate {
+        background: #1e293b;
+        border-color: #334155;
+        color: #cbd5e1;
+    }
 </style>
 @endpush
 @endonce
@@ -170,6 +195,31 @@
         } else {
             map.setView([defaultLat, defaultLng], defaultZoom);
         }
+
+        // ── Locate Me Control ──────────────────────────────────────────────
+        var LocateControl = L.Control.extend({
+            options: { position: 'topleft' },
+            onAdd: function (map) {
+                var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-locate');
+                container.title = "Locate me";
+                container.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:18px; height:18px;"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" /></svg>';
+                
+                container.onclick = function() {
+                    map.locate({ setView: true, maxZoom: 14 });
+                };
+                return container;
+            }
+        });
+        map.addControl(new LocateControl());
+
+        map.on('locationfound', function(e) {
+            L.circle(e.latlng, e.accuracy / 2).addTo(map);
+            L.marker(e.latlng).addTo(map).bindPopup("You are within " + (e.accuracy / 2).toFixed(1) + " meters from this point").openPopup();
+        });
+
+        map.on('locationerror', function(e) {
+            alert("Could not find your location: " + e.message);
+        });
 
         // Fix for maps starting in hidden/dynamic containers
         setTimeout(function() {

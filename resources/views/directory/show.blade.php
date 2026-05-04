@@ -342,11 +342,29 @@
                 <article class="card">
                     <h3>Contact and Location</h3>
                     <div class="info-grid" style="margin-top:0.9rem;">
-                        <div class="info-item"><strong>Email</strong><br>{{ $listing->email ?: 'Not available yet' }}</div>
-                        <div class="info-item"><strong>Phone</strong><br>{{ $listing->phone ?: 'Not available yet' }}</div>
+                        <div class="info-item"><strong>Email</strong><br>
+                            @if($listing->email)
+                                <a href="mailto:{{ $listing->email }}" class="text-primary hover:underline" style="color:var(--primary-dark);">{{ $listing->email }}</a>
+                            @else
+                                Not available yet
+                            @endif
+                        </div>
+                        <div class="info-item"><strong>Phone</strong><br>
+                            @if($listing->phone)
+                                <a href="tel:{{ preg_replace('/\s+/', '', $listing->phone) }}" class="text-primary hover:underline" style="color:var(--primary-dark);">{{ $listing->phone }}</a>
+                            @else
+                                Not available yet
+                            @endif
+                        </div>
                         <div class="info-item"><strong>Address</strong><br>{{ $listing->address_line ?: 'Not available yet' }}</div>
                         <div class="info-item"><strong>City / Region</strong><br>{{ $listing->city ?: 'Unknown' }}{{ $listing->region ? ', '.$listing->region : '' }}</div>
-                        <div class="info-item"><strong>Website</strong><br>{{ $listing->website_url ?: 'Not available yet' }}</div>
+                        <div class="info-item"><strong>Website</strong><br>
+                            @if($listing->website_url)
+                                <a href="{{ $listing->website_url }}" target="_blank" rel="noreferrer" class="text-primary hover:underline" style="color:var(--primary-dark); word-break:break-all;">{{ $listing->website_url }}</a>
+                            @else
+                                Not available yet
+                            @endif
+                        </div>
                         <div class="info-item"><strong>Coordinates</strong><br>
                             @if ($listing->latitude && $listing->longitude)
                                 {{ $listing->latitude }}, {{ $listing->longitude }}

@@ -62,6 +62,11 @@ class ArticleController extends Controller
         return view('articles.show', [
             'article' => $article,
             'relatedArticles' => $relatedArticles,
+            'sidebarAdCampaigns' => \App\Models\AdCampaign::where('status', 'active')
+                ->whereNotNull('creative_image')
+                ->inRandomOrder()
+                ->limit(2)
+                ->get(),
         ]);
     }
 
@@ -166,6 +171,11 @@ class ArticleController extends Controller
                         : ($activeLocation
                             ? 'Browse published articles linked to '.$activeLocation->name.'.'
                             : 'Editorial content pages replacing the WordPress post archive and single post views.'))),
+            'sidebarAdCampaigns' => \App\Models\AdCampaign::where('status', 'active')
+                ->whereNotNull('creative_image')
+                ->inRandomOrder()
+                ->limit(2)
+                ->get(),
         ]);
     }
 }

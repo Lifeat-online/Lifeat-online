@@ -50,6 +50,11 @@ class HomeController extends Controller
                 ->limit(6)
                 ->get(),
             'latestArticles' => $latestArticles,
+            'homeAdCampaigns' => \App\Models\AdCampaign::where('status', 'active')
+                ->whereNotNull('creative_image')
+                ->inRandomOrder()
+                ->limit(3)
+                ->get(),
         ]);
     }
 }

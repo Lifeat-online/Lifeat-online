@@ -500,6 +500,22 @@
         @endforelse
     </section>
 
+    @if (isset($homeAdCampaigns) && $homeAdCampaigns->isNotEmpty())
+        <section class="section">
+            <div class="section-head">
+                <div>
+                    <h2>Sponsored Spotlight</h2>
+                    <p class="section-subtitle">Promoted businesses and special offers from across the region.</p>
+                </div>
+            </div>
+            <div class="grid grid-3">
+                @foreach ($homeAdCampaigns as $ad)
+                    <x-ad-campaign-card :campaign="$ad" />
+                @endforeach
+            </div>
+        </section>
+    @endif
+
     <section class="section">
         <div class="promo-strip">
             <div class="promo-card">

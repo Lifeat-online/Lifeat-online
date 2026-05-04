@@ -263,7 +263,13 @@
                 <article class="card">
                     <h3>Event Details</h3>
                     <div class="info-grid" style="margin-top:0.9rem;">
-                        <div class="info-item"><strong>Website / Ticket link</strong><br>{{ $event->website_url ?: 'Not available yet' }}</div>
+                        <div class="info-item"><strong>Website / Ticket link</strong><br>
+                            @if($event->website_url)
+                                <a href="{{ $event->website_url }}" target="_blank" rel="noreferrer" class="text-primary hover:underline" style="color:var(--primary-dark); word-break:break-all;">{{ $event->website_url }}</a>
+                            @else
+                                Not available yet
+                            @endif
+                        </div>
                         <div class="info-item"><strong>Hosted by</strong><br>
                             @if ($event->listing)
                                 <a href="{{ route('directory.show', $event->listing) }}">{{ $event->listing->title }}</a>
@@ -325,6 +331,10 @@
                         <a class="chip-link" href="{{ route('advertise.index') }}">Advertise event</a>
                     </div>
                 </article>
+
+                @foreach ($sidebarAdCampaigns as $ad)
+                    <x-ad-campaign-card :campaign="$ad" />
+                @endforeach
             </aside>
         </div>
     </section>

@@ -134,6 +134,12 @@ class DirectoryController extends Controller
                 ->inRandomOrder()
                 ->limit(2)
                 ->get(),
+            'inlineAdCampaigns' => AdCampaign::with('listing')
+                ->where('status', 'active')
+                ->whereNotNull('creative_image')
+                ->inRandomOrder()
+                ->limit(3)
+                ->get(),
             'mapMarkers' => $mapMarkers,
         ]);
     }
