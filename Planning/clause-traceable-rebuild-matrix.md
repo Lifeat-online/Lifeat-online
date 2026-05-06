@@ -129,8 +129,8 @@ Current status note:
 
 Current status note:
 - settings, writer management, article moderation, business/event management, classifieds moderation, payments/invoices/renewals, and support workflows are live at baseline level
-- advert management and push notification management are only partially delivered because approval, serving analytics, and open-rate measurement remain outstanding
-- staff wallet and payouts remain planned rather than delivered
+- advert management and push notification management are partially delivered with baseline approval controls, dispatch controls, and counters in place; richer analytics and reporting remain outstanding
+- staff wallet and payouts are delivered at baseline level (commission credit, wallet view, payout request lifecycle, admin processing)
 
 ## 4. Core Entity Matrix
 
@@ -187,8 +187,8 @@ Current status note:
 - event upsell purchase -> publish flow is live
 - classifieds submission -> moderation -> publish/hide/flag is live
 - unified public search is live
-- push workflow is partially live through purchase, targeting fields, schedule handling, and dispatch logging, but open-rate tracking is still outstanding
-- staff commission and payout flow is not yet delivered
+- push workflow is partially live through purchase, targeting fields, schedule handling, dispatch logging, and baseline open counter; richer open telemetry and reporting are still outstanding
+- staff commission and payout flow is live at baseline level
 
 ## 6. Role Matrix
 
@@ -227,15 +227,13 @@ Current status:
 - partially delivered
 
 Built in Laravel so far:
-- Advert campaign purchasing and owner self-service
-- Push-notification campaign purchasing, owner self-service, and dispatch logging baseline
+- Advert campaign purchasing and owner/admin self-service, including baseline impression and click tracking
+- Push-notification campaign purchasing, owner/admin self-service, dispatch logging baseline, and baseline open counter
 
 Still to build:
-- In-article ads
-- Banner ads
-- Creative approval
-- Impression/click analytics
-- Push open-rate tracking and richer reporting
+- final ad inventory/placement policy decisions if more slot types are needed
+- richer campaign analytics and reporting beyond baseline counters
+- deeper push open telemetry and reporting beyond baseline counter
 
 Clause anchor:
 - `5.a` to `5.d`, `6.a`, `6.b`, `11.e`

@@ -39,8 +39,8 @@ Implemented and working in the Laravel application:
 - admin ad campaign and push campaign management (list, detail, approve, pause, resume, manual dispatch, delivery history)
 
 Still outstanding:
-- ad campaign impression/click tracking and serving analytics (E4.3)
-- push open-metric logging (E4.4 / E4.5)
+- campaign analytics refinement (beyond current counters): first-class reporting views, time-bucketed metrics, and any required attribution model decisions
+- push open-rate tracking refinement (beyond current pixel counter): open logs, tokenised tracking, and any provider-side delivery receipt integration
 - Phase 6: test coverage expansion, monitoring and alerting, load testing, security hardening, pen-test, and documentation
 
 ## 2. Implemented Public Pages
@@ -214,46 +214,45 @@ Remaining optional refinements for the writer/staff application flow:
 
 The three most actionable next targets in priority order:
 
-**Option A — Staff wallet and payout flows (E3.2)**
-The biggest remaining functional gap with direct revenue impact. Staff-assisted sales exist in concept but commission accrual, wallet balances, and payout requests are not yet implemented.
-- staff commission ledger on staff-assisted paid sales
-- wallet balance view for staff users
-- payout request submission by staff
-- admin payout approval and marking paid
-- audit logging throughout
-Clause trace: `3.d`, `8.d`, `9.c`, `9.e`
-
-**Option B — Ad campaign serving analytics (E4.3 / E4.5)**
-Closes the remaining Phase 4 gap: impression/click counters on served ad campaigns, and push open-metric logging.
-- increment impression and click counters when an ad is served or clicked
-- push open-tracking endpoint (pixel or redirect)
-- admin campaign performance summary (impressions, clicks, open rate)
+**Option A — Campaign operations & reporting depth (E4.3 / E4.5)**
+The biggest remaining monetisation gap is not purchase or dispatch, but measurement and operational oversight beyond baseline counters.
+- time-bucketed performance reporting (impressions/clicks/openerate per day/week)
+- admin reporting screens that aggregate and rank campaigns
+- decide whether to persist per-view/per-click/per-open logs (vs counters only)
+- optional tokenised open tracking for higher-quality metrics
 Clause trace: `5.c`, `5.d`, `6.b`, `9.d`, `11.e`
 
-**Option C — Phase 6 test coverage and hardening (E6.1)**
-Expand the automated test suite with webhook integration tests and E2E flows for the revenue-critical paths, before moving into load testing and security review.
+**Option B — Phase 6 hardening (E6.1)**
+Now that wallet, payouts, and baseline campaign tracking exist, the next risk reduction is hardening and deeper integration coverage.
 - PayFast webhook idempotency integration tests
-- checkout E2E (package selection → payment → entitlement activation)
+- checkout E2E (package selection → payment → entitlement activation → attribution credit)
 - subscription expiry and renewal E2E
 - role-boundary and permission-denial security tests
 Clause trace: `8.a`, `8.c`, `11.b`, `11.d`
 
+**Option C — Retained-flow scope decisions (Phase 5)**
+Close the remaining Phase 5 ambiguity so Phase 6 hardening targets the right surface area.
+- services decision path
+- vouchers
+- any retained shop/transport features
+Clause trace: `10.a`, `10.d`
+
 ### 4.2 Recommended Order
 
 Recommended sequence:
-1. **Option A** (staff wallet) — highest business value, last major unfinished functional area
-2. **Option B** (ad serving analytics) — closes Phase 4 fully, required before load testing ad surfaces
-3. **Option C** (Phase 6 hardening) — runs alongside and after A and B as the platform approaches release
+1. **Option A** (campaign reporting depth) — closes remaining Phase 4 operational gaps
+2. **Option B** (Phase 6 hardening) — expands confidence and release readiness
+3. **Option C** (retained-flow decisions) — reduces late-scope risk
 
 ## 5. Remaining Major Planned Areas
 
 The following areas are still in the planning set and not yet fully delivered:
 
 **Phase 3 outstanding:**
-- E3.2: staff wallet and payout flows — **COMPLETE** (`3.d`)
+- staff wallet and payout flows — delivered baseline; remaining work is mainly UX polish and any accounting/reporting refinements (`3.d`)
 
 **Phase 4 outstanding:**
-- E4.3 / E4.5: ad impression/click tracking and push open metrics — **COMPLETE** (`5.c`, `5.d`, `6.b`, `9.d`)
+- campaign analytics depth beyond baseline counters (time series, reporting views, logs) (`5.c`, `5.d`, `6.b`, `9.d`)
 
 **Phase 5 outstanding:**
 - retained non-core flows: services decision path and vouchers (deferred decision)

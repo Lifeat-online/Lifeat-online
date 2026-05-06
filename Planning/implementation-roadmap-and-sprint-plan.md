@@ -66,8 +66,8 @@ Current delivery position in the Laravel codebase:
 - Phase 0: largely delivered for roles, settings, audit logging, and scheduled automation baselines
 - Phase 1: broadly delivered for writer workflow, editorial moderation, article discovery taxonomy, and writer payment operations
 - Phase 2: broadly delivered for business packages, checkout, payments, invoices, entitlements, and public directory flows
-- Phase 3: partially delivered with event eligibility, event commerce, renewals, finance recovery tools, and support-safe finance visibility in place, while staff wallet/payout economics remain outstanding
-- Phase 4: partially delivered with owner advert and push self-service, package handoff, entitlement activation, and push dispatch logging in place, while creative approval, serving analytics, and push open metrics remain outstanding
+- Phase 3: partially delivered with event eligibility, event commerce, renewals, finance recovery tools, support-safe finance visibility, and staff wallet/payout baseline in place, while deeper sales tooling and reporting refinements remain outstanding
+- Phase 4: partially delivered with owner advert and push self-service, package handoff, entitlement activation, admin campaign controls, baseline impression/click tracking, push dispatch logging, and baseline push open counter in place, while creative approval policy depth and richer reporting remain outstanding
 - Phase 5: partially delivered with classifieds moderation, account/self-service improvements, customer lookup, support notes, and support-role dashboard/access controls in place, while retained non-core public decision work remains outstanding
 - Phase 6: still largely outstanding beyond the current automated test coverage baseline
 
@@ -342,7 +342,7 @@ Current delivery position in the Laravel codebase:
 | E2.2 | Checkout, PayFast, invoice, entitlement flow | 2 | P1 | Delivered baseline | `8.a` to `8.d` |
 | E2.3 | Business pricing and package admin | 2 | P1 | Partial | `3.b`, `3.c`, `9.a` |
 | E3.1 | Event package and eligibility system | 3 | P1 | Delivered baseline | `4.a` to `4.d` |
-| E3.2 | Staff-assisted sales and wallet | 3 | P1 | Groundwork only | `3.d` |
+| E3.2 | Staff-assisted sales and wallet | 3 | P1 | Delivered baseline | `3.d` |
 | E3.3 | Finance exceptions and renewals | 3 | P1 | Delivered baseline | `8.d`, `9.c`, `9.e` |
 | E4.1 | Ad inventory and packages | 4 | P1 | Partial | `5.a` to `5.d` |
 | E4.2 | Push notification monetisation | 4 | P1 | Partial | `6.a`, `6.b` |
