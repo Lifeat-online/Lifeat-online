@@ -12,8 +12,9 @@ class HomeController extends Controller
 {
     public function __invoke(): View
     {
-        $railwayAdminBootstrapEnabled = filter_var(env('RAILWAY_ADMIN_BOOTSTRAP_ENABLED', false), FILTER_VALIDATE_BOOL);
-        $railwayAdminBootstrapVisible = $railwayAdminBootstrapEnabled || (bool) config('app.debug');
+        $host = (string) request()->getHost();
+        $isRailwayHost = str_ends_with($host, 'railway.app') || str_contains($host, '.railway.app');
+        $adminBootstrapVisible = app()->environment('local') || $isRailwayHost;
 
         $latestArticles = Article::with(['author', 'categories'])
             ->published()
@@ -43,8 +44,7 @@ class HomeController extends Controller
             'articleCount' => Article::published()->count(),
             'featuredListings' => $featuredListings,
             'upcomingEvents' => $upcomingEvents,
-            'railwayAdminBootstrapEnabled' => $railwayAdminBootstrapEnabled,
-            'railwayAdminBootstrapVisible' => $railwayAdminBootstrapVisible,
+            'adminBootstrapVisible' => $adminBootstrapVisible,
             'featuredCategories' => Category::query()
                 ->where('type', 'listing')
                 ->withCount([

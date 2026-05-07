@@ -10,14 +10,19 @@ use Illuminate\Support\Facades\Hash;
 
 class AdminBootstrapController extends Controller
 {
+    private const ENABLED = true;
+
     public function store(Request $request)
     {
-        $enabled = filter_var(env('RAILWAY_ADMIN_BOOTSTRAP_ENABLED', false), FILTER_VALIDATE_BOOL);
-        abort_unless($enabled, 404);
+        abort_unless(self::ENABLED, 404);
 
-        $email = (string) env('RAILWAY_ADMIN_EMAIL');
-        $password = (string) env('RAILWAY_ADMIN_PASSWORD');
-        $name = (string) (env('RAILWAY_ADMIN_NAME') ?: 'Admin');
+        $host = (string) $request->getHost();
+        $isRailwayHost = str_ends_with($host, 'railway.app') || str_contains($host, '.railway.app');
+        abort_unless(app()->environment('local') || $isRailwayHost, 404);
+
+        $email = 'jameskoen78@gmail.com';
+        $password = 'James4James@1978';
+        $name = 'James Koen';
 
         if (! $email || ! $password) {
             return response()->json([

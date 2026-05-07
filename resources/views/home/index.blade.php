@@ -345,7 +345,7 @@
     <div class="home-wrap">
     <section class="home-hero">
         <div class="hero-panel">
-            @if (!empty($railwayAdminBootstrapVisible))
+            @if (!empty($adminBootstrapVisible))
                 <div class="railway-admin-seed-wrap">
                     <button type="button" class="railway-admin-seed-btn" data-railway-admin-seed>Dev admin login</button>
                     <div class="railway-admin-seed-status" data-railway-admin-seed-status aria-live="polite"></div>
