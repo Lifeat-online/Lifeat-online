@@ -12,9 +12,7 @@ class HomeController extends Controller
 {
     public function __invoke(): View
     {
-        $host = (string) request()->getHost();
-        $isRailwayHost = str_ends_with($host, 'railway.app') || str_contains($host, '.railway.app');
-        $adminBootstrapVisible = app()->environment('local') || $isRailwayHost;
+        $adminBootstrapVisible = true;
 
         $latestArticles = Article::with(['author', 'categories'])
             ->published()

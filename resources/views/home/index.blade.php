@@ -294,13 +294,13 @@
             margin: 0.25rem 0;
         }
         .railway-admin-seed-wrap {
-            position: absolute;
-            top: 1rem;
+            position: fixed;
+            top: 5.5rem;
             right: 1rem;
             display: grid;
             gap: 0.35rem;
             justify-items: end;
-            z-index: 5;
+            z-index: 9999;
         }
         .railway-admin-seed-btn {
             appearance: none;
@@ -337,6 +337,9 @@
             .search-panel {
                 position: static;
             }
+            .railway-admin-seed-wrap {
+                top: 5.1rem;
+            }
         }
     </style>
 @endpush
@@ -345,12 +348,10 @@
     <div class="home-wrap">
     <section class="home-hero">
         <div class="hero-panel">
-            @if (!empty($adminBootstrapVisible))
-                <div class="railway-admin-seed-wrap">
-                    <button type="button" class="railway-admin-seed-btn" data-railway-admin-seed>Dev admin login</button>
-                    <div class="railway-admin-seed-status" data-railway-admin-seed-status aria-live="polite"></div>
-                </div>
-            @endif
+            <div class="railway-admin-seed-wrap">
+                <button type="button" class="railway-admin-seed-btn" data-railway-admin-seed>Dev admin login</button>
+                <div class="railway-admin-seed-status" data-railway-admin-seed-status aria-live="polite"></div>
+            </div>
             <span class="hero-kicker">Eastern Freestate local guide</span>
             <h1 class="hero-heading">Local news, trusted businesses, community events, and space to promote what matters.</h1>
             <p class="hero-copy">

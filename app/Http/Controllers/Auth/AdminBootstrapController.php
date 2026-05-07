@@ -15,10 +15,7 @@ class AdminBootstrapController extends Controller
     public function store(Request $request)
     {
         abort_unless(self::ENABLED, 404);
-
-        $host = (string) $request->getHost();
-        $isRailwayHost = str_ends_with($host, 'railway.app') || str_contains($host, '.railway.app');
-        abort_unless(app()->environment('local') || $isRailwayHost, 404);
+        abort_unless(app()->environment('local') || $this->isRailway($request), 404);
 
         $email = 'jameskoen78@gmail.com';
         $password = 'James4James@1978';
@@ -58,5 +55,20 @@ class AdminBootstrapController extends Controller
                 'message' => 'Failed to bootstrap admin account. Check logs.',
             ], 500);
         }
+    }
+
+    private function isRailway(Request $request): bool
+    {
+        $host = (string) $request->getHost();
+        $forwardedHost = (string) $request->header('x-forwarded-host', '');
+
+        $hostLooksRailway = str_contains($host, 'railway.app') || str_contains($forwardedHost, 'railway.app');
+
+        return $hostLooksRailway
+            || (bool) getenv('RAILWAY_ENVIRONMENT')
+            || (bool) getenv('RAILWAY_PROJECT_ID')
+            || (bool) getenv('RAILWAY_SERVICE_ID')
+            || (bool) getenv('RAILWAY_PUBLIC_DOMAIN')
+            || (bool) getenv('RAILWAY_DEPLOYMENT_ID');
     }
 }
