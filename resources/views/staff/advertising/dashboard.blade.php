@@ -52,6 +52,9 @@
                                 <option value="{{ $business->id }}">{{ $business->title }}</option>
                             @endforeach
                         </select>
+                        <div style="margin-top:0.65rem;">
+                            <a id="open-workspace" href="#" class="underline text-sm text-gray-600 hover:text-gray-900" style="pointer-events:none; opacity:0.6;">Open listing workspace</a>
+                        </div>
                     </div>
                 </div>
                 <div id="staff-ad-status" class="notice" style="margin-top:1rem; display:none;"></div>
@@ -181,7 +184,9 @@
     <script>
         (() => {
             const csrf = @json(csrf_token());
+            const workspaceUrls = @json($businesses->mapWithKeys(fn ($b) => [(string) $b->id => route('account.listings.show', $b)])->all());
             const select = document.getElementById('business_id');
+            const openWorkspace = document.getElementById('open-workspace');
             const statusBox = document.getElementById('staff-ad-status');
             const summaryBox = document.getElementById('business-summary');
             const panels = document.getElementById('business-panels');
@@ -524,6 +529,12 @@
             }
 
             select.addEventListener('change', async () => {
+                const url = workspaceUrls[String(select.value || '')] || null;
+                if (openWorkspace) {
+                    openWorkspace.href = url || '#';
+                    openWorkspace.style.pointerEvents = url ? 'auto' : 'none';
+                    openWorkspace.style.opacity = url ? '1' : '0.6';
+                }
                 await loadSummary(select.value);
             });
 
@@ -537,4 +548,3 @@
         })();
     </script>
 </x-app-layout>
-

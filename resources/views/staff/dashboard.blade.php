@@ -91,7 +91,7 @@
                 <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
                     <a href="{{ route('writer.articles.create') }}" class="btn-mgmt btn-indigo">New Article</a>
                     <a href="{{ route('add-listing.index') }}" class="btn-mgmt btn-slate">New Listing</a>
-                    <a href="{{ route('account.listings.index') }}" class="btn-mgmt btn-slate">New Event</a>
+                    <a href="{{ route('account.listings.index') }}" class="btn-mgmt btn-slate">Client Listings</a>
                     <a href="{{ route('staff.advertising.index') }}" class="btn-mgmt btn-indigo">Client Advertising</a>
                     <a href="{{ route('writer.articles.index') }}" class="btn-mgmt btn-soft">My Articles</a>
                     <a href="{{ route('writer.earnings.index') }}" class="btn-mgmt btn-soft">Earnings Report</a>

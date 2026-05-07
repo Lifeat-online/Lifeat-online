@@ -18,7 +18,7 @@ class AccountEventController extends Controller
 {
     public function index(Request $request, Listing $listing): View
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
 
         return view('account.events.index', [
             'listing' => $listing->load('activeSubscription.package'),
@@ -37,7 +37,7 @@ class AccountEventController extends Controller
 
     public function create(Request $request, Listing $listing): View
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
 
         return view('account.events.form', [
             'listing' => $listing,
@@ -61,12 +61,12 @@ class AccountEventController extends Controller
 
     public function store(Request $request, Listing $listing): RedirectResponse
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
 
         $data = $this->validated($request);
         $this->ensurePublishableListing($data['status'], $listing);
         $data['listing_id'] = $listing->id;
-        $data['user_id'] = $request->user()->id;
+        $data['user_id'] = $listing->user_id ?: $request->user()->id;
         $data['slug'] = $this->uniqueSlug($data['title']);
         $data['published_at'] = $this->publishedAt($data['status'], $data['published_at'] ?? null);
         $data['is_all_day'] = $request->boolean('is_all_day');
@@ -82,7 +82,7 @@ class AccountEventController extends Controller
 
     public function edit(Request $request, Listing $listing, Event $event): View
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
         abort_unless($event->listing_id === $listing->id, 404);
         $event->load('categories');
         $event->load([
@@ -114,7 +114,7 @@ class AccountEventController extends Controller
 
     public function update(Request $request, Listing $listing, Event $event): RedirectResponse
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
         abort_unless($event->listing_id === $listing->id, 404);
 
         $data = $this->validated($request, $event);
@@ -129,6 +129,22 @@ class AccountEventController extends Controller
         return redirect()
             ->route('account.listings.events.edit', [$listing, $event])
             ->with('status', 'Event updated.');
+    }
+
+    public function destroy(Request $request, Listing $listing, Event $event): RedirectResponse
+    {
+        abort_unless($this->canAccessListing($request, $listing), 403);
+        abort_unless($event->listing_id === $listing->id, 404);
+
+        if ($event->featured_image) {
+            Storage::disk('public')->delete($event->featured_image);
+        }
+
+        $event->delete();
+
+        return redirect()
+            ->route('account.listings.events.index', $listing)
+            ->with('status', 'Event removed.');
     }
 
     private function validated(Request $request, ?Event $event = null): array
@@ -221,5 +237,13 @@ class AccountEventController extends Controller
         }
 
         return $slug;
+    }
+
+    private function canAccessListing(Request $request, Listing $listing): bool
+    {
+        $user = $request->user();
+
+        return $listing->user_id === $user->id
+            || ($user->hasRole('staff') && $listing->registered_by_user_id === $user->id);
     }
 }

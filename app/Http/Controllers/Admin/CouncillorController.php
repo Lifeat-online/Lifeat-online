@@ -24,6 +24,7 @@ class CouncillorController extends Controller
     {
         return view('admin.councillors.form', [
             'councillor' => new Councillor(),
+            'areasJson' => [],
             'users' => User::orderBy('name')->limit(200)->get(),
             'categories' => CivicFaultReport::categories(),
             'formAction' => route('admin.councillors.store'),
@@ -44,8 +45,19 @@ class CouncillorController extends Controller
 
     public function edit(Councillor $councillor): View
     {
+        $councillor->load('areas');
+
         return view('admin.councillors.form', [
-            'councillor' => $councillor->load('areas'),
+            'councillor' => $councillor,
+            'areasJson' => $councillor->areas
+                ->map(fn ($a) => [
+                    'id' => $a->id,
+                    'name' => $a->name,
+                    'geojson' => $a->geojson,
+                    'is_active' => $a->is_active,
+                ])
+                ->values()
+                ->all(),
             'users' => User::orderBy('name')->limit(200)->get(),
             'categories' => CivicFaultReport::categories(),
             'formAction' => route('admin.councillors.update', $councillor),

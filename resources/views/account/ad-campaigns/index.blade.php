@@ -33,6 +33,11 @@
                     <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
                         <a class="button-link" href="{{ route('account.listings.ad-campaigns.edit', [$listing, $campaign]) }}">Edit campaign</a>
                         <a class="button-link" href="{{ route('checkout.index', ['campaign' => $campaign->slug]) }}">Buy advert package</a>
+                        <form method="post" action="{{ route('account.listings.ad-campaigns.destroy', [$listing, $campaign]) }}" onsubmit="return confirm('Remove this advert campaign?')">
+                            @csrf
+                            @method('DELETE')
+                            <button class="button-link" type="submit">Delete</button>
+                        </form>
                     </div>
                 </div>
                 <p class="muted">

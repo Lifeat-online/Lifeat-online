@@ -33,6 +33,11 @@
                     <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
                         <a class="button-link" href="{{ route('account.listings.push-campaigns.edit', [$listing, $campaign]) }}">Edit push</a>
                         <a class="button-link" href="{{ route('checkout.index', ['push_campaign' => $campaign->slug]) }}">Buy push package</a>
+                        <form method="post" action="{{ route('account.listings.push-campaigns.destroy', [$listing, $campaign]) }}" onsubmit="return confirm('Remove this push campaign?')">
+                            @csrf
+                            @method('DELETE')
+                            <button class="button-link" type="submit">Delete</button>
+                        </form>
                     </div>
                 </div>
                 <p class="muted">

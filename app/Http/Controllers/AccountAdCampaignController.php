@@ -17,7 +17,7 @@ class AccountAdCampaignController extends Controller
 {
     public function index(Request $request, Listing $listing): View
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
 
         return view('account.ad-campaigns.index', [
             'listing' => $listing->load('activeSubscription.package'),
@@ -36,7 +36,7 @@ class AccountAdCampaignController extends Controller
 
     public function create(Request $request, Listing $listing): View
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
 
         return view('account.ad-campaigns.form', [
             'listing' => $listing,
@@ -56,12 +56,12 @@ class AccountAdCampaignController extends Controller
 
     public function store(Request $request, Listing $listing): RedirectResponse
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
         $this->ensureEntitledListing($listing);
 
         $data = $this->validated($request, $listing);
         $data['listing_id'] = $listing->id;
-        $data['user_id'] = $request->user()->id;
+        $data['user_id'] = $listing->user_id ?: $request->user()->id;
         $data['slug'] = $this->uniqueSlug($data['title']);
         $data = $this->handleUploads($request, $data);
 
@@ -74,7 +74,7 @@ class AccountAdCampaignController extends Controller
 
     public function edit(Request $request, Listing $listing, AdCampaign $adCampaign): View
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
         abort_unless($adCampaign->listing_id === $listing->id, 404);
 
         $adCampaign->load([
@@ -105,7 +105,7 @@ class AccountAdCampaignController extends Controller
 
     public function update(Request $request, Listing $listing, AdCampaign $adCampaign): RedirectResponse
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
         abort_unless($adCampaign->listing_id === $listing->id, 404);
 
         $data = $this->validated($request, $listing);
@@ -116,6 +116,19 @@ class AccountAdCampaignController extends Controller
         return redirect()
             ->route('account.listings.ad-campaigns.edit', [$listing, $adCampaign])
             ->with('status', 'Advert campaign updated.');
+    }
+
+    public function destroy(Request $request, Listing $listing, AdCampaign $adCampaign): RedirectResponse
+    {
+        abort_unless($this->canAccessListing($request, $listing), 403);
+        abort_unless($adCampaign->listing_id === $listing->id, 404);
+
+        $this->deleteFile($adCampaign->creative_image);
+        $adCampaign->delete();
+
+        return redirect()
+            ->route('account.listings.ad-campaigns.index', $listing)
+            ->with('status', 'Advert campaign removed.');
     }
 
     private function validated(Request $request, Listing $listing): array
@@ -189,5 +202,13 @@ class AccountAdCampaignController extends Controller
         }
 
         return $slug;
+    }
+
+    private function canAccessListing(Request $request, Listing $listing): bool
+    {
+        $user = $request->user();
+
+        return $listing->user_id === $user->id
+            || ($user->hasRole('staff') && $listing->registered_by_user_id === $user->id);
     }
 }

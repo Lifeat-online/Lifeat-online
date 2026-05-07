@@ -165,12 +165,7 @@
                 });
             }
 
-            const areas = @json(($councillor->areas ?? collect())->map(fn ($a) => [
-                'id' => $a->id,
-                'name' => $a->name,
-                'geojson' => $a->geojson,
-                'is_active' => $a->is_active,
-            ]));
+            const areas = @json($areasJson ?? []);
 
             const picker = document.getElementById('area_picker');
             const areaId = document.getElementById('area_id');
@@ -255,4 +250,3 @@
         })();
     </script>
 </x-app-layout>
-

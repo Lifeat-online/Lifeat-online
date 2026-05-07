@@ -125,6 +125,7 @@ Route::get('/account/listings', [AccountListingController::class, 'index'])->mid
 Route::get('/account/listings/{listing}', [AccountListingController::class, 'show'])->middleware('auth')->name('account.listings.show');
 Route::get('/account/listings/{listing}/edit', [AccountListingController::class, 'edit'])->middleware('auth')->name('account.listings.edit');
 Route::put('/account/listings/{listing}', [AccountListingController::class, 'update'])->middleware('auth')->name('account.listings.update');
+Route::delete('/account/listings/{listing}', [AccountListingController::class, 'destroy'])->middleware('auth')->name('account.listings.destroy');
 Route::get('/account/wallet', [AccountWalletController::class, 'index'])->middleware(['auth', 'role:staff'])->name('account.wallet.index');
 Route::post('/account/wallet/payout-requests', [AccountWalletController::class, 'requestPayout'])->middleware(['auth', 'role:staff'])->name('account.wallet.payout-requests.store');
 Route::delete('/account/wallet/payout-requests/{payoutRequest}', [AccountWalletController::class, 'cancelPayout'])->middleware(['auth', 'role:staff'])->name('account.wallet.payout-requests.cancel');
@@ -133,17 +134,20 @@ Route::get('/account/listings/{listing}/ad-campaigns/create', [AccountAdCampaign
 Route::post('/account/listings/{listing}/ad-campaigns', [AccountAdCampaignController::class, 'store'])->middleware('auth')->name('account.listings.ad-campaigns.store');
 Route::get('/account/listings/{listing}/ad-campaigns/{adCampaign}/edit', [AccountAdCampaignController::class, 'edit'])->middleware('auth')->name('account.listings.ad-campaigns.edit');
 Route::put('/account/listings/{listing}/ad-campaigns/{adCampaign}', [AccountAdCampaignController::class, 'update'])->middleware('auth')->name('account.listings.ad-campaigns.update');
+Route::delete('/account/listings/{listing}/ad-campaigns/{adCampaign}', [AccountAdCampaignController::class, 'destroy'])->middleware('auth')->name('account.listings.ad-campaigns.destroy');
 Route::get('/account/listings/{listing}/push-campaigns', [AccountPushCampaignController::class, 'index'])->middleware('auth')->name('account.listings.push-campaigns.index');
 Route::get('/account/listings/{listing}/push-campaigns/create', [AccountPushCampaignController::class, 'create'])->middleware('auth')->name('account.listings.push-campaigns.create');
 Route::post('/account/listings/{listing}/push-campaigns', [AccountPushCampaignController::class, 'store'])->middleware('auth')->name('account.listings.push-campaigns.store');
 Route::get('/account/listings/{listing}/push-campaigns/{pushCampaign}/edit', [AccountPushCampaignController::class, 'edit'])->middleware('auth')->name('account.listings.push-campaigns.edit');
 Route::put('/account/listings/{listing}/push-campaigns/{pushCampaign}', [AccountPushCampaignController::class, 'update'])->middleware('auth')->name('account.listings.push-campaigns.update');
 Route::post('/account/listings/{listing}/push-campaigns/{pushCampaign}/dispatch', [AccountPushCampaignController::class, 'dispatch'])->middleware('auth')->name('account.listings.push-campaigns.dispatch');
+Route::delete('/account/listings/{listing}/push-campaigns/{pushCampaign}', [AccountPushCampaignController::class, 'destroy'])->middleware('auth')->name('account.listings.push-campaigns.destroy');
 Route::get('/account/listings/{listing}/events', [AccountEventController::class, 'index'])->middleware('auth')->name('account.listings.events.index');
 Route::get('/account/listings/{listing}/events/create', [AccountEventController::class, 'create'])->middleware('auth')->name('account.listings.events.create');
 Route::post('/account/listings/{listing}/events', [AccountEventController::class, 'store'])->middleware('auth')->name('account.listings.events.store');
 Route::get('/account/listings/{listing}/events/{event}/edit', [AccountEventController::class, 'edit'])->middleware('auth')->name('account.listings.events.edit');
 Route::put('/account/listings/{listing}/events/{event}', [AccountEventController::class, 'update'])->middleware('auth')->name('account.listings.events.update');
+Route::delete('/account/listings/{listing}/events/{event}', [AccountEventController::class, 'destroy'])->middleware('auth')->name('account.listings.events.destroy');
 Route::post('/account/listings/{listing}/reviews/{review}/response', [AccountListingController::class, 'respondToReview'])->middleware('auth')->name('account.listings.reviews.respond');
 Route::post('/account/listings/{listing}/photos', [AccountListingController::class, 'storePhoto'])->middleware('auth')->name('account.listings.photos.store');
 Route::post('/account/listings/{listing}/photos/{photo}/primary', [AccountListingController::class, 'makePrimaryPhoto'])->middleware('auth')->name('account.listings.photos.primary');

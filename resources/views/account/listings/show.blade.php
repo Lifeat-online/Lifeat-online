@@ -12,6 +12,11 @@
             <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
                 <a class="button-link" href="{{ route('account.listings.index') }}">Back to listings</a>
                 <a class="button-link" href="{{ route('account.listings.edit', $listing) }}">Edit profile</a>
+                <form method="post" action="{{ route('account.listings.destroy', $listing) }}" onsubmit="return confirm('Remove this listing? This cannot be undone.')">
+                    @csrf
+                    @method('DELETE')
+                    <button class="button-link" type="submit">Delete listing</button>
+                </form>
                 @if ($listing->activeSubscription)
                     <a class="button" href="{{ route('checkout.subscriptions.renew', $listing->activeSubscription) }}">Renew subscription</a>
                 @else

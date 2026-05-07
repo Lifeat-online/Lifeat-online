@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AdCampaign;
+use App\Models\Event;
 use App\Models\Listing;
 use App\Models\PushCampaign;
 use App\Models\User;
@@ -126,5 +127,72 @@ class AdvertisingDashboardsTest extends TestCase
             ->getJson(route('api.staff.advertising.summary', $listing))
             ->assertForbidden();
     }
-}
 
+    public function test_staff_can_open_assigned_listing_workspace_and_manage_resources(): void
+    {
+        $staff = User::factory()->create(['role' => 'sales_staff']);
+        $otherStaff = User::factory()->create(['role' => 'sales_staff']);
+        $owner = User::factory()->create();
+
+        $listing = Listing::factory()->create([
+            'user_id' => $owner->id,
+            'registered_by_user_id' => $staff->id,
+            'status' => 'published',
+        ]);
+
+        $event = Event::create([
+            'listing_id' => $listing->id,
+            'user_id' => $owner->id,
+            'title' => 'Test Event',
+            'slug' => 'test-event-'.Str::lower(Str::random(6)),
+            'start_at' => now()->addDay(),
+            'status' => 'draft',
+        ]);
+
+        $ad = AdCampaign::create([
+            'listing_id' => $listing->id,
+            'user_id' => $owner->id,
+            'title' => 'Test Ad',
+            'slug' => 'test-ad-'.Str::lower(Str::random(6)),
+            'status' => 'draft',
+            'placement' => 'banner',
+            'budget_currency' => 'ZAR',
+        ]);
+
+        $push = PushCampaign::create([
+            'listing_id' => $listing->id,
+            'user_id' => $owner->id,
+            'title' => 'Test Push',
+            'slug' => 'test-push-'.Str::lower(Str::random(6)),
+            'message' => 'Hello',
+            'status' => 'draft',
+            'budget_currency' => 'ZAR',
+        ]);
+
+        $this->actingAs($staff)
+            ->get(route('account.listings.show', $listing))
+            ->assertOk();
+
+        $this->actingAs($otherStaff)
+            ->get(route('account.listings.show', $listing))
+            ->assertForbidden();
+
+        $this->actingAs($staff)
+            ->delete(route('account.listings.events.destroy', [$listing, $event]))
+            ->assertRedirect(route('account.listings.events.index', $listing));
+
+        $this->assertDatabaseMissing('events', ['id' => $event->id]);
+
+        $this->actingAs($staff)
+            ->delete(route('account.listings.ad-campaigns.destroy', [$listing, $ad]))
+            ->assertRedirect(route('account.listings.ad-campaigns.index', $listing));
+
+        $this->assertDatabaseMissing('ad_campaigns', ['id' => $ad->id]);
+
+        $this->actingAs($staff)
+            ->delete(route('account.listings.push-campaigns.destroy', [$listing, $push]))
+            ->assertRedirect(route('account.listings.push-campaigns.index', $listing));
+
+        $this->assertDatabaseMissing('push_campaigns', ['id' => $push->id]);
+    }
+}

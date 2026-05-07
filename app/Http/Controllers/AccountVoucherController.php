@@ -14,7 +14,7 @@ class AccountVoucherController extends Controller
 {
     public function index(Request $request, Listing $listing): View
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
 
         $status = trim((string) $request->string('status'));
 
@@ -35,7 +35,7 @@ class AccountVoucherController extends Controller
 
     public function create(Request $request, Listing $listing): View
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
 
         return view('account.vouchers.manage.form', [
             'listing' => $listing,
@@ -56,7 +56,7 @@ class AccountVoucherController extends Controller
 
     public function store(Request $request, Listing $listing): RedirectResponse
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
 
         $data = $this->validated($request);
         $data['listing_id'] = $listing->id;
@@ -74,7 +74,7 @@ class AccountVoucherController extends Controller
 
     public function edit(Request $request, Listing $listing, Voucher $voucher): View
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
         abort_unless($voucher->listing_id === $listing->id, 404);
 
         $voucher->load('categories');
@@ -92,7 +92,7 @@ class AccountVoucherController extends Controller
 
     public function update(Request $request, Listing $listing, Voucher $voucher): RedirectResponse
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
         abort_unless($voucher->listing_id === $listing->id, 404);
 
         $data = $this->validated($request);
@@ -109,7 +109,7 @@ class AccountVoucherController extends Controller
 
     public function destroy(Request $request, Listing $listing, Voucher $voucher): RedirectResponse
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
         abort_unless($voucher->listing_id === $listing->id, 404);
 
         $voucher->delete();
@@ -121,7 +121,7 @@ class AccountVoucherController extends Controller
 
     public function dashboard(Request $request, Listing $listing): View
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
 
         $voucherIds = Voucher::query()->where('listing_id', $listing->id)->pluck('id');
 
@@ -192,5 +192,12 @@ class AccountVoucherController extends Controller
 
         return $data;
     }
-}
 
+    private function canAccessListing(Request $request, Listing $listing): bool
+    {
+        $user = $request->user();
+
+        return $listing->user_id === $user->id
+            || ($user->hasRole('staff') && $listing->registered_by_user_id === $user->id);
+    }
+}

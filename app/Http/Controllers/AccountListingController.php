@@ -19,9 +19,17 @@ class AccountListingController extends Controller
     {
         $status = $request->string('status')->toString();
 
+        $user = $request->user();
+
         return view('account.listings.index', [
             'listings' => Listing::with(['activeSubscription.package', 'subscriptions.package'])
-                ->where('user_id', $request->user()->id)
+                ->where(function ($query) use ($user) {
+                    $query->where('user_id', $user->id);
+
+                    if ($user->hasRole('staff')) {
+                        $query->orWhere('registered_by_user_id', $user->id);
+                    }
+                })
                 ->when($status !== '', fn ($query) => $query->where('status', $status))
                 ->latest()
                 ->paginate(15)
@@ -32,7 +40,7 @@ class AccountListingController extends Controller
 
     public function show(Request $request, Listing $listing): View
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
 
         $listing->load([
             'categories',
@@ -65,7 +73,7 @@ class AccountListingController extends Controller
 
     public function edit(Request $request, Listing $listing): View
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
         $listing->load('categories');
 
         return view('account.listings.form', [
@@ -77,7 +85,7 @@ class AccountListingController extends Controller
 
     public function update(Request $request, Listing $listing): RedirectResponse
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
 
         $data = $this->validated($request);
         $data = $this->handleUploads($request, $data, $listing);
@@ -92,7 +100,7 @@ class AccountListingController extends Controller
 
     public function respondToReview(Request $request, Listing $listing, Review $review): RedirectResponse
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
         abort_unless($review->listing_id === $listing->id, 404);
         abort_unless($review->status === 'approved', 403);
 
@@ -113,7 +121,7 @@ class AccountListingController extends Controller
 
     public function storePhoto(Request $request, Listing $listing): RedirectResponse
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
 
         $data = $request->validate([
             'photo_upload' => ['required', 'image', 'max:5120'],
@@ -133,7 +141,7 @@ class AccountListingController extends Controller
 
     public function destroyPhoto(Request $request, Listing $listing, ListingPhoto $photo): RedirectResponse
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
         abort_unless($photo->listing_id === $listing->id, 404);
 
         $this->deleteFile($photo->image_path);
@@ -146,7 +154,7 @@ class AccountListingController extends Controller
 
     public function makePrimaryPhoto(Request $request, Listing $listing, ListingPhoto $photo): RedirectResponse
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        abort_unless($this->canAccessListing($request, $listing), 403);
         abort_unless($photo->listing_id === $listing->id, 404);
 
         $listing->photos()->increment('sort_order');
@@ -213,5 +221,26 @@ class AccountListingController extends Controller
         if ($path) {
             Storage::disk('public')->delete($path);
         }
+    }
+
+    public function destroy(Request $request, Listing $listing): RedirectResponse
+    {
+        abort_unless($this->canAccessListing($request, $listing), 403);
+
+        $this->deleteFile($listing->featured_image);
+        $this->deleteFile($listing->logo_path);
+        $listing->delete();
+
+        return redirect()
+            ->route('account.listings.index')
+            ->with('status', 'Listing removed.');
+    }
+
+    private function canAccessListing(Request $request, Listing $listing): bool
+    {
+        $user = $request->user();
+
+        return $listing->user_id === $user->id
+            || ($user->hasRole('staff') && $listing->registered_by_user_id === $user->id);
     }
 }
