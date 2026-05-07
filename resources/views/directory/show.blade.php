@@ -281,6 +281,35 @@
                     </article>
                 @endif
 
+                @if ($listing->vouchers->isNotEmpty())
+                    <article class="card">
+                        <div class="section-head">
+                            <div>
+                                <h2>Vouchers</h2>
+                                <p class="section-subtitle">Limited-time offers available from this business.</p>
+                            </div>
+                            <a href="{{ route('vouchers.index', ['listing' => $listing->slug]) }}">View all</a>
+                        </div>
+                        <div class="grid" style="margin-top:0.9rem;">
+                            @foreach ($listing->vouchers as $voucher)
+                                <div class="event-item" style="display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap; align-items:center;">
+                                    <div>
+                                        <strong><a href="{{ route('vouchers.show', [$listing, $voucher]) }}">{{ $voucher->title }}</a></strong>
+                                        <div class="detail-meta">
+                                            <span>{{ $voucher->formattedValue() ?: 'Offer' }}</span>
+                                            @if ($voucher->end_at)
+                                                <span>Ends {{ $voucher->end_at->format('j M Y') }}</span>
+                                            @endif
+                                            <span>{{ $voucher->remainingUses() }} left</span>
+                                        </div>
+                                    </div>
+                                    <a class="chip-link" href="{{ route('vouchers.show', [$listing, $voucher]) }}">View</a>
+                                </div>
+                            @endforeach
+                        </div>
+                    </article>
+                @endif
+
                 <article class="card">
                     <div class="section-head">
                         <div>

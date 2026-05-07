@@ -152,6 +152,7 @@ class DirectoryController extends Controller
             'categories',
             'owner',
             'photos',
+            'vouchers' => fn ($query) => $query->active()->with('categories')->orderByDesc('published_at')->orderByDesc('id')->limit(6),
             'events' => fn ($query) => $query->published()->orderBy('start_at')->limit(3),
             'reviews' => fn ($query) => $query->where('status', 'approved')->latest(),
             'reviews.author',

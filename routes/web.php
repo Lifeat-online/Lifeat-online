@@ -38,6 +38,11 @@ use App\Http\Controllers\EventController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LegalController;
 use App\Http\Controllers\SearchController;
+use App\Http\Controllers\VoucherController;
+use App\Http\Controllers\VoucherRedemptionController;
+use App\Http\Controllers\AccountVoucherController;
+use App\Http\Controllers\AccountVoucherRedemptionController;
+use App\Http\Controllers\StaffVoucherRedemptionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\WriterApplicationController;
 use Illuminate\Support\Facades\Route;
@@ -56,6 +61,11 @@ Route::get('/articles/{article:slug}', [ArticleController::class, 'show'])->name
 Route::get('/search', [SearchController::class, 'index'])->name('search.index');
 Route::get('/classifieds', [ClassifiedController::class, 'index'])->name('classifieds.index');
 Route::get('/classifieds/{classified:slug}', [ClassifiedController::class, 'show'])->name('classifieds.show');
+Route::get('/vouchers', [VoucherController::class, 'index'])->name('vouchers.index');
+Route::scopeBindings()->group(function () {
+    Route::get('/vouchers/{listing:slug}/{voucher:slug}', [VoucherController::class, 'show'])->name('vouchers.show');
+    Route::post('/vouchers/{listing:slug}/{voucher:slug}/redeem', [VoucherRedemptionController::class, 'store'])->middleware('auth')->name('vouchers.redeem');
+});
 Route::get('/advertise', [AdvertiseController::class, 'index'])->name('advertise.index');
 Route::get('/add-listing', [AddListingController::class, 'index'])->name('add-listing.index');
 Route::post('/add-listing/start', [AddListingController::class, 'start'])->middleware('auth')->name('add-listing.start');
@@ -102,6 +112,7 @@ Route::post('/account/listings/{listing}/photos', [AccountListingController::cla
 Route::post('/account/listings/{listing}/photos/{photo}/primary', [AccountListingController::class, 'makePrimaryPhoto'])->middleware('auth')->name('account.listings.photos.primary');
 Route::delete('/account/listings/{listing}/photos/{photo}', [AccountListingController::class, 'destroyPhoto'])->middleware('auth')->name('account.listings.photos.destroy');
 Route::get('/account/submissions', [AccountSubmissionController::class, 'index'])->middleware('auth')->name('account.submissions.index');
+Route::get('/account/vouchers', [AccountVoucherRedemptionController::class, 'index'])->middleware('auth')->name('account.vouchers.index');
 Route::get('/basket', [CheckoutController::class, 'basket'])->name('basket.index');
 Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');
 Route::get('/checkout/subscriptions/{subscription}/renew', [CheckoutController::class, 'renewSubscription'])->middleware('auth')->name('checkout.subscriptions.renew');
@@ -127,8 +138,23 @@ Route::middleware('auth')->group(function () {
     Route::put('/my-classifieds/{classified}', [ClassifiedSubmissionController::class, 'update'])->name('classifieds.manage.update');
 });
 
+Route::middleware('auth')->scopeBindings()->group(function () {
+    Route::get('/account/listings/{listing}/vouchers', [AccountVoucherController::class, 'index'])->name('account.listings.vouchers.index');
+    Route::get('/account/listings/{listing}/vouchers/dashboard', [AccountVoucherController::class, 'dashboard'])->name('account.listings.vouchers.dashboard');
+    Route::get('/account/listings/{listing}/vouchers/create', [AccountVoucherController::class, 'create'])->name('account.listings.vouchers.create');
+    Route::post('/account/listings/{listing}/vouchers', [AccountVoucherController::class, 'store'])->name('account.listings.vouchers.store');
+    Route::get('/account/listings/{listing}/vouchers/{voucher}/edit', [AccountVoucherController::class, 'edit'])->name('account.listings.vouchers.edit');
+    Route::put('/account/listings/{listing}/vouchers/{voucher}', [AccountVoucherController::class, 'update'])->name('account.listings.vouchers.update');
+    Route::delete('/account/listings/{listing}/vouchers/{voucher}', [AccountVoucherController::class, 'destroy'])->name('account.listings.vouchers.destroy');
+});
+
 Route::middleware(['auth', 'role:admin,editor,staff,writer'])->group(function () {
     Route::get('/staff/dashboard', \App\Http\Controllers\StaffDashboardController::class)->name('staff.dashboard');
+});
+
+Route::middleware('auth')->group(function () {
+    Route::get('/staff/vouchers/redeem', [StaffVoucherRedemptionController::class, 'show'])->name('staff.vouchers.redeem');
+    Route::post('/staff/vouchers/consume', [StaffVoucherRedemptionController::class, 'consume'])->name('staff.vouchers.consume');
 });
 
 Route::middleware(['auth', 'role:writer'])->prefix('writer')->name('writer.')->group(function () {

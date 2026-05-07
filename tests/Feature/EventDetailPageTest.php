@@ -88,9 +88,9 @@ class EventDetailPageTest extends TestCase
         $response->assertOk();
         $response->assertSee('Blue Crane Winter Market');
         $response->assertSee('About This Event');
-        $response->assertSee('Venue and Attendance');
+        $response->assertSee('Venue and Schedule');
         $response->assertSee('Event Details');
         $response->assertSee('Related Events');
-        $response->assertSee('Promote an event');
+        $response->assertSee('Promote your event');
     }
 }

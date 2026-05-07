@@ -5,10 +5,14 @@ namespace App\Services;
 use App\Mail\InvoiceIssuedMail;
 use App\Mail\RenewalPaymentReminderMail;
 use App\Mail\SubscriptionExpiryReminderMail;
+use App\Mail\VoucherRedeemedMail;
+use App\Mail\VoucherUsageThresholdReachedMail;
 use App\Models\Invoice;
 use App\Models\NotificationLog;
 use App\Models\Order;
 use App\Models\Subscription;
+use App\Models\Voucher;
+use App\Models\VoucherRedemption;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
@@ -30,6 +34,8 @@ class NotificationDispatchService
             'invoice_issued' => $this->sendInvoiceIssued($notification->notifiable, true),
             'subscription_expiry_reminder' => $this->sendSubscriptionExpiryReminder($notification->notifiable, true),
             'renewal_payment_reminder' => $this->sendRenewalPaymentReminder($notification->notifiable, true),
+            'voucher_redeemed' => $this->sendVoucherRedeemed($notification->notifiable, true),
+            'voucher_usage_threshold_reached' => $this->sendVoucherUsageThresholdReached($notification->notifiable, (int) ($notification->meta_json['threshold'] ?? 0), true),
             default => throw new RuntimeException('Notification type cannot be resent.'),
         };
     }
@@ -40,6 +46,8 @@ class NotificationDispatchService
             'invoice_issued',
             'subscription_expiry_reminder',
             'renewal_payment_reminder',
+            'voucher_redeemed',
+            'voucher_usage_threshold_reached',
         ], true);
     }
 
@@ -120,6 +128,46 @@ class NotificationDispatchService
             $order->user->email,
             fn () => Mail::to($order->user->email)->send(new RenewalPaymentReminderMail($order)),
             ['order_number' => $order->order_number, 'resent' => $resent]
+        );
+    }
+
+    public function sendVoucherRedeemed(?VoucherRedemption $redemption, bool $resent = false): NotificationLog
+    {
+        if (! $redemption?->customer?->email) {
+            throw new RuntimeException('Voucher customer email is missing.');
+        }
+
+        return $this->dispatch(
+            'voucher_redeemed',
+            $redemption,
+            $redemption->customer->email,
+            fn () => Mail::to($redemption->customer->email)->send(new VoucherRedeemedMail($redemption)),
+            [
+                'voucher_id' => $redemption->voucher_id,
+                'listing_id' => $redemption->voucher?->listing_id,
+                'code' => $redemption->code,
+                'resent' => $resent,
+            ]
+        );
+    }
+
+    public function sendVoucherUsageThresholdReached(?Voucher $voucher, int $thresholdPercent, bool $resent = false): NotificationLog
+    {
+        if (! $voucher?->listing?->owner?->email) {
+            throw new RuntimeException('Voucher business email is missing.');
+        }
+
+        return $this->dispatch(
+            'voucher_usage_threshold_reached',
+            $voucher,
+            $voucher->listing->owner->email,
+            fn () => Mail::to($voucher->listing->owner->email)->send(new VoucherUsageThresholdReachedMail($voucher, $thresholdPercent)),
+            [
+                'voucher_id' => $voucher->id,
+                'listing_id' => $voucher->listing_id,
+                'threshold' => $thresholdPercent,
+                'resent' => $resent,
+            ]
         );
     }
 

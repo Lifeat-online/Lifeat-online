@@ -120,6 +120,16 @@
             </article>
 
             <article class="card">
+                <h3>Vouchers</h3>
+                <p class="muted">Create and manage promotional vouchers customers can redeem from your directory profile.</p>
+                <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:0.75rem;">
+                    <a class="button" href="{{ route('account.listings.vouchers.create', $listing) }}">Create voucher</a>
+                    <a class="button-link" href="{{ route('account.listings.vouchers.index', $listing) }}">Manage vouchers</a>
+                    <a class="button-link" href="{{ route('account.listings.vouchers.dashboard', $listing) }}">Usage dashboard</a>
+                </div>
+            </article>
+
+            <article class="card">
                 <h3>Photo Gallery</h3>
                 <form method="post" action="{{ route('account.listings.photos.store', $listing) }}" enctype="multipart/form-data" style="margin-top:1rem;">
                     @csrf

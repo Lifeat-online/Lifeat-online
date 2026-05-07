@@ -242,6 +242,7 @@
             <nav class="nav">
                 <a href="{{ route('home') }}" class="{{ request()->routeIs('home') ? 'active' : '' }}">Home</a>
                 <a href="{{ route('directory.index') }}" class="{{ request()->routeIs('directory.*') ? 'active' : '' }}">Directory</a>
+                <a href="{{ route('vouchers.index') }}" class="{{ request()->routeIs('vouchers.*') ? 'active' : '' }}">Vouchers</a>
                 <a href="{{ route('events.index') }}" class="{{ request()->routeIs('events.*') ? 'active' : '' }}">Events</a>
                 <a href="{{ route('articles.index') }}" class="{{ request()->routeIs('articles.*') ? 'active' : '' }}">Articles</a>
                 <a href="{{ route('classifieds.index') }}" class="{{ request()->routeIs('classifieds.*') ? 'active' : '' }}">Classifieds</a>
@@ -285,6 +286,7 @@
                 <strong>Explore</strong>
                 <p><a href="{{ route('articles.index') }}">Latest Articles</a></p>
                 <p><a href="{{ route('directory.index') }}">Business Directory</a></p>
+                <p><a href="{{ route('vouchers.index') }}">Vouchers</a></p>
                 <p><a href="{{ route('events.index') }}">Upcoming Events</a></p>
             </div>
             <div>

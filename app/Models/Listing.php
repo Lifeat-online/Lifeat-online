@@ -92,6 +92,11 @@ class Listing extends Model
         return $this->hasMany(ListingPhoto::class)->orderBy('sort_order')->orderBy('id');
     }
 
+    public function vouchers(): HasMany
+    {
+        return $this->hasMany(Voucher::class);
+    }
+
     public function orderItems(): MorphMany
     {
         return $this->morphMany(OrderItem::class, 'purchasable');
