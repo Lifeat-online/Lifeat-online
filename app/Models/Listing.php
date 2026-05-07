@@ -17,6 +17,7 @@ class Listing extends Model
 
     protected $fillable = [
         'user_id',
+        'registered_by_user_id',
         'source_channel',
         'title',
         'slug',
@@ -62,6 +63,11 @@ class Listing extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
+    public function registeredBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'registered_by_user_id');
+    }
+
     public function categories(): BelongsToMany
     {
         return $this->belongsToMany(Category::class, 'listing_category');
@@ -95,6 +101,11 @@ class Listing extends Model
     public function vouchers(): HasMany
     {
         return $this->hasMany(Voucher::class);
+    }
+
+    public function marketingIntegrations(): HasMany
+    {
+        return $this->hasMany(MarketingIntegration::class);
     }
 
     public function orderItems(): MorphMany

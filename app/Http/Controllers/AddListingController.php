@@ -45,6 +45,7 @@ class AddListingController extends Controller
 
         $listing = Listing::create([
             'user_id' => $request->user()->id,
+            'registered_by_user_id' => $request->user()->hasRole('staff') ? $request->user()->id : null,
             'source_channel' => $package->is_self_service ? 'self_service' : 'staff_assisted',
             'title' => $validated['title'],
             'slug' => $this->uniqueListingSlug($validated['title']),

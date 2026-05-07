@@ -20,6 +20,7 @@ class ListingFactory extends Factory
 
         return [
             'user_id' => User::factory(),
+            'registered_by_user_id' => null,
             'source_channel' => 'self_service',
             'title' => $title,
             'slug' => Str::slug($title).'-'.Str::lower(Str::random(6)),
@@ -38,4 +39,3 @@ class ListingFactory extends Factory
         ];
     }
 }
-

@@ -37,6 +37,7 @@ class ListingController extends Controller
     {
         $data = $this->validated($request);
         $data['user_id'] = $request->user()->id;
+        $data['registered_by_user_id'] = $request->user()->hasRole('staff') ? $request->user()->id : null;
         $data['published_at'] = $this->publishedAt($data['status'], $data['published_at'] ?? null);
         $data['is_featured'] = $request->boolean('is_featured');
         $data = $this->handleUploads($request, $data);

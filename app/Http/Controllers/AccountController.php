@@ -75,6 +75,7 @@ class AccountController extends Controller
                 ['label' => 'Open dashboard', 'description' => 'Go to your authenticated home area.', 'route' => 'dashboard', 'visible' => true],
                 ['label' => 'Start listing', 'description' => 'Create a new business listing starter.', 'route' => 'add-listing.index', 'visible' => true],
                 ['label' => 'My listings', 'description' => 'Track business listing status, package progress, and renewals.', 'route' => 'account.listings.index', 'visible' => true],
+                ['label' => 'Advertising dashboard', 'description' => 'Manage ads, push campaigns, and marketing integrations.', 'route' => 'account.advertising.index', 'visible' => true],
                 ['label' => 'Browse packages', 'description' => 'Review package and checkout options.', 'route' => 'checkout.index', 'visible' => true],
                 ['label' => 'My invoices', 'description' => 'Review invoice history tied to your orders.', 'route' => 'account.invoices.index', 'visible' => true],
                 ['label' => 'Submission history', 'description' => 'Track statuses and feedback across listings, classifieds, and articles.', 'route' => 'account.submissions.index', 'visible' => true],

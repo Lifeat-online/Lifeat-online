@@ -47,10 +47,14 @@ use App\Http\Controllers\AccountVoucherRedemptionController;
 use App\Http\Controllers\StaffVoucherRedemptionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\WriterApplicationController;
+use App\Http\Controllers\AccountAdvertisingDashboardController;
+use App\Http\Controllers\StaffAdvertisingDashboardController;
 use App\Http\Controllers\CivicFaultMapController;
 use App\Http\Controllers\CivicFaultDataController;
 use App\Http\Controllers\CivicFaultReportController;
 use App\Http\Controllers\Councillor\CivicFaultReportController as CouncillorCivicFaultReportController;
+use App\Http\Controllers\Api\ClientAdvertisingApiController;
+use App\Http\Controllers\Api\StaffAdvertisingApiController;
 use App\Http\Controllers\Auth\AdminBootstrapController;
 use Illuminate\Support\Facades\Route;
 
@@ -87,6 +91,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/faults/report', [CivicFaultReportController::class, 'store'])->name('faults.report.store');
 });
 
+Route::middleware('auth')->prefix('api')->name('api.')->group(function () {
+    Route::prefix('client/advertising')->name('client.advertising.')->group(function () {
+        Route::get('/listings', [ClientAdvertisingApiController::class, 'listings'])->name('listings');
+        Route::get('/listings/{listing}', [ClientAdvertisingApiController::class, 'summary'])->name('summary');
+        Route::put('/listings/{listing}/integrations/{type}', [ClientAdvertisingApiController::class, 'updateIntegration'])->name('integrations.update');
+    });
+
+    Route::middleware('role:staff')->prefix('staff/advertising')->name('staff.advertising.')->group(function () {
+        Route::get('/businesses', [StaffAdvertisingApiController::class, 'businesses'])->name('businesses');
+        Route::get('/businesses/{listing}', [StaffAdvertisingApiController::class, 'summary'])->name('summary');
+        Route::put('/ad-campaigns/{adCampaign}', [StaffAdvertisingApiController::class, 'updateAdCampaign'])->name('ad-campaigns.update');
+        Route::put('/push-campaigns/{pushCampaign}', [StaffAdvertisingApiController::class, 'updatePushCampaign'])->name('push-campaigns.update');
+        Route::put('/businesses/{listing}/integrations/{type}', [StaffAdvertisingApiController::class, 'updateIntegration'])->name('integrations.update');
+    });
+});
+
 // Ad & push tracking — public, no auth, no session
 Route::get('/ads/{adCampaign}/i', [AdTrackingController::class, 'impression'])->name('ad-tracking.impression');
 Route::get('/ads/{adCampaign}/click', [AdTrackingController::class, 'click'])->name('ad-tracking.click');
@@ -98,6 +118,7 @@ Route::get('/staff-signup', [WriterApplicationController::class, 'create'])->nam
 Route::post('/staff-signup', [WriterApplicationController::class, 'store'])->name('staff-signup.store');
 Route::get('/staff-signup/submitted', [WriterApplicationController::class, 'submitted'])->name('staff-signup.submitted');
 Route::get('/account', [AccountController::class, 'index'])->middleware('auth')->name('account.index');
+Route::get('/account/advertising', [AccountAdvertisingDashboardController::class, 'index'])->middleware('auth')->name('account.advertising.index');
 Route::get('/account/invoices', [AccountInvoiceController::class, 'index'])->middleware('auth')->name('account.invoices.index');
 Route::get('/account/invoices/{invoice}', [AccountInvoiceController::class, 'show'])->middleware('auth')->name('account.invoices.show');
 Route::get('/account/listings', [AccountListingController::class, 'index'])->middleware('auth')->name('account.listings.index');
@@ -166,6 +187,10 @@ Route::middleware('auth')->scopeBindings()->group(function () {
 
 Route::middleware(['auth', 'role:admin,editor,staff,writer'])->group(function () {
     Route::get('/staff/dashboard', \App\Http\Controllers\StaffDashboardController::class)->name('staff.dashboard');
+});
+
+Route::middleware(['auth', 'role:staff'])->group(function () {
+    Route::get('/staff/advertising', [StaffAdvertisingDashboardController::class, 'index'])->name('staff.advertising.index');
 });
 
 Route::middleware('auth')->group(function () {

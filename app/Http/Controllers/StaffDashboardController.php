@@ -18,7 +18,7 @@ class StaffDashboardController extends Controller
 
         return view('staff.dashboard', [
             'counts' => [
-                'listings' => Listing::where('user_id', $user->id)->count(),
+                'listings' => Listing::where('registered_by_user_id', $user->id)->count(),
                 'events' => Event::where('user_id', $user->id)->count(),
                 'articles' => Article::where('user_id', $user->id)->count(),
             ],
@@ -28,7 +28,7 @@ class StaffDashboardController extends Controller
                 'paid' => (float) ArticleWordLedger::where('writer_user_id', $user->id)->where('status', 'paid')->sum('gross_amount'),
             ],
             'latest' => [
-                'listings' => Listing::where('user_id', $user->id)->latest()->limit(5)->get(),
+                'listings' => Listing::where('registered_by_user_id', $user->id)->latest()->limit(5)->get(),
                 'events' => Event::where('user_id', $user->id)->latest()->limit(5)->get(),
                 'articles' => Article::where('user_id', $user->id)->latest()->limit(5)->get(),
             ]

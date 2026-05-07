@@ -21,6 +21,8 @@ class PushCampaign extends Model
         'slug',
         'headline',
         'message',
+        'budget_amount',
+        'budget_currency',
         'schedule_at',
         'audience_scope',
         'target_city',
@@ -41,6 +43,7 @@ class PushCampaign extends Model
             'published_at'      => 'datetime',
             'sent_at'           => 'datetime',
             'package_expires_at' => 'datetime',
+            'budget_amount' => 'decimal:2',
             'open_count'        => 'integer',
         ];
     }
