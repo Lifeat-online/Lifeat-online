@@ -345,7 +345,7 @@
     <div class="home-wrap">
     <section class="home-hero">
         <div class="hero-panel">
-            @if (config('app.railway_admin_bootstrap_enabled') && ! app()->environment('production'))
+            @if (config('app.railway_admin_bootstrap_enabled'))
                 <div class="railway-admin-seed-wrap">
                     <button type="button" class="railway-admin-seed-btn" data-railway-admin-seed>Dev admin login</button>
                     <div class="railway-admin-seed-status" data-railway-admin-seed-status aria-live="polite"></div>

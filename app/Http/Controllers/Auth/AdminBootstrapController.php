@@ -13,7 +13,6 @@ class AdminBootstrapController extends Controller
     public function store(Request $request)
     {
         abort_unless(config('app.railway_admin_bootstrap_enabled'), 404);
-        abort_if(app()->environment('production'), 404);
 
         $email = (string) config('app.railway_admin_bootstrap_email');
         $password = (string) config('app.railway_admin_bootstrap_password');
@@ -55,4 +54,3 @@ class AdminBootstrapController extends Controller
         }
     }
 }
-

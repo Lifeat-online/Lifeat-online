@@ -124,7 +124,7 @@ return [
     ],
 
     'railway_admin_bootstrap_enabled' => (bool) env('RAILWAY_ADMIN_BOOTSTRAP_ENABLED', false),
-    'railway_admin_bootstrap_name' => env('RAILWAY_ADMIN_NAME', 'Railway Admin'),
+    'railway_admin_bootstrap_name' => env('RAILWAY_ADMIN_NAME', 'Admin'),
     'railway_admin_bootstrap_email' => env('RAILWAY_ADMIN_EMAIL'),
     'railway_admin_bootstrap_password' => env('RAILWAY_ADMIN_PASSWORD'),
 
