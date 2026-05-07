@@ -12,6 +12,9 @@ class HomeController extends Controller
 {
     public function __invoke(): View
     {
+        $railwayAdminBootstrapEnabled = filter_var(env('RAILWAY_ADMIN_BOOTSTRAP_ENABLED', false), FILTER_VALIDATE_BOOL);
+        $railwayAdminBootstrapVisible = $railwayAdminBootstrapEnabled || (bool) config('app.debug');
+
         $latestArticles = Article::with(['author', 'categories'])
             ->published()
             ->latest('published_at')
@@ -40,6 +43,8 @@ class HomeController extends Controller
             'articleCount' => Article::published()->count(),
             'featuredListings' => $featuredListings,
             'upcomingEvents' => $upcomingEvents,
+            'railwayAdminBootstrapEnabled' => $railwayAdminBootstrapEnabled,
+            'railwayAdminBootstrapVisible' => $railwayAdminBootstrapVisible,
             'featuredCategories' => Category::query()
                 ->where('type', 'listing')
                 ->withCount([

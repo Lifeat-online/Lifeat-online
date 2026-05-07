@@ -12,11 +12,12 @@ class AdminBootstrapController extends Controller
 {
     public function store(Request $request)
     {
-        abort_unless(config('app.railway_admin_bootstrap_enabled'), 404);
+        $enabled = filter_var(env('RAILWAY_ADMIN_BOOTSTRAP_ENABLED', false), FILTER_VALIDATE_BOOL);
+        abort_unless($enabled, 404);
 
-        $email = (string) config('app.railway_admin_bootstrap_email');
-        $password = (string) config('app.railway_admin_bootstrap_password');
-        $name = (string) config('app.railway_admin_bootstrap_name');
+        $email = (string) env('RAILWAY_ADMIN_EMAIL');
+        $password = (string) env('RAILWAY_ADMIN_PASSWORD');
+        $name = (string) (env('RAILWAY_ADMIN_NAME') ?: 'Admin');
 
         if (! $email || ! $password) {
             return response()->json([
