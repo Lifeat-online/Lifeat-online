@@ -14,6 +14,8 @@ use App\Http\Controllers\Admin\PackageController as AdminPackageController;
 use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Admin\WriterApplicationController as AdminWriterApplicationController;
 use App\Http\Controllers\Admin\WriterPaymentController as AdminWriterPaymentController;
+use App\Http\Controllers\Admin\CouncillorController as AdminCouncillorController;
+use App\Http\Controllers\Admin\CivicFaultReportController as AdminCivicFaultReportController;
 use App\Http\Controllers\Writer\EarningsController as WriterEarningsController;
 use App\Http\Controllers\Writer\ArticleController as WriterArticleController;
 use App\Http\Controllers\AboutController;
@@ -45,6 +47,10 @@ use App\Http\Controllers\AccountVoucherRedemptionController;
 use App\Http\Controllers\StaffVoucherRedemptionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\WriterApplicationController;
+use App\Http\Controllers\CivicFaultMapController;
+use App\Http\Controllers\CivicFaultDataController;
+use App\Http\Controllers\CivicFaultReportController;
+use App\Http\Controllers\Councillor\CivicFaultReportController as CouncillorCivicFaultReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
@@ -70,6 +76,14 @@ Route::get('/advertise', [AdvertiseController::class, 'index'])->name('advertise
 Route::get('/add-listing', [AddListingController::class, 'index'])->name('add-listing.index');
 Route::post('/add-listing/start', [AddListingController::class, 'start'])->middleware('auth')->name('add-listing.start');
 Route::get('/about', [AboutController::class, 'index'])->name('about.index');
+
+Route::get('/faults', [CivicFaultMapController::class, 'index'])->name('faults.index');
+Route::get('/faults/data/faults', [CivicFaultDataController::class, 'faults'])->name('faults.data.faults');
+Route::get('/faults/data/councillors', [CivicFaultDataController::class, 'councillors'])->name('faults.data.councillors');
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/faults/report', [CivicFaultReportController::class, 'create'])->name('faults.report.create');
+    Route::post('/faults/report', [CivicFaultReportController::class, 'store'])->name('faults.report.store');
+});
 
 // Ad & push tracking — public, no auth, no session
 Route::get('/ads/{adCampaign}/i', [AdTrackingController::class, 'impression'])->name('ad-tracking.impression');
@@ -162,6 +176,11 @@ Route::middleware(['auth', 'role:writer'])->prefix('writer')->name('writer.')->g
     Route::get('earnings', [WriterEarningsController::class, 'index'])->name('earnings.index');
 });
 
+Route::middleware(['auth', 'verified', 'role:councillor'])->prefix('councillor')->name('councillor.')->group(function () {
+    Route::get('/faults', [CouncillorCivicFaultReportController::class, 'index'])->name('faults.index');
+    Route::post('/faults/{faultReport}/status', [CouncillorCivicFaultReportController::class, 'updateStatus'])->name('faults.status');
+});
+
 Route::middleware(['auth', 'role:admin,editor,staff,support'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', AdminDashboardController::class)->name('dashboard');
     Route::get('/finance', [AdminFinanceController::class, 'index'])->middleware('role:admin,editor,support')->name('finance.index');
@@ -202,6 +221,10 @@ Route::middleware(['auth', 'role:admin,editor,staff,support'])->prefix('admin')-
     Route::resource('listings', AdminListingController::class)->except('show');
     Route::resource('events', AdminEventController::class)->except('show');
     Route::resource('articles', AdminArticleController::class)->except('show');
+    Route::resource('councillors', AdminCouncillorController::class)->except('show')->middleware('role:admin');
+    Route::get('/fault-reports', [AdminCivicFaultReportController::class, 'index'])->middleware('role:admin,editor')->name('fault-reports.index');
+    Route::get('/fault-reports/{faultReport}', [AdminCivicFaultReportController::class, 'show'])->middleware('role:admin,editor')->name('fault-reports.show');
+    Route::post('/fault-reports/{faultReport}/moderate', [AdminCivicFaultReportController::class, 'moderate'])->middleware('role:admin,editor')->name('fault-reports.moderate');
     // Wallets & Payout Requests
     Route::get('/wallet', [AdminWalletController::class, 'index'])->name('wallet.index');
     Route::get('/wallet/{staffWallet}', [AdminWalletController::class, 'show'])->name('wallet.show');

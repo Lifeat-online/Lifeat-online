@@ -35,6 +35,13 @@
             --shadow-soft: 0 10px 30px rgba(2, 6, 23, 0.06);
             --ring: 0 0 0 4px rgba(29, 78, 216, 0.18);
         }
+        @if (request()->routeIs('faults.*'))
+        :root {
+            --primary: #005cb9;
+            --primary-dark: #00205b;
+            --ring: 0 0 0 4px rgba(0, 92, 185, 0.22);
+        }
+        @endif
         html[data-theme="dark"] {
             color-scheme: dark;
             --bg: #070f1b;
@@ -48,6 +55,12 @@
             --shadow-soft: 0 12px 38px rgba(0, 0, 0, 0.35);
             --ring: 0 0 0 4px rgba(96, 165, 250, 0.22);
         }
+        @if (request()->routeIs('faults.*'))
+        html[data-theme="dark"] {
+            --primary: #60a5fa;
+            --primary-dark: #005cb9;
+        }
+        @endif
         * { box-sizing: border-box; }
         body {
             margin: 0;
@@ -78,6 +91,10 @@
         .topbar { border-bottom: 1px solid rgba(255, 255, 255, 0.14); }
         .topbar-inner { display: flex; gap: 1rem; align-items: center; justify-content: space-between; padding: 0.75rem 0; font-size: 0.95rem; color: rgba(219, 234, 254, 0.95); }
         .topbar-copy { margin: 0; }
+        .da-brand { display: inline-flex; align-items: center; gap: 0.6rem; }
+        .da-logo { width: 38px; height: 38px; border-radius: 999px; background: #005cb9; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 14px 34px rgba(0, 92, 185, 0.25); border: 1px solid rgba(255, 255, 255, 0.18); }
+        .da-logo span { font-weight: 900; letter-spacing: -0.04em; font-size: 0.95rem; color: #fff; }
+        .da-tag { padding: 0.25rem 0.6rem; border-radius: 999px; background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.16); font-weight: 800; font-size: 0.85rem; color: rgba(219, 234, 254, 0.98); }
         .container { width: min(1120px, calc(100% - 2rem)); margin: 0 auto; }
         .nav {
             display: flex;
@@ -223,7 +240,15 @@
     <header class="site-header">
         <div class="topbar">
             <div class="container topbar-inner">
-                <p class="topbar-copy">Eastern Freestate local news, business discovery, events, and community opportunities.</p>
+                @if (request()->routeIs('faults.*'))
+                    <div class="da-brand">
+                        <div class="da-logo" aria-hidden="true"><span>DA</span></div>
+                        <p class="topbar-copy">Civic infrastructure fault reporting — potholes, burst pipes, streetlights, sidewalks, and more.</p>
+                        <span class="da-tag">Powered by DA</span>
+                    </div>
+                @else
+                    <p class="topbar-copy">Eastern Freestate local news, business discovery, events, and community opportunities.</p>
+                @endif
                 <div>{{ now()->format('D j M Y') }}</div>
             </div>
         </div>
@@ -248,6 +273,7 @@
                 <a href="{{ route('classifieds.index') }}" class="{{ request()->routeIs('classifieds.*') ? 'active' : '' }}">Classifieds</a>
                 <a href="{{ route('advertise.index') }}" class="{{ request()->routeIs('advertise.*') ? 'active' : '' }}">Advertise</a>
                 <a href="{{ route('search.index') }}" class="{{ request()->routeIs('search.*') ? 'active' : '' }}">Search</a>
+                <a href="{{ route('faults.index') }}" class="{{ request()->routeIs('faults.*') ? 'active' : '' }}">Faults</a>
                 <a href="{{ route('about.index') }}" class="{{ request()->routeIs('about.*') ? 'active' : '' }}">About</a>
                 <span class="nav-spacer"></span>
                 <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle dark and light mode" title="Toggle dark and light mode">
@@ -302,6 +328,12 @@
                 <p><a href="{{ route('about.index') }}">About Life@</a></p>
             </div>
         </div>
+        @if (request()->routeIs('faults.*'))
+            <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                <strong>Powered by DA</strong>
+                <p class="mb-0">This civic infrastructure fault reporting interface is sponsored by the Democratic Alliance (DA).</p>
+            </div>
+        @endif
     </footer>
     <script>
         (() => {

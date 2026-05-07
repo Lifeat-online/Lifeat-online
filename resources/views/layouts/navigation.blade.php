@@ -30,6 +30,21 @@
                             {{ __('Classifieds') }}
                         </x-nav-link>
                     @endif
+                    @if (Auth::user()->hasRole('admin', 'editor'))
+                        <x-nav-link :href="route('admin.fault-reports.index')" :active="request()->routeIs('admin.fault-reports.*')">
+                            {{ __('Fault Reports') }}
+                        </x-nav-link>
+                    @endif
+                    @if (Auth::user()->hasRole('admin'))
+                        <x-nav-link :href="route('admin.councillors.index')" :active="request()->routeIs('admin.councillors.*')">
+                            {{ __('Councillors') }}
+                        </x-nav-link>
+                    @endif
+                    @if (Auth::user()->hasRole('councillor'))
+                        <x-nav-link :href="route('councillor.faults.index')" :active="request()->routeIs('councillor.faults.*')">
+                            {{ __('My Faults') }}
+                        </x-nav-link>
+                    @endif
                 </div>
             </div>
 
@@ -106,6 +121,21 @@
             @if (Auth::user()->hasRole('admin', 'editor', 'staff'))
                 <x-responsive-nav-link :href="route('admin.classifieds.index')" :active="request()->routeIs('admin.classifieds.*')">
                     {{ __('Classifieds') }}
+                </x-responsive-nav-link>
+            @endif
+            @if (Auth::user()->hasRole('admin', 'editor'))
+                <x-responsive-nav-link :href="route('admin.fault-reports.index')" :active="request()->routeIs('admin.fault-reports.*')">
+                    {{ __('Fault Reports') }}
+                </x-responsive-nav-link>
+            @endif
+            @if (Auth::user()->hasRole('admin'))
+                <x-responsive-nav-link :href="route('admin.councillors.index')" :active="request()->routeIs('admin.councillors.*')">
+                    {{ __('Councillors') }}
+                </x-responsive-nav-link>
+            @endif
+            @if (Auth::user()->hasRole('councillor'))
+                <x-responsive-nav-link :href="route('councillor.faults.index')" :active="request()->routeIs('councillor.faults.*')">
+                    {{ __('My Faults') }}
                 </x-responsive-nav-link>
             @endif
         </div>
