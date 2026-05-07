@@ -25,10 +25,32 @@
             </form>
 
             <div class="rounded-lg bg-white p-6 shadow-sm">
+                @if ($errors->has('campaign'))
+                    <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{{ $errors->first('campaign') }}</div>
+                @endif
+                @if (session('status'))
+                    <div class="mb-4 rounded-md bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
+                @endif
+                <form method="post" action="{{ route('admin.campaigns.push.bulk') }}">
+                    @csrf
+                    <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <select class="rounded-md border-gray-300 text-sm" name="action" required>
+                                <option value="" selected disabled>Bulk action…</option>
+                                <option value="dispatch">Dispatch</option>
+                            </select>
+                            <button class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white" type="submit" onclick="return confirm('Dispatch the selected campaigns now?');">Run</button>
+                        </div>
+                        <label class="flex items-center gap-2 text-sm text-gray-600">
+                            <input id="select_all" type="checkbox" class="rounded border-gray-300">
+                            Select all on this page
+                        </label>
+                    </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">
                             <tr>
+                                <th class="px-4 py-3 text-left"></th>
                                 <th class="px-4 py-3 text-left">Campaign</th>
                                 <th class="px-4 py-3 text-left">Listing</th>
                                 <th class="px-4 py-3 text-left">Owner</th>
@@ -42,6 +64,7 @@
                         <tbody class="divide-y divide-gray-100">
                             @forelse ($campaigns as $campaign)
                                 <tr>
+                                    <td class="px-4 py-3"><input class="row_cb rounded border-gray-300" type="checkbox" name="ids[]" value="{{ $campaign->id }}"></td>
                                     <td class="px-4 py-3">
                                         <a class="font-medium text-indigo-600" href="{{ route('admin.campaigns.push.show', $campaign) }}">{{ $campaign->title }}</a>
                                         @if ($campaign->headline)
@@ -64,14 +87,24 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="px-4 py-6 text-center text-gray-500">No push campaigns found.</td>
+                                    <td colspan="9" class="px-4 py-6 text-center text-gray-500">No push campaigns found.</td>
                                 </tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
+                </form>
                 <div class="mt-6">{{ $campaigns->links() }}</div>
             </div>
         </div>
     </div>
+
+    <script>
+        (() => {
+            const all = document.getElementById('select_all');
+            const cbs = Array.from(document.querySelectorAll('.row_cb'));
+            if (!all || cbs.length === 0) return;
+            all.addEventListener('change', () => cbs.forEach((cb) => cb.checked = all.checked));
+        })();
+    </script>
 </x-app-layout>

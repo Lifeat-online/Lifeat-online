@@ -9,6 +9,7 @@ use App\Services\CouncillorAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class CivicFaultReportController extends Controller
@@ -23,6 +24,11 @@ class CivicFaultReportController extends Controller
 
     public function store(Request $request, CouncillorAssignmentService $assignmentService)
     {
+        $clientUuid = trim((string) $request->input('client_uuid', ''));
+        if ($clientUuid === '' || $clientUuid === 'undefined' || $clientUuid === 'null' || ! Str::isUuid($clientUuid)) {
+            $request->merge(['client_uuid' => null]);
+        }
+
         $validated = $request->validate([
             'client_uuid' => ['nullable', 'uuid'],
             'category' => ['required', Rule::in(array_keys(CivicFaultReport::categories()))],

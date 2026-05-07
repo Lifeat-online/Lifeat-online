@@ -7,6 +7,9 @@
                 <a href="{{ route('admin.finance.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Finance</a>
                 <a href="{{ route('admin.campaigns.ads.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Ad Campaigns</a>
                 <a href="{{ route('admin.campaigns.push.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Push Campaigns</a>
+                <a href="{{ route('admin.vouchers.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Vouchers</a>
+                <a href="{{ route('admin.integrations.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Integrations</a>
+                <a href="{{ route('admin.audit-logs.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Audit Logs</a>
                 <a href="{{ route('admin.wallet.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Staff Wallets</a>
                 <a href="{{ route('admin.payout-requests.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Payout Requests</a>
                 @if ($dashboardRoleFlags['canCreateContent'])
@@ -43,6 +46,49 @@
                     <div class="rounded-lg bg-white p-6 shadow-sm"><p class="text-sm text-gray-500">Payments</p><p class="mt-2 text-3xl font-bold">{{ $supportCounts['payments'] }}</p></div>
                     <div class="rounded-lg bg-white p-6 shadow-sm"><p class="text-sm text-gray-500">Subscriptions</p><p class="mt-2 text-3xl font-bold">{{ $supportCounts['subscriptions'] }}</p></div>
                     <div class="rounded-lg bg-white p-6 shadow-sm"><p class="text-sm text-gray-500">Notifications</p><p class="mt-2 text-3xl font-bold">{{ $supportCounts['notifications'] }}</p></div>
+                </div>
+
+                <div class="rounded-lg bg-white p-6 shadow-sm" data-metrics-root data-metrics-url="{{ route('admin.metrics') }}">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <h3 class="text-lg font-semibold text-gray-900">Live Metrics</h3>
+                        <p class="text-sm text-gray-500" data-metrics-status>Updating…</p>
+                    </div>
+                    <div class="mt-4 grid gap-4 md:grid-cols-4">
+                        <a href="{{ route('admin.fault-reports.index', ['approval' => 'pending']) }}" class="rounded-lg bg-slate-50 p-4">
+                            <p class="text-sm text-gray-500">Faults Pending Approval</p>
+                            <p class="mt-2 text-2xl font-semibold" data-metrics="faults.pending">—</p>
+                        </a>
+                        <a href="{{ route('admin.fault-reports.index', ['sort' => 'newest']) }}" class="rounded-lg bg-slate-50 p-4">
+                            <p class="text-sm text-gray-500">Faults Reported (1h)</p>
+                            <p class="mt-2 text-2xl font-semibold" data-metrics="faults.reported_last_hour">—</p>
+                        </a>
+                        <a href="{{ route('admin.campaigns.ads.index', ['status' => 'ready']) }}" class="rounded-lg bg-slate-50 p-4">
+                            <p class="text-sm text-gray-500">Ads Ready</p>
+                            <p class="mt-2 text-2xl font-semibold" data-metrics="advertising.ads_ready">—</p>
+                        </a>
+                        <a href="{{ route('admin.campaigns.push.index', ['sent' => 'no']) }}" class="rounded-lg bg-slate-50 p-4">
+                            <p class="text-sm text-gray-500">Push Pending</p>
+                            <p class="mt-2 text-2xl font-semibold" data-metrics="advertising.push_pending">—</p>
+                        </a>
+                    </div>
+                    <div class="mt-4 grid gap-4 md:grid-cols-4">
+                        <div class="rounded-lg bg-slate-50 p-4">
+                            <p class="text-sm text-gray-500">Avg Resolution Hours (last 50)</p>
+                            <p class="mt-2 text-2xl font-semibold" data-metrics="faults.avg_resolution_hours_last_50">—</p>
+                        </div>
+                        <div class="rounded-lg bg-slate-50 p-4">
+                            <p class="text-sm text-gray-500">Resolved (7d)</p>
+                            <p class="mt-2 text-2xl font-semibold" data-metrics="faults.resolved_last_7d">—</p>
+                        </div>
+                        <div class="rounded-lg bg-slate-50 p-4">
+                            <p class="text-sm text-gray-500">Integrations Active</p>
+                            <p class="mt-2 text-2xl font-semibold" data-metrics="integrations.active">—</p>
+                        </div>
+                        <div class="rounded-lg bg-slate-50 p-4">
+                            <p class="text-sm text-gray-500">Vouchers</p>
+                            <p class="mt-2 text-2xl font-semibold" data-metrics="core.vouchers">—</p>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="grid gap-4 md:grid-cols-3">
@@ -141,6 +187,49 @@
                     <div class="rounded-lg bg-white p-6 shadow-sm"><p class="text-sm text-gray-500">Applications</p><p class="mt-2 text-3xl font-bold">{{ $counts['writerApplications'] }}</p></div>
                 </div>
 
+                <div class="rounded-lg bg-white p-6 shadow-sm" data-metrics-root data-metrics-url="{{ route('admin.metrics') }}">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <h3 class="text-lg font-semibold text-gray-900">Live Metrics</h3>
+                        <p class="text-sm text-gray-500" data-metrics-status>Updating…</p>
+                    </div>
+                    <div class="mt-4 grid gap-4 md:grid-cols-4">
+                        <a href="{{ route('admin.fault-reports.index', ['approval' => 'pending']) }}" class="rounded-lg bg-slate-50 p-4">
+                            <p class="text-sm text-gray-500">Faults Pending Approval</p>
+                            <p class="mt-2 text-2xl font-semibold" data-metrics="faults.pending">—</p>
+                        </a>
+                        <a href="{{ route('admin.fault-reports.index', ['sort' => 'newest']) }}" class="rounded-lg bg-slate-50 p-4">
+                            <p class="text-sm text-gray-500">Faults Reported (1h)</p>
+                            <p class="mt-2 text-2xl font-semibold" data-metrics="faults.reported_last_hour">—</p>
+                        </a>
+                        <a href="{{ route('admin.campaigns.ads.index', ['status' => 'ready']) }}" class="rounded-lg bg-slate-50 p-4">
+                            <p class="text-sm text-gray-500">Ads Ready</p>
+                            <p class="mt-2 text-2xl font-semibold" data-metrics="advertising.ads_ready">—</p>
+                        </a>
+                        <a href="{{ route('admin.campaigns.push.index', ['sent' => 'no']) }}" class="rounded-lg bg-slate-50 p-4">
+                            <p class="text-sm text-gray-500">Push Pending</p>
+                            <p class="mt-2 text-2xl font-semibold" data-metrics="advertising.push_pending">—</p>
+                        </a>
+                    </div>
+                    <div class="mt-4 grid gap-4 md:grid-cols-4">
+                        <div class="rounded-lg bg-slate-50 p-4">
+                            <p class="text-sm text-gray-500">Avg Resolution Hours (last 50)</p>
+                            <p class="mt-2 text-2xl font-semibold" data-metrics="faults.avg_resolution_hours_last_50">—</p>
+                        </div>
+                        <div class="rounded-lg bg-slate-50 p-4">
+                            <p class="text-sm text-gray-500">Resolved (7d)</p>
+                            <p class="mt-2 text-2xl font-semibold" data-metrics="faults.resolved_last_7d">—</p>
+                        </div>
+                        <div class="rounded-lg bg-slate-50 p-4">
+                            <p class="text-sm text-gray-500">Integrations Active</p>
+                            <p class="mt-2 text-2xl font-semibold" data-metrics="integrations.active">—</p>
+                        </div>
+                        <div class="rounded-lg bg-slate-50 p-4">
+                            <p class="text-sm text-gray-500">Vouchers</p>
+                            <p class="mt-2 text-2xl font-semibold" data-metrics="core.vouchers">—</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="grid gap-6 lg:grid-cols-4">
                     <div class="rounded-lg bg-white p-6 shadow-sm">
                         <h3 class="font-semibold">Recent Listings</h3>
@@ -162,4 +251,52 @@
             @endif
         </div>
     </div>
+
+    <script>
+        (() => {
+            const roots = Array.from(document.querySelectorAll('[data-metrics-root]'));
+            if (roots.length === 0) return;
+
+            const setValue = (root, key, value) => {
+                const el = root.querySelector(`[data-metrics="${key}"]`);
+                if (!el) return;
+                el.textContent = value === null || typeof value === 'undefined' ? '—' : String(value);
+            };
+
+            const flatten = (obj, prefix = '') => {
+                const out = {};
+                for (const [k, v] of Object.entries(obj || {})) {
+                    const nextKey = prefix ? `${prefix}.${k}` : k;
+                    if (v && typeof v === 'object' && !Array.isArray(v)) {
+                        Object.assign(out, flatten(v, nextKey));
+                    } else {
+                        out[nextKey] = v;
+                    }
+                }
+                return out;
+            };
+
+            const tick = async (root) => {
+                const url = root.getAttribute('data-metrics-url');
+                const status = root.querySelector('[data-metrics-status]');
+                try {
+                    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const payload = await res.json();
+                    const flat = flatten(payload);
+                    for (const [key, value] of Object.entries(flat)) {
+                        setValue(root, key, value);
+                    }
+                    if (status) status.textContent = 'Live';
+                } catch (e) {
+                    if (status) status.textContent = 'Unavailable';
+                }
+            };
+
+            roots.forEach((root) => {
+                tick(root);
+                window.setInterval(() => tick(root), 15000);
+            });
+        })();
+    </script>
 </x-app-layout>

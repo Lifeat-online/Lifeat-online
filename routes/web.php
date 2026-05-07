@@ -10,8 +10,12 @@ use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\EventController as AdminEventController;
 use App\Http\Controllers\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\Admin\ListingController as AdminListingController;
+use App\Http\Controllers\Admin\MetricsController as AdminMetricsController;
 use App\Http\Controllers\Admin\PackageController as AdminPackageController;
 use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
+use App\Http\Controllers\Admin\VoucherController as AdminVoucherController;
+use App\Http\Controllers\Admin\MarketingIntegrationController as AdminMarketingIntegrationController;
+use App\Http\Controllers\Admin\AuditLogController as AdminAuditLogController;
 use App\Http\Controllers\Admin\WriterApplicationController as AdminWriterApplicationController;
 use App\Http\Controllers\Admin\WriterPaymentController as AdminWriterPaymentController;
 use App\Http\Controllers\Admin\CouncillorController as AdminCouncillorController;
@@ -104,6 +108,71 @@ Route::middleware('auth')->prefix('api')->name('api.')->group(function () {
         Route::put('/ad-campaigns/{adCampaign}', [StaffAdvertisingApiController::class, 'updateAdCampaign'])->name('ad-campaigns.update');
         Route::put('/push-campaigns/{pushCampaign}', [StaffAdvertisingApiController::class, 'updatePushCampaign'])->name('push-campaigns.update');
         Route::put('/businesses/{listing}/integrations/{type}', [StaffAdvertisingApiController::class, 'updateIntegration'])->name('integrations.update');
+    });
+
+    Route::middleware('role:admin,editor,staff,support')->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/metrics', AdminMetricsController::class)->name('metrics');
+        Route::get('/audit-logs', [AdminAuditLogController::class, 'index'])->middleware('role:admin,editor,support')->name('audit-logs.index');
+
+        Route::get('/listings', [AdminListingController::class, 'index'])->name('listings.index');
+        Route::post('/listings', [AdminListingController::class, 'store'])->name('listings.store');
+        Route::get('/listings/{listing:slug}', [AdminListingController::class, 'show'])->name('listings.show');
+        Route::put('/listings/{listing:slug}', [AdminListingController::class, 'update'])->name('listings.update');
+        Route::delete('/listings/{listing:slug}', [AdminListingController::class, 'destroy'])->name('listings.destroy');
+        Route::post('/listings/bulk', [AdminListingController::class, 'bulk'])->name('listings.bulk');
+
+        Route::get('/events', [AdminEventController::class, 'index'])->name('events.index');
+        Route::post('/events', [AdminEventController::class, 'store'])->name('events.store');
+        Route::get('/events/{event:slug}', [AdminEventController::class, 'show'])->name('events.show');
+        Route::put('/events/{event:slug}', [AdminEventController::class, 'update'])->name('events.update');
+        Route::delete('/events/{event:slug}', [AdminEventController::class, 'destroy'])->name('events.destroy');
+        Route::post('/events/bulk', [AdminEventController::class, 'bulk'])->name('events.bulk');
+
+        Route::get('/articles', [AdminArticleController::class, 'index'])->name('articles.index');
+        Route::post('/articles', [AdminArticleController::class, 'store'])->middleware('role:admin,editor')->name('articles.store');
+        Route::get('/articles/{article:slug}', [AdminArticleController::class, 'show'])->name('articles.show');
+        Route::put('/articles/{article:slug}', [AdminArticleController::class, 'update'])->middleware('role:admin,editor')->name('articles.update');
+        Route::delete('/articles/{article:slug}', [AdminArticleController::class, 'destroy'])->middleware('role:admin,editor')->name('articles.destroy');
+        Route::post('/articles/bulk', [AdminArticleController::class, 'bulk'])->middleware('role:admin,editor')->name('articles.bulk');
+
+        Route::get('/vouchers', [AdminVoucherController::class, 'index'])->middleware('role:admin,editor,staff')->name('vouchers.index');
+        Route::post('/vouchers', [AdminVoucherController::class, 'store'])->middleware('role:admin,editor,staff')->name('vouchers.store');
+        Route::get('/vouchers/{voucher:id}', [AdminVoucherController::class, 'show'])->middleware('role:admin,editor,staff')->name('vouchers.show');
+        Route::put('/vouchers/{voucher:id}', [AdminVoucherController::class, 'update'])->middleware('role:admin,editor,staff')->name('vouchers.update');
+        Route::delete('/vouchers/{voucher:id}', [AdminVoucherController::class, 'destroy'])->middleware('role:admin,editor,staff')->name('vouchers.destroy');
+        Route::post('/vouchers/bulk', [AdminVoucherController::class, 'bulk'])->middleware('role:admin,editor,staff')->name('vouchers.bulk');
+
+        Route::get('/integrations', [AdminMarketingIntegrationController::class, 'index'])->middleware('role:admin,editor,staff')->name('integrations.index');
+        Route::post('/integrations', [AdminMarketingIntegrationController::class, 'store'])->middleware('role:admin,editor,staff')->name('integrations.store');
+        Route::get('/integrations/{integration}', [AdminMarketingIntegrationController::class, 'show'])->middleware('role:admin,editor,staff')->name('integrations.show');
+        Route::put('/integrations/{integration}', [AdminMarketingIntegrationController::class, 'update'])->middleware('role:admin,editor,staff')->name('integrations.update');
+        Route::delete('/integrations/{integration}', [AdminMarketingIntegrationController::class, 'destroy'])->middleware('role:admin,editor,staff')->name('integrations.destroy');
+        Route::post('/integrations/bulk', [AdminMarketingIntegrationController::class, 'bulk'])->middleware('role:admin,editor,staff')->name('integrations.bulk');
+
+        Route::get('/campaigns/ads', [AdminCampaignController::class, 'adIndex'])->name('campaigns.ads.index');
+        Route::get('/campaigns/ads/{adCampaign}', [AdminCampaignController::class, 'adShow'])->name('campaigns.ads.show');
+        Route::post('/campaigns/ads/{adCampaign}/approve', [AdminCampaignController::class, 'adApprove'])->middleware('role:admin,editor')->name('campaigns.ads.approve');
+        Route::post('/campaigns/ads/{adCampaign}/pause', [AdminCampaignController::class, 'adPause'])->middleware('role:admin,editor')->name('campaigns.ads.pause');
+        Route::post('/campaigns/ads/{adCampaign}/resume', [AdminCampaignController::class, 'adResume'])->middleware('role:admin,editor')->name('campaigns.ads.resume');
+        Route::post('/campaigns/ads/bulk', [AdminCampaignController::class, 'adBulk'])->middleware('role:admin,editor')->name('campaigns.ads.bulk');
+
+        Route::get('/campaigns/push', [AdminCampaignController::class, 'pushIndex'])->name('campaigns.push.index');
+        Route::get('/campaigns/push/{pushCampaign}', [AdminCampaignController::class, 'pushShow'])->name('campaigns.push.show');
+        Route::post('/campaigns/push/{pushCampaign}/dispatch', [AdminCampaignController::class, 'pushDispatch'])->middleware('role:admin,editor')->name('campaigns.push.dispatch');
+        Route::post('/campaigns/push/bulk', [AdminCampaignController::class, 'pushBulk'])->middleware('role:admin,editor')->name('campaigns.push.bulk');
+
+        Route::get('/councillors', [AdminCouncillorController::class, 'index'])->middleware('role:admin')->name('councillors.index');
+        Route::post('/councillors', [AdminCouncillorController::class, 'store'])->middleware('role:admin')->name('councillors.store');
+        Route::get('/councillors/{councillor}', [AdminCouncillorController::class, 'show'])->middleware('role:admin')->name('councillors.show');
+        Route::put('/councillors/{councillor}', [AdminCouncillorController::class, 'update'])->middleware('role:admin')->name('councillors.update');
+        Route::delete('/councillors/{councillor}', [AdminCouncillorController::class, 'destroy'])->middleware('role:admin')->name('councillors.destroy');
+        Route::post('/councillors/bulk', [AdminCouncillorController::class, 'bulk'])->middleware('role:admin')->name('councillors.bulk');
+
+        Route::get('/fault-reports', [AdminCivicFaultReportController::class, 'index'])->middleware('role:admin,editor')->name('fault-reports.index');
+        Route::get('/fault-reports/{faultReport}', [AdminCivicFaultReportController::class, 'show'])->middleware('role:admin,editor')->name('fault-reports.show');
+        Route::post('/fault-reports/{faultReport}/moderate', [AdminCivicFaultReportController::class, 'moderate'])->middleware('role:admin,editor')->name('fault-reports.moderate');
+        Route::put('/fault-reports/{faultReport}', [AdminCivicFaultReportController::class, 'update'])->middleware('role:admin,editor')->name('fault-reports.update');
+        Route::post('/fault-reports/bulk', [AdminCivicFaultReportController::class, 'bulk'])->middleware('role:admin,editor')->name('fault-reports.bulk');
     });
 });
 
@@ -214,6 +283,7 @@ Route::middleware(['auth', 'verified', 'role:councillor'])->prefix('councillor')
 
 Route::middleware(['auth', 'role:admin,editor,staff,support'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', AdminDashboardController::class)->name('dashboard');
+    Route::get('/metrics', AdminMetricsController::class)->name('metrics');
     Route::get('/finance', [AdminFinanceController::class, 'index'])->middleware('role:admin,editor,support')->name('finance.index');
     Route::get('/finance/export/{dataset}', [AdminFinanceController::class, 'export'])->middleware('role:admin,editor')->name('finance.export');
     Route::post('/finance/payments/{payment}/mark-paid', [AdminFinanceController::class, 'markPaymentPaid'])->middleware('role:admin,editor')->name('finance.payments.mark-paid');
@@ -234,6 +304,7 @@ Route::middleware(['auth', 'role:admin,editor,staff,support'])->prefix('admin')-
     Route::get('/finance/subscriptions/{subscription}', [AdminFinanceController::class, 'showSubscription'])->middleware('role:admin,editor,support')->name('finance.subscriptions.show');
     Route::get('/settings', [AdminSettingsController::class, 'index'])->middleware('role:admin')->name('settings.index');
     Route::put('/settings', [AdminSettingsController::class, 'update'])->middleware('role:admin')->name('settings.update');
+    Route::get('/audit-logs', [AdminAuditLogController::class, 'index'])->middleware('role:admin,editor,support')->name('audit-logs.index');
     Route::get('/customers', [AdminCustomerLookupController::class, 'index'])->name('customers.index');
     Route::get('/customers/{user}', [AdminCustomerLookupController::class, 'show'])->name('customers.show');
     Route::post('/customers/{user}/notes', [AdminCustomerLookupController::class, 'storeNote'])->name('customers.notes.store');
@@ -249,13 +320,29 @@ Route::middleware(['auth', 'role:admin,editor,staff,support'])->prefix('admin')-
     Route::get('/writer-payments/batches/{batch}/export', [AdminWriterPaymentController::class, 'export'])->middleware('role:admin,editor')->name('writer-payments.batches.export');
     Route::post('/writer-payments/batches/{batch}/mark-paid', [AdminWriterPaymentController::class, 'markPaid'])->middleware('role:admin')->name('writer-payments.batches.mark-paid');
     Route::resource('packages', AdminPackageController::class)->except('show', 'destroy')->middleware('role:admin');
-    Route::resource('listings', AdminListingController::class)->except('show');
-    Route::resource('events', AdminEventController::class)->except('show');
-    Route::resource('articles', AdminArticleController::class)->except('show');
+    Route::post('/listings/bulk', [AdminListingController::class, 'bulk'])->middleware('role:admin,editor,staff')->name('listings.bulk');
+    Route::resource('listings', AdminListingController::class)->except('show')->middleware('role:admin,editor,staff');
+    Route::post('/events/bulk', [AdminEventController::class, 'bulk'])->middleware('role:admin,editor,staff')->name('events.bulk');
+    Route::resource('events', AdminEventController::class)->except('show')->middleware('role:admin,editor,staff');
+    Route::post('/articles/bulk', [AdminArticleController::class, 'bulk'])->middleware('role:admin,editor')->name('articles.bulk');
+    Route::resource('articles', AdminArticleController::class)->except('show')->middleware('role:admin,editor');
+    Route::get('/vouchers', [AdminVoucherController::class, 'index'])->middleware('role:admin,editor,staff')->name('vouchers.index');
+    Route::get('/vouchers/create', [AdminVoucherController::class, 'create'])->middleware('role:admin,editor,staff')->name('vouchers.create');
+    Route::post('/vouchers', [AdminVoucherController::class, 'store'])->middleware('role:admin,editor,staff')->name('vouchers.store');
+    Route::get('/vouchers/{voucher:id}', [AdminVoucherController::class, 'show'])->middleware('role:admin,editor,staff')->name('vouchers.show');
+    Route::get('/vouchers/{voucher:id}/edit', [AdminVoucherController::class, 'edit'])->middleware('role:admin,editor,staff')->name('vouchers.edit');
+    Route::put('/vouchers/{voucher:id}', [AdminVoucherController::class, 'update'])->middleware('role:admin,editor,staff')->name('vouchers.update');
+    Route::delete('/vouchers/{voucher:id}', [AdminVoucherController::class, 'destroy'])->middleware('role:admin,editor,staff')->name('vouchers.destroy');
+    Route::post('/vouchers/bulk', [AdminVoucherController::class, 'bulk'])->middleware('role:admin,editor,staff')->name('vouchers.bulk');
+    Route::post('/integrations/bulk', [AdminMarketingIntegrationController::class, 'bulk'])->middleware('role:admin,editor,staff')->name('integrations.bulk');
+    Route::resource('integrations', AdminMarketingIntegrationController::class)->middleware('role:admin,editor,staff');
+    Route::post('/councillors/bulk', [AdminCouncillorController::class, 'bulk'])->middleware('role:admin')->name('councillors.bulk');
     Route::resource('councillors', AdminCouncillorController::class)->except('show')->middleware('role:admin');
     Route::get('/fault-reports', [AdminCivicFaultReportController::class, 'index'])->middleware('role:admin,editor')->name('fault-reports.index');
     Route::get('/fault-reports/{faultReport}', [AdminCivicFaultReportController::class, 'show'])->middleware('role:admin,editor')->name('fault-reports.show');
     Route::post('/fault-reports/{faultReport}/moderate', [AdminCivicFaultReportController::class, 'moderate'])->middleware('role:admin,editor')->name('fault-reports.moderate');
+    Route::put('/fault-reports/{faultReport}', [AdminCivicFaultReportController::class, 'update'])->middleware('role:admin,editor')->name('fault-reports.update');
+    Route::post('/fault-reports/bulk', [AdminCivicFaultReportController::class, 'bulk'])->middleware('role:admin,editor')->name('fault-reports.bulk');
     // Wallets & Payout Requests
     Route::get('/wallet', [AdminWalletController::class, 'index'])->name('wallet.index');
     Route::get('/wallet/{staffWallet}', [AdminWalletController::class, 'show'])->name('wallet.show');
@@ -266,11 +353,13 @@ Route::middleware(['auth', 'role:admin,editor,staff,support'])->prefix('admin')-
     Route::post('/payout-requests/{payoutRequest}/mark-paid', [AdminPayoutRequestController::class, 'markPaid'])->middleware('role:admin')->name('payout-requests.mark-paid');
     // Ad / Push Campaigns
     Route::get('/campaigns/ads', [AdminCampaignController::class, 'adIndex'])->name('campaigns.ads.index');
+    Route::post('/campaigns/ads/bulk', [AdminCampaignController::class, 'adBulk'])->middleware('role:admin,editor')->name('campaigns.ads.bulk');
     Route::get('/campaigns/ads/{adCampaign}', [AdminCampaignController::class, 'adShow'])->name('campaigns.ads.show');
     Route::post('/campaigns/ads/{adCampaign}/approve', [AdminCampaignController::class, 'adApprove'])->middleware('role:admin,editor')->name('campaigns.ads.approve');
     Route::post('/campaigns/ads/{adCampaign}/pause', [AdminCampaignController::class, 'adPause'])->middleware('role:admin,editor')->name('campaigns.ads.pause');
     Route::post('/campaigns/ads/{adCampaign}/resume', [AdminCampaignController::class, 'adResume'])->middleware('role:admin,editor')->name('campaigns.ads.resume');
     Route::get('/campaigns/push', [AdminCampaignController::class, 'pushIndex'])->name('campaigns.push.index');
+    Route::post('/campaigns/push/bulk', [AdminCampaignController::class, 'pushBulk'])->middleware('role:admin,editor')->name('campaigns.push.bulk');
     Route::get('/campaigns/push/{pushCampaign}', [AdminCampaignController::class, 'pushShow'])->name('campaigns.push.show');
     Route::post('/campaigns/push/{pushCampaign}/dispatch', [AdminCampaignController::class, 'pushDispatch'])->middleware('role:admin,editor')->name('campaigns.push.dispatch');
 });

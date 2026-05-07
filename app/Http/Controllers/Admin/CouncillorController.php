@@ -6,18 +6,54 @@ use App\Http\Controllers\Controller;
 use App\Models\Councillor;
 use App\Models\CivicFaultReport;
 use App\Models\User;
+use App\Services\AuditLogService;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class CouncillorController extends Controller
 {
-    public function index(): View
+    public function index(Request $request)
     {
+        $filters = [
+            'q' => trim((string) $request->string('q')),
+            'active' => $request->string('active')->toString(),
+        ];
+
+        $councillors = Councillor::query()
+            ->withCount('assignedFaultReports')
+            ->when($filters['q'] !== '', function ($query) use ($filters) {
+                $needle = mb_substr($filters['q'], 0, 120);
+                $query->where(function ($inner) use ($needle) {
+                    $inner->where('full_name', 'like', "%{$needle}%")
+                        ->orWhere('email', 'like', "%{$needle}%")
+                        ->orWhere('phone', 'like', "%{$needle}%");
+                });
+            })
+            ->when($filters['active'] !== '', fn ($query) => $query->where('is_active', $filters['active'] === 'yes'))
+            ->orderBy('full_name')
+            ->paginate(20)
+            ->withQueryString();
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'councillors' => $councillors]);
+        }
+
         return view('admin.councillors.index', [
-            'councillors' => Councillor::withCount('assignedFaultReports')->orderBy('full_name')->paginate(20),
+            'councillors' => $councillors,
+            'filters' => $filters,
         ]);
+    }
+
+    public function show(Request $request, Councillor $councillor)
+    {
+        $councillor->load(['areas', 'user']);
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'councillor' => $councillor]);
+        }
+
+        return redirect()->route('admin.councillors.edit', $councillor);
     }
 
     public function create(): View
@@ -33,12 +69,20 @@ class CouncillorController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AuditLogService $audit)
     {
         $data = $this->validated($request);
         $councillor = Councillor::create($data);
         $this->ensureCouncillorRole($councillor);
-        $this->syncArea($councillor, $request);
+        $areaAudit = $this->syncArea($councillor, $request);
+        $audit->log($request, 'councillor.created', $councillor, [], $councillor->toArray());
+        if ($areaAudit) {
+            $audit->log($request, $areaAudit['action'], $areaAudit['subject'], $areaAudit['before'], $areaAudit['after']);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'councillor' => $councillor->fresh()->load('areas')], 201);
+        }
 
         return redirect()->route('admin.councillors.edit', $councillor)->with('status', 'Councillor created.');
     }
@@ -66,21 +110,65 @@ class CouncillorController extends Controller
         ]);
     }
 
-    public function update(Request $request, Councillor $councillor): RedirectResponse
+    public function update(Request $request, Councillor $councillor, AuditLogService $audit)
     {
+        $before = $councillor->toArray();
         $data = $this->validated($request, $councillor);
         $councillor->update($data);
         $this->ensureCouncillorRole($councillor);
-        $this->syncArea($councillor, $request);
+        $areaAudit = $this->syncArea($councillor, $request);
+        $audit->log($request, 'councillor.updated', $councillor, $before, $councillor->fresh()->toArray());
+        if ($areaAudit) {
+            $audit->log($request, $areaAudit['action'], $areaAudit['subject'], $areaAudit['before'], $areaAudit['after']);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'councillor' => $councillor->fresh()->load('areas')]);
+        }
 
         return redirect()->route('admin.councillors.edit', $councillor)->with('status', 'Councillor updated.');
     }
 
-    public function destroy(Councillor $councillor): RedirectResponse
+    public function destroy(Request $request, Councillor $councillor, AuditLogService $audit)
     {
+        $before = $councillor->toArray();
         $councillor->delete();
+        $audit->log($request, 'councillor.deleted', $councillor, $before, []);
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true]);
+        }
 
         return redirect()->route('admin.councillors.index')->with('status', 'Councillor removed.');
+    }
+
+    public function bulk(Request $request, AuditLogService $audit)
+    {
+        $validated = $request->validate([
+            'action' => ['required', Rule::in(['activate', 'deactivate', 'delete'])],
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'exists:councillors,id'],
+        ]);
+
+        $targets = Councillor::query()->whereIn('id', $validated['ids'])->get();
+
+        foreach ($targets as $councillor) {
+            $before = $councillor->toArray();
+
+            match ($validated['action']) {
+                'activate' => $councillor->update(['is_active' => true]),
+                'deactivate' => $councillor->update(['is_active' => false]),
+                'delete' => $councillor->delete(),
+            };
+
+            $audit->log($request, 'councillor.bulk_'.$validated['action'], $councillor, $before, $councillor->fresh()?->toArray() ?? []);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'affected' => $targets->count()]);
+        }
+
+        return redirect()->route('admin.councillors.index')->with('status', 'Bulk operation completed.');
     }
 
     private function validated(Request $request, ?Councillor $councillor = null): array
@@ -105,18 +193,18 @@ class CouncillorController extends Controller
         return $data;
     }
 
-    private function syncArea(Councillor $councillor, Request $request): void
+    private function syncArea(Councillor $councillor, Request $request): ?array
     {
         $name = $request->string('area_name')->toString();
         $geojsonRaw = $request->string('area_geojson')->toString();
 
         if (! $name || ! $geojsonRaw) {
-            return;
+            return null;
         }
 
         $decoded = json_decode($geojsonRaw, true);
         if (! is_array($decoded)) {
-            return;
+            return null;
         }
 
         $areaId = $request->integer('area_id');
@@ -124,20 +212,32 @@ class CouncillorController extends Controller
         if ($areaId) {
             $area = $councillor->areas()->whereKey($areaId)->first();
             if ($area) {
+                $before = $area->toArray();
                 $area->update([
                     'name' => $name,
                     'geojson' => $decoded,
                     'is_active' => $request->boolean('area_is_active'),
                 ]);
-                return;
+                return [
+                    'action' => 'councillor_area.updated',
+                    'subject' => $area,
+                    'before' => $before,
+                    'after' => $area->fresh()->toArray(),
+                ];
             }
         }
 
-        $councillor->areas()->create([
+        $area = $councillor->areas()->create([
             'name' => $name,
             'geojson' => $decoded,
             'is_active' => $request->boolean('area_is_active'),
         ]);
+        return [
+            'action' => 'councillor_area.created',
+            'subject' => $area,
+            'before' => [],
+            'after' => $area->toArray(),
+        ];
     }
 
     private function ensureCouncillorRole(Councillor $councillor): void

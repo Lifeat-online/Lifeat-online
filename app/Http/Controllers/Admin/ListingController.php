@@ -5,20 +5,70 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Listing;
+use App\Services\AuditLogService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class ListingController extends Controller
 {
-    public function index(): View
+    public function index(Request $request)
     {
+        $status = $request->string('status')->toString();
+        $featured = $request->string('featured')->toString();
+        $search = trim((string) $request->string('q'));
+        $sort = $request->string('sort')->toString() ?: 'newest';
+
+        $query = Listing::query()
+            ->with('categories')
+            ->when($status !== '', fn ($q) => $q->where('status', $status))
+            ->when($featured !== '', fn ($q) => $q->where('is_featured', $featured === 'yes'))
+            ->when($search !== '', function ($q) use ($search) {
+                $needle = mb_substr($search, 0, 120);
+                $q->where(function ($inner) use ($needle) {
+                    $inner->where('title', 'like', "%{$needle}%")
+                        ->orWhere('slug', 'like', "%{$needle}%")
+                        ->orWhere('city', 'like', "%{$needle}%")
+                        ->orWhere('email', 'like', "%{$needle}%")
+                        ->orWhere('phone', 'like', "%{$needle}%");
+                });
+            });
+
+        $query->orderBy(match ($sort) {
+            'oldest' => 'created_at',
+            'title_asc' => 'title',
+            'title_desc' => 'title',
+            default => 'created_at',
+        }, in_array($sort, ['oldest', 'title_asc'], true) ? 'asc' : 'desc');
+
+        $listings = $query->paginate(15)->withQueryString();
+
+        if ($request->expectsJson()) {
+            return response()->json($listings);
+        }
+
         return view('admin.listings.index', [
-            'listings' => Listing::with('categories')->latest()->paginate(15),
+            'listings' => $listings,
+            'filters' => [
+                'q' => $search,
+                'status' => $status,
+                'featured' => $featured,
+                'sort' => $sort,
+            ],
         ]);
+    }
+
+    public function show(Request $request, Listing $listing)
+    {
+        $listing->load(['categories', 'owner', 'marketingIntegrations', 'vouchers']);
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'listing' => $listing]);
+        }
+
+        return redirect()->route('admin.listings.edit', $listing);
     }
 
     public function create(): View
@@ -33,7 +83,7 @@ class ListingController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AuditLogService $audit)
     {
         $data = $this->validated($request);
         $data['user_id'] = $request->user()->id;
@@ -44,6 +94,11 @@ class ListingController extends Controller
 
         $listing = Listing::create($data);
         $listing->categories()->sync($request->input('category_ids', []));
+        $audit->log($request, 'listing.created', $listing, [], $listing->fresh()->toArray());
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'listing' => $listing->fresh()->load('categories')], 201);
+        }
 
         return redirect()->route('admin.listings.edit', $listing)->with('status', 'Listing saved.');
     }
@@ -62,8 +117,10 @@ class ListingController extends Controller
         ]);
     }
 
-    public function update(Request $request, Listing $listing): RedirectResponse
+    public function update(Request $request, Listing $listing, AuditLogService $audit)
     {
+        $before = $listing->toArray();
+
         $data = $this->validated($request, $listing);
         $data['published_at'] = $this->publishedAt($data['status'], $data['published_at'] ?? $listing->published_at);
         $data['is_featured'] = $request->boolean('is_featured');
@@ -71,17 +128,65 @@ class ListingController extends Controller
 
         $listing->update($data);
         $listing->categories()->sync($request->input('category_ids', []));
+        $audit->log($request, 'listing.updated', $listing, $before, $listing->fresh()->toArray());
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'listing' => $listing->fresh()->load('categories')]);
+        }
 
         return redirect()->route('admin.listings.edit', $listing)->with('status', 'Listing updated.');
     }
 
-    public function destroy(Listing $listing): RedirectResponse
+    public function destroy(Request $request, Listing $listing, AuditLogService $audit)
     {
+        $before = $listing->toArray();
+        $audit->log($request, 'listing.deleted', $listing, $before, []);
         $this->deleteFile($listing->featured_image);
         $this->deleteFile($listing->logo_path);
         $listing->delete();
 
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true]);
+        }
+
         return redirect()->route('admin.listings.index')->with('status', 'Listing deleted.');
+    }
+
+    public function bulk(Request $request, AuditLogService $audit)
+    {
+        $validated = $request->validate([
+            'action' => ['required', Rule::in(['publish', 'unpublish', 'feature', 'unfeature', 'delete'])],
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['string'],
+        ]);
+
+        $ids = collect($validated['ids'])->filter()->unique()->values()->all();
+
+        $targets = Listing::query()->whereIn('slug', $ids)->get();
+
+        foreach ($targets as $listing) {
+            $before = $listing->toArray();
+
+            match ($validated['action']) {
+                'publish' => $listing->update(['status' => 'published', 'published_at' => $listing->published_at ?: now()]),
+                'unpublish' => $listing->update(['status' => 'draft', 'published_at' => null]),
+                'feature' => $listing->update(['is_featured' => true]),
+                'unfeature' => $listing->update(['is_featured' => false]),
+                'delete' => (function () use ($listing) {
+                    $this->deleteFile($listing->featured_image);
+                    $this->deleteFile($listing->logo_path);
+                    $listing->delete();
+                })(),
+            };
+
+            $audit->log($request, 'listing.bulk_'.$validated['action'], $listing, $before, $listing->fresh()?->toArray() ?? []);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'affected' => $targets->count()]);
+        }
+
+        return redirect()->route('admin.listings.index')->with('status', 'Bulk operation completed.');
     }
 
     private function validated(Request $request, ?Listing $listing = null): array

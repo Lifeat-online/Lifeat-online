@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Event;
 use App\Models\Listing;
+use App\Services\AuditLogService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -16,11 +16,56 @@ use Illuminate\Validation\ValidationException;
 
 class EventController extends Controller
 {
-    public function index(): View
+    public function index(Request $request)
     {
+        $status = $request->string('status')->toString();
+        $search = trim((string) $request->string('q'));
+        $sort = $request->string('sort')->toString() ?: 'newest';
+
+        $query = Event::query()
+            ->with(['listing', 'categories'])
+            ->when($status !== '', fn ($q) => $q->where('status', $status))
+            ->when($search !== '', function ($q) use ($search) {
+                $needle = mb_substr($search, 0, 120);
+                $q->where(function ($inner) use ($needle) {
+                    $inner->where('title', 'like', "%{$needle}%")
+                        ->orWhere('slug', 'like', "%{$needle}%")
+                        ->orWhereHas('listing', fn ($l) => $l->where('title', 'like', "%{$needle}%"));
+                });
+            });
+
+        $query->orderBy(match ($sort) {
+            'oldest' => 'created_at',
+            'start_asc' => 'start_at',
+            'start_desc' => 'start_at',
+            default => 'created_at',
+        }, in_array($sort, ['oldest', 'start_asc'], true) ? 'asc' : 'desc');
+
+        $events = $query->paginate(15)->withQueryString();
+
+        if ($request->expectsJson()) {
+            return response()->json($events);
+        }
+
         return view('admin.events.index', [
-            'events' => Event::with(['listing', 'categories'])->latest()->paginate(15),
+            'events' => $events,
+            'filters' => [
+                'q' => $search,
+                'status' => $status,
+                'sort' => $sort,
+            ],
         ]);
+    }
+
+    public function show(Request $request, Event $event)
+    {
+        $event->load(['listing', 'categories']);
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'event' => $event]);
+        }
+
+        return redirect()->route('admin.events.edit', $event);
     }
 
     public function create(): View
@@ -36,7 +81,7 @@ class EventController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AuditLogService $audit)
     {
         $data = $this->validated($request);
         $this->ensurePublishableListing($data['status'], $data['listing_id'] ?? null);
@@ -47,6 +92,11 @@ class EventController extends Controller
 
         $event = Event::create($data);
         $event->categories()->sync($request->input('category_ids', []));
+        $audit->log($request, 'event.created', $event, [], $event->fresh()->toArray());
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'event' => $event->fresh()->load(['listing', 'categories'])], 201);
+        }
 
         return redirect()->route('admin.events.edit', $event)->with('status', 'Event saved.');
     }
@@ -66,8 +116,9 @@ class EventController extends Controller
         ]);
     }
 
-    public function update(Request $request, Event $event): RedirectResponse
+    public function update(Request $request, Event $event, AuditLogService $audit)
     {
+        $before = $event->toArray();
         $data = $this->validated($request, $event);
         $this->ensurePublishableListing($data['status'], $data['listing_id'] ?? null);
         $data['published_at'] = $this->publishedAt($data['status'], $data['published_at'] ?? $event->published_at);
@@ -76,16 +127,77 @@ class EventController extends Controller
 
         $event->update($data);
         $event->categories()->sync($request->input('category_ids', []));
+        $audit->log($request, 'event.updated', $event, $before, $event->fresh()->toArray());
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'event' => $event->fresh()->load(['listing', 'categories'])]);
+        }
 
         return redirect()->route('admin.events.edit', $event)->with('status', 'Event updated.');
     }
 
-    public function destroy(Event $event): RedirectResponse
+    public function destroy(Request $request, Event $event, AuditLogService $audit)
     {
+        $before = $event->toArray();
+        $audit->log($request, 'event.deleted', $event, $before, []);
         $this->deleteFile($event->featured_image);
         $event->delete();
 
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true]);
+        }
+
         return redirect()->route('admin.events.index')->with('status', 'Event deleted.');
+    }
+
+    public function bulk(Request $request, AuditLogService $audit)
+    {
+        $validated = $request->validate([
+            'action' => ['required', Rule::in(['publish', 'unpublish', 'delete'])],
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['string'],
+        ]);
+
+        $ids = collect($validated['ids'])->filter()->unique()->values()->all();
+        $targets = Event::query()->whereIn('slug', $ids)->get();
+
+        $errors = [];
+
+        foreach ($targets as $event) {
+            $before = $event->toArray();
+
+            try {
+                match ($validated['action']) {
+                    'publish' => (function () use ($event) {
+                        $this->ensurePublishableListing('published', $event->listing_id);
+                        $event->update(['status' => 'published', 'published_at' => $event->published_at ?: now()]);
+                    })(),
+                    'unpublish' => $event->update(['status' => 'draft', 'published_at' => null]),
+                    'delete' => (function () use ($event) {
+                        $this->deleteFile($event->featured_image);
+                        $event->delete();
+                    })(),
+                };
+            } catch (ValidationException $e) {
+                $errors[] = $event->title.': '.collect($e->errors())->flatten()->first();
+                continue;
+            }
+
+            $audit->log($request, 'event.bulk_'.$validated['action'], $event, $before, $event->fresh()?->toArray() ?? []);
+        }
+
+        if (count($errors) > 0) {
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => false, 'errors' => $errors], 422);
+            }
+            return redirect()->route('admin.events.index')->withErrors(['bulk' => implode(' | ', $errors)]);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'affected' => $targets->count()]);
+        }
+
+        return redirect()->route('admin.events.index')->with('status', 'Bulk operation completed.');
     }
 
     private function validated(Request $request, ?Event $event = null): array
