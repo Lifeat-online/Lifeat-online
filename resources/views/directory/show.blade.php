@@ -222,12 +222,12 @@
                 </div>
 
                 @if ($listing->logo_path)
-                    <img class="detail-logo" src="{{ \Illuminate\Support\Facades\Storage::url($listing->logo_path) }}" alt="{{ $listing->title }} logo">
+                    <img class="detail-logo" src="{{ \Illuminate\Support\Facades\Storage::url($listing->logo_path) }}" alt="{{ $listing->title }} logo" loading="lazy" decoding="async">
                 @endif
             </div>
 
             @if ($coverImage)
-                <img class="detail-cover" src="{{ \Illuminate\Support\Facades\Storage::url($coverImage) }}" alt="{{ $listing->title }}">
+                <img class="detail-cover" src="{{ \Illuminate\Support\Facades\Storage::url($coverImage) }}" alt="{{ $listing->title }}" decoding="async" fetchpriority="high">
             @endif
         </div>
 
@@ -271,7 +271,7 @@
                         <div class="gallery-grid" style="margin-top:0.9rem;">
                             @foreach ($listing->photos as $photo)
                                 <div>
-                                    <img src="{{ \Illuminate\Support\Facades\Storage::url($photo->image_path) }}" alt="{{ $photo->caption ?: $listing->title }}">
+                                    <img src="{{ \Illuminate\Support\Facades\Storage::url($photo->image_path) }}" alt="{{ $photo->caption ?: $listing->title }}" loading="lazy" decoding="async">
                                     @if ($photo->caption)
                                         <p class="muted" style="margin-top:0.5rem;">{{ $photo->caption }}</p>
                                     @endif

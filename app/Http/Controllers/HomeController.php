@@ -6,6 +6,7 @@ use App\Models\Article;
 use App\Models\Category;
 use App\Models\Event;
 use App\Models\Listing;
+use App\Models\Voucher;
 use Illuminate\Contracts\View\View;
 
 class HomeController extends Controller
@@ -34,6 +35,18 @@ class HomeController extends Controller
             ->limit(4)
             ->get();
 
+        $featuredVouchers = Voucher::query()
+            ->with([
+                'listing',
+                'categories',
+            ])
+            ->active()
+            ->whereHas('listing', fn ($listing) => $listing->where('status', 'published'))
+            ->orderByDesc('published_at')
+            ->orderByDesc('id')
+            ->limit(4)
+            ->get();
+
         return view('home.index', [
             'leadArticle' => $latestArticles->first(),
             'secondaryArticles' => $latestArticles->slice(1)->values(),
@@ -42,6 +55,7 @@ class HomeController extends Controller
             'articleCount' => Article::published()->count(),
             'featuredListings' => $featuredListings,
             'upcomingEvents' => $upcomingEvents,
+            'featuredVouchers' => $featuredVouchers,
             'adminBootstrapVisible' => $adminBootstrapVisible,
             'featuredCategories' => Category::query()
                 ->where('type', 'listing')

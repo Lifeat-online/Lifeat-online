@@ -4,9 +4,10 @@
 
 @section('content')
     <section class="section">
-        <div class="section-head">
+        <div class="section-head" data-reveal>
             <div>
-                <h2>{{ $voucher->title }}</h2>
+                <div class="eyebrow">Voucher offer</div>
+                <h1>{{ $voucher->title }}</h1>
                 <div class="meta">
                     <span><a href="{{ route('directory.show', $listing) }}">{{ $listing->title }}</a></span>
                     @if ($voucher->start_at)
@@ -15,9 +16,10 @@
                     @if ($voucher->end_at)
                         <span>Ends {{ $voucher->end_at->format('j M Y') }}</span>
                     @endif
+                    <span>{{ $voucher->remainingUses() }} of {{ $voucher->usage_limit }} remaining</span>
                 </div>
             </div>
-            <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center;">
+            <div class="flex gap-3 flex-wrap items-center">
                 <a class="button-link" href="{{ route('vouchers.index') }}">Back to vouchers</a>
                 @if ($isActive)
                     @auth
@@ -28,12 +30,14 @@
                     @else
                         <a class="button" href="{{ route('login') }}">Login to redeem</a>
                     @endauth
+                @else
+                    <span class="badge" style="opacity:0.72;">Unavailable</span>
                 @endif
             </div>
         </div>
 
         @if ($errors->any())
-            <div class="card" style="border-color:#fca5a5;">
+            <div class="card" style="border-color:#fca5a5;" data-reveal>
                 <strong>Could not redeem voucher</strong>
                 <div class="muted" style="margin-top:0.35rem;">
                     {{ collect($errors->all())->first() }}
@@ -42,7 +46,7 @@
         @endif
 
         <div class="grid grid-2">
-            <article class="card">
+            <article class="card" data-reveal>
                 <h3 class="h3-block">Offer</h3>
                 <p>{{ $voucher->description ?: 'Details coming soon.' }}</p>
                 <div style="margin-top:0.75rem;">
@@ -52,7 +56,7 @@
                 </div>
             </article>
 
-            <article class="card">
+            <article class="card" data-reveal>
                 <h3 class="h3-block">Availability</h3>
                 <p><strong>Value:</strong> {{ $voucher->formattedValue() ?: 'Offer' }}</p>
                 <p><strong>Remaining:</strong> {{ $voucher->remainingUses() }} of {{ $voucher->usage_limit }}</p>
@@ -67,4 +71,3 @@
         </div>
     </section>
 @endsection
-

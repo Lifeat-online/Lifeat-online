@@ -47,7 +47,7 @@
         <label for="remember_me" style="margin: 0; font-size: 0.85rem; color: var(--muted); font-weight: 500;">Remember me for 30 days</label>
     </div>
 
-    <button type="submit" class="auth-btn">
+    <button type="submit" class="button auth-btn">
         Sign in to platform
     </button>
 </form>

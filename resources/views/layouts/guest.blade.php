@@ -7,7 +7,6 @@
 
         <title>{{ config('app.name', 'Laravel') }} - Authentication</title>
 
-        <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700&display=swap" rel="stylesheet" />
 
@@ -21,130 +20,30 @@
                 document.documentElement.style.colorScheme = theme;
             })();
         </script>
-
-        <style>
-            :root {
-                --bg: #f5f7fb;
-                --surface: #ffffff;
-                --border: #d9e1ec;
-                --text: #1f2937;
-                --muted: #6b7280;
-                --primary: #1d4ed8;
-                --shadow: 0 16px 44px rgba(2, 6, 23, 0.08);
-                --ring: 0 0 0 4px rgba(29, 78, 216, 0.18);
-            }
-            html[data-theme="dark"] {
-                --bg: #070f1b;
-                --surface: #0b1220;
-                --border: #253247;
-                --text: #e5eefb;
-                --muted: #94a3b8;
-                --primary: #60a5fa;
-                --shadow: 0 18px 56px rgba(0, 0, 0, 0.45);
-            }
-            body {
-                margin: 0;
-                font-family: 'Figtree', sans-serif;
-                background: var(--bg);
-                color: var(--text);
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                position: relative;
-                overflow-x: hidden;
-            }
-            .auth-background {
-                position: absolute;
-                top: 0; left: 0; right: 0; bottom: 0;
-                z-index: -1;
-                background: 
-                    radial-gradient(circle at 15% 15%, rgba(29, 78, 216, 0.1), transparent 40%),
-                    radial-gradient(circle at 85% 85%, rgba(147, 197, 253, 0.15), transparent 40%),
-                    linear-gradient(135deg, var(--bg), var(--bg) 50%, rgba(29, 78, 216, 0.02));
-            }
-            .auth-card {
-                background: var(--surface);
-                border: 1px solid var(--border);
-                border-radius: 24px;
-                width: min(440px, calc(100% - 2rem));
-                padding: 2.5rem;
-                box-shadow: var(--shadow);
-                backdrop-filter: blur(8px);
-                animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-            }
-            @keyframes slideUp {
-                from { opacity: 0; transform: translateY(20px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            .logo-wrap {
-                text-align: center;
-                margin-bottom: 2rem;
-            }
-            .logo-wrap img {
-                height: 60px;
-                width: auto;
-                filter: drop-shadow(0 4px 12px rgba(2, 6, 23, 0.1));
-            }
-            /* Custom Form Styles to avoid Tailwind dependency for now */
-            .auth-form-group { margin-bottom: 1.25rem; }
-            .auth-label { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text); }
-            .auth-input {
-                width: 100%;
-                padding: 0.75rem 1rem;
-                border-radius: 12px;
-                border: 1px solid var(--border);
-                background: var(--surface);
-                color: var(--text);
-                font-family: inherit;
-                transition: all 0.2s;
-            }
-            .auth-input:focus { border-color: var(--primary); outline: none; box-shadow: var(--ring); }
-            .auth-btn {
-                width: 100%;
-                padding: 0.85rem;
-                border-radius: 12px;
-                border: 0;
-                background: var(--primary);
-                color: #fff;
-                font-weight: 700;
-                cursor: pointer;
-                transition: transform 0.1s, filter 0.2s;
-                margin-top: 1rem;
-            }
-            .auth-btn:hover { filter: brightness(1.1); }
-            .auth-btn:active { transform: scale(0.98); }
-            .auth-links { margin-top: 1.5rem; text-align: center; font-size: 0.9rem; color: var(--muted); }
-            .auth-links a { color: var(--primary); text-decoration: none; font-weight: 600; }
-            .auth-links a:hover { text-decoration: underline; }
-            .error-list { color: #ef4444; font-size: 0.85rem; margin-top: 0.5rem; list-style: none; padding: 0; }
-        </style>
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body>
-        <div class="auth-background"></div>
-        <div class="auth-card">
-            <div class="logo-wrap">
-                <a href="/">
-                    <img
-                        src="{{ asset('branding/life-logo-light.svg') }}"
-                        data-theme-logo
-                        data-logo-light="{{ asset('branding/life-logo-light.svg') }}"
-                        data-logo-dark="{{ asset('branding/life-logo-dark.svg') }}"
-                        alt="Life Platform"
-                    >
-                </a>
+    <body class="lp min-h-screen">
+        <div class="min-h-screen grid place-items-center px-4 py-12">
+            <div class="w-full max-w-md">
+                <div class="card" data-reveal>
+                    <div class="flex justify-center mb-8">
+                        <a href="{{ route('home') }}" aria-label="Life Platform home">
+                            <x-application-logo class="h-12 w-auto" />
+                        </a>
+                    </div>
+                    {{ $slot }}
+                </div>
+                <div class="mt-6 text-center text-sm muted">
+                    <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle dark and light mode" title="Toggle dark and light mode">
+                        <svg data-theme-icon-sun xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2.25M12 18.75V21M4.97 4.97l1.59 1.59M17.44 17.44l1.59 1.59M3 12h2.25M18.75 12H21M4.97 19.03l1.59-1.59M17.44 6.56l1.59-1.59M15.75 12A3.75 3.75 0 1112 8.25 3.75 3.75 0 0115.75 12z" />
+                        </svg>
+                        <svg data-theme-icon-moon xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="display:none;">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 12.79A9 9 0 1111.21 3c-.02.25-.03.5-.03.75a9 9 0 009.07 9.04c.25 0 .5-.01.75-.03z" />
+                        </svg>
+                    </button>
+                </div>
             </div>
-
-            {{ $slot }}
         </div>
-
-        <script>
-            (() => {
-                const theme = document.documentElement.dataset.theme;
-                document.querySelectorAll('[data-theme-logo]').forEach((logo) => {
-                    logo.src = theme === 'dark' ? logo.dataset.logoDark : logo.dataset.logoLight;
-                });
-            })();
-        </script>
     </body>
 </html>

@@ -10,7 +10,7 @@
                     <span>{{ $classified->city ?: 'Location' }}</span>
                 </div>
                 @if ($classified->featured_image)
-                    <img src="{{ \Illuminate\Support\Facades\Storage::url($classified->featured_image) }}" alt="" style="width:100%; height:280px; object-fit:cover; border-radius:12px; margin:0 0 1rem;">
+                    <img src="{{ \Illuminate\Support\Facades\Storage::url($classified->featured_image) }}" alt="{{ $classified->title }}" loading="lazy" decoding="async" style="width:100%; height:280px; object-fit:cover; border-radius:12px; margin:0 0 1rem;">
                 @endif
                 <h2>{{ $classified->title }}</h2>
                 <p class="muted">

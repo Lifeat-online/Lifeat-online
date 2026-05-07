@@ -59,7 +59,7 @@
         @endif
     </div>
 
-    <button type="submit" class="auth-btn">
+    <button type="submit" class="button auth-btn">
         Create account
     </button>
 </form>

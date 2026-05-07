@@ -179,7 +179,7 @@
             </div>
 
             @if ($event->featured_image)
-                <img class="event-detail-cover" src="{{ \Illuminate\Support\Facades\Storage::url($event->featured_image) }}" alt="{{ $event->title }}">
+                <img class="event-detail-cover" src="{{ \Illuminate\Support\Facades\Storage::url($event->featured_image) }}" alt="{{ $event->title }}" decoding="async" fetchpriority="high">
             @endif
         </div>
 

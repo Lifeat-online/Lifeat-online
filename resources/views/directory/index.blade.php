@@ -359,7 +359,7 @@
                     @if ($loop->first)<div class="listing-grid">@endif
                     <article class="card listing-card">
                         @if ($listing->featured_image)
-                            <img class="listing-cover" src="{{ \Illuminate\Support\Facades\Storage::url($listing->featured_image) }}" alt="{{ $listing->title }}">
+                            <img class="listing-cover" src="{{ \Illuminate\Support\Facades\Storage::url($listing->featured_image) }}" alt="{{ $listing->title }}" loading="lazy" decoding="async">
                         @endif
 
                         <div class="listing-top">
@@ -376,7 +376,7 @@
                                 <h3 style="margin:0.45rem 0 0.2rem;"><a href="{{ route('directory.show', $listing) }}">{{ $listing->title }}</a></h3>
                             </div>
                             @if ($listing->logo_path)
-                                <img class="listing-logo" src="{{ \Illuminate\Support\Facades\Storage::url($listing->logo_path) }}" alt="{{ $listing->title }} logo">
+                                <img class="listing-logo" src="{{ \Illuminate\Support\Facades\Storage::url($listing->logo_path) }}" alt="{{ $listing->title }} logo" loading="lazy" decoding="async">
                             @endif
                         </div>
 

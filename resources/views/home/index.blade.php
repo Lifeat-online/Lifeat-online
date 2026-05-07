@@ -82,6 +82,7 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            gap: 0.5rem;
             border-radius: 999px;
             padding: 0.9rem 1.2rem;
             font-weight: 700;
@@ -358,9 +359,9 @@
                 Life@ News is your digital guide to the Eastern Freestate — read local stories, discover businesses near you, find upcoming events, and connect with your community.
             </p>
             <div class="hero-actions">
-                <a href="{{ route('directory.index') }}" class="hero-primary">Browse Directory</a>
-                <a href="{{ route('events.index') }}" class="hero-secondary">See Upcoming Events</a>
-                <a href="{{ route('advertise.index') }}" class="hero-secondary">Advertise With Us</a>
+                <a href="{{ route('directory.index') }}" class="hero-primary">Browse Directory <x-icon name="arrow-right" class="w-4 h-4" /></a>
+                <a href="{{ route('events.index') }}" class="hero-secondary">See Upcoming Events <x-icon name="arrow-right" class="w-4 h-4" /></a>
+                <a href="{{ route('advertise.index') }}" class="hero-secondary">Advertise With Us <x-icon name="arrow-right" class="w-4 h-4" /></a>
             </div>
             <div class="stat-grid-home">
                 <div class="stat-tile">
@@ -429,7 +430,7 @@
             <div class="lead-grid">
                 <article class="card">
                     @if ($leadArticle->featured_image)
-                        <img class="feature-media" src="{{ \Illuminate\Support\Facades\Storage::url($leadArticle->featured_image) }}" alt="{{ $leadArticle->title }}">
+                        <img class="feature-media" src="{{ \Illuminate\Support\Facades\Storage::url($leadArticle->featured_image) }}" alt="{{ $leadArticle->title }}" decoding="async" fetchpriority="high">
                     @else
                         <div class="media-fallback" aria-hidden="true"></div>
                     @endif
@@ -517,10 +518,10 @@
             @if ($loop->first)<div class="grid grid-2">@endif
             <article class="card listing-card-home">
                 @if ($listing->featured_image)
-                    <img class="feature-media media-220" src="{{ \Illuminate\Support\Facades\Storage::url($listing->featured_image) }}" alt="{{ $listing->title }}">
+                    <img class="feature-media media-220" src="{{ \Illuminate\Support\Facades\Storage::url($listing->featured_image) }}" alt="{{ $listing->title }}" loading="lazy" decoding="async">
                 @endif
                 @if ($listing->logo_path)
-                    <img class="listing-logo" src="{{ \Illuminate\Support\Facades\Storage::url($listing->logo_path) }}" alt="{{ $listing->title }} logo">
+                    <img class="listing-logo" src="{{ \Illuminate\Support\Facades\Storage::url($listing->logo_path) }}" alt="{{ $listing->title }} logo" loading="lazy" decoding="async">
                 @endif
                 <span class="eyebrow">{{ $listing->is_featured ? 'Featured business' : 'Local business' }}</span>
                 <h3 class="h3-card"><a href="{{ route('directory.show', $listing) }}">{{ $listing->title }}</a></h3>
@@ -537,6 +538,23 @@
             <div class="empty-state">No featured businesses are visible yet.</div>
         @endforelse
     </section>
+
+    @if (isset($featuredVouchers) && $featuredVouchers->isNotEmpty())
+        <section class="section">
+            <div class="section-head" data-reveal>
+                <div>
+                    <h2>Voucher Deals</h2>
+                    <p class="section-subtitle">Save with limited-time offers from businesses in the directory.</p>
+                </div>
+                <a href="{{ route('vouchers.index') }}">View all vouchers</a>
+            </div>
+            <div class="grid grid-2">
+                @foreach ($featuredVouchers as $voucher)
+                    <x-voucher-card :voucher="$voucher" />
+                @endforeach
+            </div>
+        </section>
+    @endif
 
     @if (isset($homeAdCampaigns) && $homeAdCampaigns->isNotEmpty())
         <section class="section">
@@ -589,7 +607,7 @@
             @if ($loop->first)<div class="grid grid-2">@endif
             <article class="card event-card-home">
                 @if ($event->featured_image)
-                    <img class="feature-media media-220" src="{{ \Illuminate\Support\Facades\Storage::url($event->featured_image) }}" alt="{{ $event->title }}">
+                    <img class="feature-media media-220" src="{{ \Illuminate\Support\Facades\Storage::url($event->featured_image) }}" alt="{{ $event->title }}" loading="lazy" decoding="async">
                 @endif
                 <span class="eyebrow">Upcoming event</span>
                 <h3 class="h3-card"><a href="{{ route('events.show', $event) }}">{{ $event->title }}</a></h3>

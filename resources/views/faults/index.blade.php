@@ -11,8 +11,24 @@
         .faults-grid { display: grid; gap: 1rem; grid-template-columns: 1fr; }
         .faults-map { height: min(72vh, 700px); border-radius: 16px; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow-soft); background: var(--surface); }
         .faults-controls { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-        .faults-banner { border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.18); background: linear-gradient(135deg, rgba(0, 92, 185, 0.22), rgba(0, 32, 91, 0.25)); padding: 1rem; color: rgba(219, 234, 254, 0.96); }
-        .faults-banner strong { color: #ffffff; }
+        .faults-banner {
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background:
+                radial-gradient(900px circle at 18% 30%, rgb(var(--brand-rgb) / 0.16), transparent 52%),
+                radial-gradient(900px circle at 86% 0%, rgb(var(--accent-rgb) / 0.12), transparent 58%),
+                linear-gradient(135deg, rgb(var(--surface-rgb) / 0.94), rgb(var(--surface-rgb) / 0.74));
+            padding: 1.25rem;
+            color: rgb(var(--text-rgb) / 0.92);
+            box-shadow: var(--shadow-soft);
+        }
+        html[data-theme="dark"] .faults-banner {
+            border-color: rgb(var(--brand-rgb) / 0.16);
+            background: linear-gradient(135deg, rgba(0, 92, 185, 0.22), rgba(0, 32, 91, 0.25));
+            color: rgba(219, 234, 254, 0.96);
+        }
+        .faults-banner strong { color: rgb(var(--text-rgb) / 0.98); }
+        html[data-theme="dark"] .faults-banner strong { color: #ffffff; }
         .faults-actions { display:flex; flex-wrap: wrap; gap: 0.75rem; align-items:center; justify-content: space-between; }
         .pill { display:inline-flex; align-items:center; gap:0.5rem; padding: 0.35rem 0.7rem; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: 0.9rem; }
         .pill-dot { width: 10px; height: 10px; border-radius: 999px; display:inline-block; }
@@ -20,18 +36,19 @@
         .pill-dot.acknowledged { background: #f59e0b; }
         .pill-dot.in_progress { background: #3b82f6; }
         .pill-dot.resolved { background: #10b981; }
-        .subnote { margin: 0.35rem 0 0; color: var(--muted); }
+        .subnote { margin: 0.35rem 0 0; color: rgb(var(--muted-rgb) / 0.95); }
+        html[data-theme="dark"] .subnote { color: rgba(219, 234, 254, 0.9); }
     </style>
 @endpush
 
 @section('content')
     <div class="faults-grid">
         <div class="card" style="background: transparent; border: 0; box-shadow: none; padding: 0;">
-            <div class="faults-banner">
+            <div class="faults-banner" data-reveal>
                 <div class="faults-actions">
                     <div>
                         <strong>DA Civic Infrastructure Fault Reporting</strong>
-                        <p class="subnote" style="color: rgba(219, 234, 254, 0.9); margin-top: 0.45rem;">Powered by DA — help us fix potholes, burst pipes, damaged streetlights, broken sidewalks and more.</p>
+                        <p class="subnote" style="margin-top: 0.45rem;">Powered by DA — help us fix potholes, burst pipes, damaged streetlights, broken sidewalks and more.</p>
                     </div>
                     <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
                         <a class="button-link" href="{{ route('faults.report.create') }}">Report a fault</a>

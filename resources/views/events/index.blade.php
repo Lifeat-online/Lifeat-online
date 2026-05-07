@@ -327,7 +327,7 @@
                     @if ($loop->first)<div class="event-grid">@endif
                     <article class="card event-card">
                         @if ($event->featured_image)
-                            <img class="event-cover" src="{{ \Illuminate\Support\Facades\Storage::url($event->featured_image) }}" alt="{{ $event->title }}">
+                            <img class="event-cover" src="{{ \Illuminate\Support\Facades\Storage::url($event->featured_image) }}" alt="{{ $event->title }}" loading="lazy" decoding="async">
                         @endif
 
                         <div class="event-meta">
