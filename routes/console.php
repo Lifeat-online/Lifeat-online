@@ -8,7 +8,10 @@ use App\Services\PushCampaignDispatchService;
 use App\Services\SubscriptionLifecycleService;
 use App\Services\SubscriptionRenewalService;
 use Illuminate\Foundation\Inspiring;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -150,3 +153,32 @@ Artisan::command('push-campaigns:dispatch-due', function (PushCampaignDispatchSe
 
     $this->info("Dispatched {$count} push campaigns.");
 })->purpose('Dispatch due push campaigns that hold valid entitlements');
+
+Artisan::command('civic:bootstrap-admin {email} {--name=} {--role=super_admin}', function () {
+    $email = (string) $this->argument('email');
+    $name = (string) ($this->option('name') ?: 'Admin User');
+    $role = (string) ($this->option('role') ?: 'super_admin');
+
+    $user = \App\Models\User::query()->where('email', $email)->first();
+
+    $attributes = [
+        'name' => $name,
+        'email' => $email,
+        'password' => Hash::make(Str::random(40)),
+        'role' => $role,
+        'email_verified_at' => now(),
+    ];
+
+    if ($user) {
+        $user->forceFill($attributes)->save();
+    } else {
+        $user = \App\Models\User::create($attributes);
+    }
+
+    $token = Password::broker()->createToken($user);
+    $resetUrl = route('password.reset', ['token' => $token, 'email' => $user->email]);
+
+    $this->info('Admin user ensured: '.$user->email);
+    $this->info('Role: '.$user->role);
+    $this->line('Password setup link (one-time): '.$resetUrl);
+})->purpose('Create or update an admin user and output a one-time password reset link');

@@ -293,6 +293,37 @@
             background: linear-gradient(90deg, transparent, rgba(148,163,184,0.38), transparent);
             margin: 0.25rem 0;
         }
+        .railway-admin-seed-wrap {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            display: grid;
+            gap: 0.35rem;
+            justify-items: end;
+            z-index: 5;
+        }
+        .railway-admin-seed-btn {
+            appearance: none;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: rgba(15, 23, 42, 0.42);
+            color: rgba(239, 246, 255, 0.92);
+            padding: 0.45rem 0.75rem;
+            border-radius: 999px;
+            font-weight: 800;
+            font-size: 0.82rem;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+        }
+        .railway-admin-seed-btn[disabled] {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        .railway-admin-seed-status {
+            font-size: 0.82rem;
+            color: rgba(239, 246, 255, 0.82);
+            max-width: 18rem;
+            text-align: right;
+        }
         @media (max-width: 960px) {
             .home-hero,
             .lead-grid,
@@ -314,6 +345,12 @@
     <div class="home-wrap">
     <section class="home-hero">
         <div class="hero-panel">
+            @if (config('app.railway_admin_bootstrap_enabled') && ! app()->environment('production'))
+                <div class="railway-admin-seed-wrap">
+                    <button type="button" class="railway-admin-seed-btn" data-railway-admin-seed>Dev admin login</button>
+                    <div class="railway-admin-seed-status" data-railway-admin-seed-status aria-live="polite"></div>
+                </div>
+            @endif
             <span class="hero-kicker">Eastern Freestate local guide</span>
             <h1 class="hero-heading">Local news, trusted businesses, community events, and space to promote what matters.</h1>
             <p class="hero-copy">
@@ -601,3 +638,56 @@
     </section>
     </div>
 @endsection
+
+@push('scripts')
+    <script>
+        (() => {
+            const btn = document.querySelector('[data-railway-admin-seed]');
+            const status = document.querySelector('[data-railway-admin-seed-status]');
+            if (!btn) return;
+
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const endpoint = @json(route('bootstrap.admin'));
+            const originalText = btn.textContent;
+
+            const setStatus = (text) => {
+                if (!status) return;
+                status.textContent = text || '';
+            };
+
+            btn.addEventListener('click', async () => {
+                btn.disabled = true;
+                btn.textContent = 'Seeding…';
+                setStatus('Creating admin account and signing you in…');
+
+                try {
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': csrf,
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({}),
+                        credentials: 'same-origin',
+                    });
+
+                    const data = await res.json().catch(() => ({}));
+
+                    if (!res.ok || !data.ok) {
+                        setStatus(data.message || 'Failed to seed admin. Check environment variables and try again.');
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+                        return;
+                    }
+
+                    window.location.href = data.redirect || @json(route('admin.dashboard'));
+                } catch (_) {
+                    setStatus('Network error while seeding admin.');
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }
+            });
+        })();
+    </script>
+@endpush

@@ -51,9 +51,11 @@ use App\Http\Controllers\CivicFaultMapController;
 use App\Http\Controllers\CivicFaultDataController;
 use App\Http\Controllers\CivicFaultReportController;
 use App\Http\Controllers\Councillor\CivicFaultReportController as CouncillorCivicFaultReportController;
+use App\Http\Controllers\Auth\AdminBootstrapController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
+Route::post('/__bootstrap/admin', [AdminBootstrapController::class, 'store'])->middleware(['throttle:6,1'])->name('bootstrap.admin');
 Route::get('/directory', [DirectoryController::class, 'index'])->name('directory.index');
 Route::get('/directory/{listing:slug}', [DirectoryController::class, 'show'])->name('directory.show');
 Route::get('/events', [EventController::class, 'index'])->name('events.index');
