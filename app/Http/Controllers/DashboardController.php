@@ -39,6 +39,7 @@ class DashboardController extends Controller
                     'isSupport' => $user->hasRole('support'),
                     'isStaffWriter' => $user->hasRole('admin', 'staff', 'writer'),
                     'canReviewApplications' => $user->hasRole('admin', 'editor'),
+                    'canUseDevTools' => $user->hasRole('admin'),
                 ],
                 'counts' => [
                     'users' => User::count(),

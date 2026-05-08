@@ -20,6 +20,7 @@ use App\Http\Controllers\Admin\WriterApplicationController as AdminWriterApplica
 use App\Http\Controllers\Admin\WriterPaymentController as AdminWriterPaymentController;
 use App\Http\Controllers\Admin\CouncillorController as AdminCouncillorController;
 use App\Http\Controllers\Admin\CivicFaultReportController as AdminCivicFaultReportController;
+use App\Http\Controllers\Admin\DevUpdateController as AdminDevUpdateController;
 use App\Http\Controllers\Writer\EarningsController as WriterEarningsController;
 use App\Http\Controllers\Writer\ArticleController as WriterArticleController;
 use App\Http\Controllers\AboutController;
@@ -93,6 +94,11 @@ Route::get('/faults/data/councillors', [CivicFaultDataController::class, 'counci
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/faults/report', [CivicFaultReportController::class, 'create'])->name('faults.report.create');
     Route::post('/faults/report', [CivicFaultReportController::class, 'store'])->name('faults.report.store');
+});
+
+Route::middleware(['auth', 'role:admin'])->prefix('dev')->name('dev.')->group(function () {
+    Route::get('/updates/status', [AdminDevUpdateController::class, 'status'])->name('updates.status');
+    Route::post('/updates/apply', [AdminDevUpdateController::class, 'apply'])->name('updates.apply');
 });
 
 Route::middleware('auth')->prefix('api')->name('api.')->group(function () {
