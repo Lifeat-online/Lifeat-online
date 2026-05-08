@@ -6,9 +6,11 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Life Platform')</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+    <link rel="preload" as="image" href="{{ asset('branding/life-logo-light.svg') }}">
+    <link rel="preload" as="image" href="{{ asset('branding/life-logo-dark.svg') }}">
     @stack('head')
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700|inter:400,500,600,700&display=swap" rel="stylesheet" />
     <script>
         (() => {
             const key = 'life-theme';
@@ -24,7 +26,113 @@
 </head>
 <body class="lp">
     <a class="lp-skip-link" href="#main">Skip to content</a>
-    <header class="site-header">
+    @php
+        $navLinks = [
+            ['label' => 'Home', 'url' => route('home'), 'active' => request()->routeIs('home')],
+            ['label' => 'Directory', 'url' => route('directory.index'), 'active' => request()->routeIs('directory.*')],
+            ['label' => 'Vouchers', 'url' => route('vouchers.index'), 'active' => request()->routeIs('vouchers.*')],
+            ['label' => 'Events', 'url' => route('events.index'), 'active' => request()->routeIs('events.*')],
+            ['label' => 'Articles', 'url' => route('articles.index'), 'active' => request()->routeIs('articles.*')],
+            ['label' => 'Classifieds', 'url' => route('classifieds.index'), 'active' => request()->routeIs('classifieds.*')],
+            ['label' => 'Advertise', 'url' => route('advertise.index'), 'active' => request()->routeIs('advertise.*')],
+            ['label' => 'Search', 'url' => route('search.index'), 'active' => request()->routeIs('search.*')],
+            ['label' => 'Faults', 'url' => route('faults.index'), 'active' => request()->routeIs('faults.*')],
+            ['label' => 'About', 'url' => route('about.index'), 'active' => request()->routeIs('about.*')],
+        ];
+
+        $routeName = optional(request()->route())->getName();
+        $crumbs = [
+            ['label' => 'Home', 'url' => route('home')],
+        ];
+
+        $pushCrumb = function (string $label, ?string $url = null) use (&$crumbs) {
+            $crumbs[] = ['label' => $label, 'url' => $url];
+        };
+
+        switch ($routeName) {
+            case 'home':
+                $crumbs = [];
+                break;
+            case 'directory.index':
+                $pushCrumb('Directory', route('directory.index'));
+                break;
+            case 'directory.show':
+                $pushCrumb('Directory', route('directory.index'));
+                $listing = request()->route('listing');
+                $pushCrumb($listing?->title ?: 'Listing', null);
+                break;
+            case 'vouchers.index':
+                $pushCrumb('Vouchers', route('vouchers.index'));
+                break;
+            case 'vouchers.show':
+                $pushCrumb('Vouchers', route('vouchers.index'));
+                $voucher = request()->route('voucher');
+                $pushCrumb($voucher?->title ?: 'Voucher', null);
+                break;
+            case 'events.index':
+                $pushCrumb('Events', route('events.index'));
+                break;
+            case 'events.show':
+                $pushCrumb('Events', route('events.index'));
+                $event = request()->route('event');
+                $pushCrumb($event?->title ?: 'Event', null);
+                break;
+            case 'articles.index':
+            case 'articles.categories.show':
+            case 'articles.tags.show':
+            case 'articles.locations.show':
+            case 'articles.authors.show':
+                $pushCrumb('Articles', route('articles.index'));
+                break;
+            case 'articles.show':
+                $pushCrumb('Articles', route('articles.index'));
+                $article = request()->route('article');
+                $pushCrumb($article?->title ?: 'Article', null);
+                break;
+            case 'classifieds.index':
+                $pushCrumb('Classifieds', route('classifieds.index'));
+                break;
+            case 'classifieds.show':
+                $pushCrumb('Classifieds', route('classifieds.index'));
+                $classified = request()->route('classified');
+                $pushCrumb($classified?->title ?: 'Classified', null);
+                break;
+            case 'advertise.index':
+                $pushCrumb('Advertise', route('advertise.index'));
+                break;
+            case 'search.index':
+                $pushCrumb('Search', route('search.index'));
+                break;
+            case 'faults.index':
+                $pushCrumb('Faults', route('faults.index'));
+                break;
+            case 'faults.report.create':
+                $pushCrumb('Faults', route('faults.index'));
+                $pushCrumb('Report a fault', null);
+                break;
+            case 'add-listing.index':
+                $pushCrumb('Add listing', route('add-listing.index'));
+                break;
+            case 'contact.index':
+                $pushCrumb('Contact', route('contact.index'));
+                break;
+            case 'legal.privacy':
+                $pushCrumb('Privacy', route('legal.privacy'));
+                break;
+            case 'legal.terms':
+                $pushCrumb('Terms', route('legal.terms'));
+                break;
+            case 'about.index':
+                $pushCrumb('About', route('about.index'));
+                break;
+            default:
+                if (request()->routeIs('account.*')) {
+                    $pushCrumb('Account', route('account.index'));
+                }
+                break;
+        }
+    @endphp
+    <header class="site-header" data-sticky-header>
         <div class="topbar">
             <div class="container topbar-inner">
                 @if (request()->routeIs('faults.*'))
@@ -48,44 +156,117 @@
                     data-logo-dark="{{ asset('branding/life-logo-dark.svg') }}"
                     alt="Life Platform"
                     class="brand-logo"
+                    width="240"
+                    height="56"
                 >
             </a>
             <p class="page-copy">A fast, clean local front door for editorial content, trusted businesses, upcoming events, and advertising opportunities across the Eastern Freestate.</p>
-            <nav class="nav" aria-label="Primary navigation">
-                <a href="{{ route('home') }}" class="{{ request()->routeIs('home') ? 'active' : '' }}">Home</a>
-                <a href="{{ route('directory.index') }}" class="{{ request()->routeIs('directory.*') ? 'active' : '' }}">Directory</a>
-                <a href="{{ route('vouchers.index') }}" class="{{ request()->routeIs('vouchers.*') ? 'active' : '' }}">Vouchers</a>
-                <a href="{{ route('events.index') }}" class="{{ request()->routeIs('events.*') ? 'active' : '' }}">Events</a>
-                <a href="{{ route('articles.index') }}" class="{{ request()->routeIs('articles.*') ? 'active' : '' }}">Articles</a>
-                <a href="{{ route('classifieds.index') }}" class="{{ request()->routeIs('classifieds.*') ? 'active' : '' }}">Classifieds</a>
-                <a href="{{ route('advertise.index') }}" class="{{ request()->routeIs('advertise.*') ? 'active' : '' }}">Advertise</a>
-                <a href="{{ route('search.index') }}" class="{{ request()->routeIs('search.*') ? 'active' : '' }}">Search</a>
-                <a href="{{ route('faults.index') }}" class="{{ request()->routeIs('faults.*') ? 'active' : '' }}">Faults</a>
-                <a href="{{ route('about.index') }}" class="{{ request()->routeIs('about.*') ? 'active' : '' }}">About</a>
-                <span class="nav-spacer"></span>
-                <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle dark and light mode" title="Toggle dark and light mode">
-                    <svg data-theme-icon-sun xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2.25M12 18.75V21M4.97 4.97l1.59 1.59M17.44 17.44l1.59 1.59M3 12h2.25M18.75 12H21M4.97 19.03l1.59-1.59M17.44 6.56l1.59-1.59M15.75 12A3.75 3.75 0 1112 8.25 3.75 3.75 0 0115.75 12z" />
-                    </svg>
-                    <svg data-theme-icon-moon xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="display:none;">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 12.79A9 9 0 1111.21 3c-.02.25-.03.5-.03.75a9 9 0 009.07 9.04c.25 0 .5-.01.75-.03z" />
-                    </svg>
+            <nav class="lp-nav" aria-label="Primary navigation" data-nav-root>
+                <button type="button" class="lp-nav-toggle" data-nav-toggle aria-controls="lp-nav-drawer" aria-expanded="false" aria-label="Open menu">
+                    <x-icon name="menu" class="w-6 h-6" />
                 </button>
-                @auth
-                    <a href="{{ route('dashboard') }}" class="button-link">Dashboard</a>
-                    <form method="post" action="{{ route('logout') }}">
-                        @csrf
-                        <button type="submit" class="button-link">Logout</button>
-                    </form>
-                @else
-                    <a href="{{ route('login') }}" class="button-link">Login</a>
-                    <a href="{{ route('register') }}" class="button-link">Register</a>
-                @endauth
+
+                <div class="lp-nav-desktop" data-nav-desktop>
+                    <ul class="lp-nav-list">
+                        @foreach ($navLinks as $link)
+                            <li class="lp-nav-item">
+                                <a href="{{ $link['url'] }}" class="lp-nav-link {{ $link['active'] ? 'active' : '' }}" data-nav-link>{{ $link['label'] }}</a>
+                            </li>
+                        @endforeach
+                    </ul>
+                    <div class="lp-nav-tools">
+                        <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle dark and light mode" title="Toggle dark and light mode">
+                            <svg data-theme-icon-sun xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2.25M12 18.75V21M4.97 4.97l1.59 1.59M17.44 17.44l1.59 1.59M3 12h2.25M18.75 12H21M4.97 19.03l1.59-1.59M17.44 6.56l1.59-1.59M15.75 12A3.75 3.75 0 1112 8.25 3.75 3.75 0 0115.75 12z" />
+                            </svg>
+                            <svg data-theme-icon-moon xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="display:none;">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 12.79A9 9 0 1111.21 3c-.02.25-.03.5-.03.75a9 9 0 009.07 9.04c.25 0 .5-.01.75-.03z" />
+                            </svg>
+                        </button>
+                        @auth
+                            <a href="{{ route('dashboard') }}" class="button-link">Dashboard</a>
+                            <form method="post" action="{{ route('logout') }}">
+                                @csrf
+                                <button type="submit" class="button-link">Logout</button>
+                            </form>
+                        @else
+                            <a href="{{ route('login') }}" class="button-link">Login</a>
+                            <a href="{{ route('register') }}" class="button-link">Register</a>
+                        @endauth
+                    </div>
+                </div>
+
+                <div class="lp-nav-overlay" data-nav-overlay hidden></div>
+                <div class="lp-nav-drawer" id="lp-nav-drawer" data-nav-drawer hidden role="dialog" aria-modal="true" aria-label="Menu">
+                    <div class="lp-drawer-head">
+                        <div class="lp-drawer-brand">
+                            <img
+                                src="{{ asset('branding/life-logo-light.svg') }}"
+                                data-theme-logo
+                                data-logo-light="{{ asset('branding/life-logo-light.svg') }}"
+                                data-logo-dark="{{ asset('branding/life-logo-dark.svg') }}"
+                                alt="Life Platform"
+                                class="lp-drawer-logo"
+                                width="180"
+                                height="42"
+                                decoding="async"
+                            >
+                        </div>
+                        <div class="lp-drawer-actions">
+                            <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle dark and light mode" title="Toggle dark and light mode">
+                                <svg data-theme-icon-sun xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2.25M12 18.75V21M4.97 4.97l1.59 1.59M17.44 17.44l1.59 1.59M3 12h2.25M18.75 12H21M4.97 19.03l1.59-1.59M17.44 6.56l1.59-1.59M15.75 12A3.75 3.75 0 1112 8.25 3.75 3.75 0 0115.75 12z" />
+                                </svg>
+                                <svg data-theme-icon-moon xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="display:none;">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 12.79A9 9 0 1111.21 3c-.02.25-.03.5-.03.75a9 9 0 009.07 9.04c.25 0 .5-.01.75-.03z" />
+                                </svg>
+                            </button>
+                            <button type="button" class="lp-nav-close" data-nav-close aria-label="Close menu">
+                                <x-icon name="x" class="w-6 h-6" />
+                            </button>
+                        </div>
+                    </div>
+                    <ul class="lp-nav-mobile-list">
+                        @foreach ($navLinks as $link)
+                            <li>
+                                <a href="{{ $link['url'] }}" class="lp-nav-mobile-link {{ $link['active'] ? 'active' : '' }}" data-nav-link>{{ $link['label'] }}</a>
+                            </li>
+                        @endforeach
+                    </ul>
+                    <div class="lp-drawer-footer">
+                        @auth
+                            <a href="{{ route('dashboard') }}" class="button-link w-full">Dashboard</a>
+                            <form method="post" action="{{ route('logout') }}" class="w-full">
+                                @csrf
+                                <button type="submit" class="button-link w-full">Logout</button>
+                            </form>
+                        @else
+                            <a href="{{ route('login') }}" class="button-link w-full">Login</a>
+                            <a href="{{ route('register') }}" class="button-link w-full">Register</a>
+                        @endauth
+                    </div>
+                </div>
             </nav>
         </div>
     </header>
 
     <main id="main" class="container" data-reveal>
+        @if (!empty($crumbs) && count($crumbs) > 1)
+            <nav class="lp-breadcrumb" aria-label="Breadcrumb" data-reveal>
+                <ol class="lp-breadcrumb-list">
+                    @foreach ($crumbs as $crumb)
+                        @php $isLast = $loop->last; @endphp
+                        <li class="lp-breadcrumb-item">
+                            @if (! $isLast && ! empty($crumb['url']))
+                                <a class="lp-breadcrumb-link" href="{{ $crumb['url'] }}">{{ $crumb['label'] }}</a>
+                            @else
+                                <span class="lp-breadcrumb-current" aria-current="page">{{ $crumb['label'] }}</span>
+                            @endif
+                        </li>
+                    @endforeach
+                </ol>
+            </nav>
+        @endif
         @yield('content')
     </main>
 

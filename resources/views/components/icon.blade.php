@@ -15,6 +15,16 @@
 @endphp
 
 @switch($name)
+    @case('menu')
+        <svg {{ $attributes->merge($common)->except('name') }}>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+        @break
+    @case('x')
+        <svg {{ $attributes->merge($common)->except('name') }}>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18" />
+        </svg>
+        @break
     @case('arrow-right')
         <svg {{ $attributes->merge($common)->except('name') }}>
             <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12h13.5m0 0l-5.25-5.25M18 12l-5.25 5.25" />

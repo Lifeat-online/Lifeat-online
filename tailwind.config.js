@@ -32,8 +32,8 @@ export default {
         },
         extend: {
             fontFamily: {
-                sans: ['Figtree', ...defaultTheme.fontFamily.sans],
-                display: ['Figtree', ...defaultTheme.fontFamily.sans],
+                sans: ['Inter', 'Figtree', ...defaultTheme.fontFamily.sans],
+                display: ['Inter', 'Figtree', ...defaultTheme.fontFamily.sans],
             },
             colors: {
                 canvas: withOpacity('--canvas-rgb'),
