@@ -1,9 +1,8 @@
-const CACHE_VERSION = 'da-faults-v1';
+const CACHE_VERSION = 'da-faults-v2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
 const STATIC_URLS = [
-  '/',
   '/faults',
   '/faults/report',
 ];
@@ -27,13 +26,19 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
 
   if (req.method !== 'GET') return;
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
         .then((res) => {
           const copy = res.clone();
-          caches.open(RUNTIME_CACHE).then((cache) => cache.put(req, copy));
+          event.waitUntil(
+            caches
+              .open(RUNTIME_CACHE)
+              .then((cache) => cache.put(req, copy))
+              .catch(() => {})
+          );
           return res;
         })
         .catch(async () => {
@@ -53,7 +58,12 @@ self.addEventListener('fetch', (event) => {
         return fetch(req)
           .then((res) => {
             const copy = res.clone();
-            caches.open(RUNTIME_CACHE).then((cache) => cache.put(req, copy));
+            event.waitUntil(
+              caches
+                .open(RUNTIME_CACHE)
+                .then((cache) => cache.put(req, copy))
+                .catch(() => {})
+            );
             return res;
           })
           .catch(() => cached);
@@ -69,7 +79,12 @@ self.addEventListener('fetch', (event) => {
         return fetch(req)
           .then((res) => {
             const copy = res.clone();
-            caches.open(RUNTIME_CACHE).then((cache) => cache.put(req, copy));
+            event.waitUntil(
+              caches
+                .open(RUNTIME_CACHE)
+                .then((cache) => cache.put(req, copy))
+                .catch(() => {})
+            );
             return res;
           })
           .catch(() => cached);
@@ -77,4 +92,3 @@ self.addEventListener('fetch', (event) => {
     );
   }
 });
-

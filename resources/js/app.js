@@ -317,6 +317,27 @@ const initPublicNavigation = () => {
     );
 };
 
+const initScopedServiceWorker = () => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const url = document.querySelector('meta[name="lp-sw-url"]')?.getAttribute('content');
+    const scope = document.querySelector('meta[name="lp-sw-scope"]')?.getAttribute('content');
+    if (!url || !scope) return;
+
+    navigator.serviceWorker
+        .getRegistrations()
+        .then((regs) => {
+            regs.forEach((r) => {
+                if (r.scope === `${location.origin}/`) {
+                    r.unregister().catch(() => {});
+                }
+            });
+        })
+        .catch(() => {});
+
+    navigator.serviceWorker.register(url, { scope }).catch(() => {});
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     initThemeToggle();
     initReveal();
@@ -324,4 +345,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initPublicNavigation();
     initSmoothScroll();
     initSectionHighlighting();
+    initScopedServiceWorker();
 });

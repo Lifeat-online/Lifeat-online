@@ -98,6 +98,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 Route::middleware(['auth', 'role:admin'])->prefix('dev')->name('dev.')->group(function () {
     Route::get('/updates/status', [AdminDevUpdateController::class, 'status'])->name('updates.status');
+    Route::get('/updates/credentials', [AdminDevUpdateController::class, 'credentials'])->name('updates.credentials');
+    Route::post('/updates/credentials', [AdminDevUpdateController::class, 'saveCredentials'])->name('updates.credentials.save');
+    Route::post('/updates/credentials/test', [AdminDevUpdateController::class, 'testCredentials'])->name('updates.credentials.test');
     Route::post('/updates/apply', [AdminDevUpdateController::class, 'apply'])->name('updates.apply');
 });
 

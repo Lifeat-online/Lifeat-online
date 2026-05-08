@@ -4,6 +4,8 @@
 
 @push('head')
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <meta name="lp-sw-url" content="{{ asset('sw.js') }}">
+    <meta name="lp-sw-scope" content="/faults/">
 @endpush
 
 @push('styles')
@@ -297,12 +299,6 @@
                 form.reset();
                 alert('Saved offline. It will submit automatically when your connection is restored.');
             });
-        })();
-    </script>
-    <script>
-        (() => {
-            if (!('serviceWorker' in navigator)) return;
-            navigator.serviceWorker.register(@json(asset('sw.js'))).catch(() => {});
         })();
     </script>
 @endpush
