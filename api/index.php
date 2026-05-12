@@ -41,8 +41,6 @@ foreach ($defaultEnv as $key => $value) {
 // Register the Composer autoloader
 require __DIR__.'/../vendor/autoload.php';
 
-// Bootstrap Laravel and handle the request...
-$app = require_once __DIR__.'/../bootstrap/app.php';
-
-$app->handleRequest(Illuminate\Http\Request::capture());
+// Forward Vercel requests to normal index.php
+require __DIR__ . '/../public/index.php';
 
