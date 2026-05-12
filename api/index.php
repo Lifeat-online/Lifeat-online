@@ -41,15 +41,8 @@ foreach ($defaultEnv as $key => $value) {
 // Register the Composer autoloader
 require __DIR__.'/../vendor/autoload.php';
 
+// Bootstrap Laravel and handle the request...
 $app = require_once __DIR__.'/../bootstrap/app.php';
 
-// Capture the request and handle it
-$request = Illuminate\Http\Request::capture();
-$response = $app->handleRequest($request);
-
-// Send the response back to the client
-$response->send();
-
-// Terminate the application
-$app->terminate();
+$app->handleRequest(Illuminate\Http\Request::capture());
 
