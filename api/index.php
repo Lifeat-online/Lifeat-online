@@ -41,6 +41,9 @@ foreach ($defaultEnv as $key => $value) {
 // Register the Composer autoloader
 require __DIR__.'/../vendor/autoload.php';
 
+// Fix Vercel's document root
+$_SERVER['DOCUMENT_ROOT'] = __DIR__ . '/../public';
+
 // Forward Vercel requests to normal index.php
 require __DIR__ . '/../public/index.php';
 
