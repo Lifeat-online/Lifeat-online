@@ -26,6 +26,7 @@ $defaultEnv = [
     'VIEW_COMPILED_PATH' => $laravelTempRoot.DIRECTORY_SEPARATOR.'views',
     'LOG_CHANNEL' => 'stderr',
     'CACHE_DRIVER' => 'array',
+    'SESSION_DRIVER' => 'cookie',
 ];
 
 foreach ($defaultEnv as $key => $value) {
