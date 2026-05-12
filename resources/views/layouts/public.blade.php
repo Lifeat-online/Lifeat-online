@@ -132,7 +132,7 @@
                 break;
         }
     @endphp
-    <header class="site-header" data-sticky-header>
+    <header class="site-header">
         <div class="topbar">
             <div class="container topbar-inner">
                 @if (request()->routeIs('faults.*'))
