@@ -80,55 +80,6 @@ const prefersReducedMotion = () => {
     return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 };
 
-const initStickyHeader = () => {
-    const header = document.querySelector('[data-sticky-header]');
-    if (!header) return;
-
-    const TOP_THRESHOLD = 24;
-    const SCROLL_THRESHOLD = 6;
-    const HIDE_THRESHOLD = 120;
-
-    let lastY = window.scrollY || 0;
-    let ticking = false;
-
-    const update = () => {
-        ticking = false;
-        const y = window.scrollY || 0;
-        const delta = y - lastY;
-        lastY = y;
-
-        const menuOpen = document.documentElement.classList.contains('lp-nav-open');
-        if (menuOpen) {
-            header.classList.remove('is-hidden');
-            return;
-        }
-
-        if (y < TOP_THRESHOLD) {
-            header.classList.remove('is-hidden');
-            return;
-        }
-
-        if (delta > SCROLL_THRESHOLD && y > HIDE_THRESHOLD) {
-            header.classList.add('is-hidden');
-            return;
-        }
-
-        if (delta < -SCROLL_THRESHOLD) {
-            header.classList.remove('is-hidden');
-        }
-    };
-
-    window.addEventListener(
-        'scroll',
-        () => {
-            if (ticking) return;
-            ticking = true;
-            window.requestAnimationFrame(update);
-        },
-        { passive: true },
-    );
-};
-
 const initSectionHighlighting = () => {
     const links = Array.from(document.querySelectorAll('[data-nav-link]')).filter((a) => a instanceof HTMLAnchorElement);
     if (!links.length) return;
@@ -341,7 +292,6 @@ const initScopedServiceWorker = () => {
 document.addEventListener('DOMContentLoaded', () => {
     initThemeToggle();
     initReveal();
-    initStickyHeader();
     initPublicNavigation();
     initSmoothScroll();
     initSectionHighlighting();

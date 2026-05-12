@@ -137,8 +137,6 @@
     }
 
     .site-header {
-        position: sticky;
-        top: 0;
         z-index: 40;
         overflow: hidden;
         border-bottom: 1px solid rgb(var(--border-rgb) / 0.8);
@@ -150,10 +148,6 @@
     html[data-theme="dark"] .site-header {
         background: rgb(var(--surface-rgb) / 0.90);
         box-shadow: 0 1px 3px rgb(0 0 0 / 0.40), 0 1px 2px rgb(0 0 0 / 0.28);
-    }
-
-    .site-header.is-hidden {
-        transform: translateY(-100%);
     }
 
     .site-header::before {
