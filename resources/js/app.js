@@ -1,6 +1,7 @@
 import './bootstrap';
 
 import Alpine from 'alpinejs';
+import { createClient } from '@supabase/supabase-js';
 
 window.Alpine = Alpine;
 
@@ -289,6 +290,17 @@ const initScopedServiceWorker = () => {
     navigator.serviceWorker.register(url, { scope }).catch(() => {});
 };
 
+const initSupabase = () => {
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!url || !key) return;
+    try {
+        window.supabase = createClient(url, key);
+    } catch (error) {
+        console.error('Supabase initialization failed:', error);
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     initThemeToggle();
     initReveal();
@@ -296,4 +308,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initSmoothScroll();
     initSectionHighlighting();
     initScopedServiceWorker();
+    initSupabase();
 });
