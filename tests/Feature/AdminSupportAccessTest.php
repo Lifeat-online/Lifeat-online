@@ -177,10 +177,31 @@ class AdminSupportAccessTest extends TestCase
         $response->assertSee(route('admin.finance.payments.index', ['status' => 'failed']), false);
         $response->assertSee(route('admin.finance.notifications.index', ['status' => 'attention']), false);
         $response->assertSee(route('admin.finance.subscriptions.index', ['status' => 'active', 'ending_within_days' => 7]));
+        $response->assertDontSee('Developer Control Center');
+        $response->assertDontSee('Testing Area');
         $response->assertDontSee('New Listing');
         $response->assertDontSee('New Event');
         $response->assertDontSee('New Article');
         $response->assertDontSee('Review Applications');
+    }
+
+    public function test_admin_user_sees_dev_tab_sections_on_dashboard(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'name' => 'Admin Dev User',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('admin.dashboard'));
+
+        $response->assertOk();
+        $response->assertSee('Management Area');
+        $response->assertSee('Dev');
+        $response->assertSee('Developer Control Center');
+        $response->assertSee('Live Metrics');
+        $response->assertSee('Testing Area');
+        $response->assertSee('Roles And Permissions');
+        $response->assertSee('Server Statistics');
     }
 
     public function test_support_user_cannot_use_write_finance_actions(): void
@@ -212,6 +233,19 @@ class AdminSupportAccessTest extends TestCase
         ]);
 
         $response = $this->actingAs($support)->post(route('admin.finance.payments.mark-paid', $payment));
+
+        $response->assertForbidden();
+    }
+
+    public function test_support_user_cannot_run_dev_test_suite(): void
+    {
+        $support = User::factory()->create([
+            'role' => 'support',
+        ]);
+
+        $response = $this->actingAs($support)->postJson(route('dev.tests.run'), [
+            'suite' => 'Unit',
+        ]);
 
         $response->assertForbidden();
     }

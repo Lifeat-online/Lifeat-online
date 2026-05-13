@@ -102,6 +102,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('dev')->name('dev.')->group(fu
     Route::post('/updates/credentials', [AdminDevUpdateController::class, 'saveCredentials'])->name('updates.credentials.save');
     Route::post('/updates/credentials/test', [AdminDevUpdateController::class, 'testCredentials'])->name('updates.credentials.test');
     Route::post('/updates/apply', [AdminDevUpdateController::class, 'apply'])->name('updates.apply');
+    Route::post('/tests/run', [AdminDevUpdateController::class, 'runTests'])->middleware('throttle:2,1')->name('tests.run');
 });
 
 Route::middleware('auth')->prefix('api')->name('api.')->group(function () {
