@@ -14,7 +14,8 @@ class HomePageTest extends TestCase
         $response = $this->get(route('home'));
 
         $response->assertOk();
-        $response->assertSee('Local news, trusted businesses, community events, and space to promote what matters.');
+        $response->assertSee('Local news, trusted businesses, community events, and paid work for people in our towns.');
+        $response->assertSee('Advertising here funds local earning opportunities.');
         $response->assertSee('Top Story and Latest News');
         $response->assertSee('Featured Businesses');
         $response->assertSee('Upcoming Events');

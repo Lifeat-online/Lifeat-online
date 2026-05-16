@@ -241,11 +241,35 @@
             margin-bottom: 1rem;
         }
         .promo-strip,
-        .community-strip {
+        .community-strip,
+        .mission-strip {
             display: grid;
             gap: 1rem;
             grid-template-columns: 1.2fr 0.8fr;
             align-items: stretch;
+        }
+        .mission-card {
+            border-radius: 24px;
+            padding: 1.6rem;
+            border: 1px solid var(--border);
+            background:
+                linear-gradient(135deg, rgba(20, 184, 166, 0.12), rgba(29, 78, 216, 0.04)),
+                var(--surface);
+        }
+        .mission-list {
+            display: grid;
+            gap: 0.75rem;
+            margin: 1rem 0 0;
+            padding: 0;
+            list-style: none;
+        }
+        .mission-list li {
+            display: grid;
+            gap: 0.25rem;
+            padding: 0.85rem;
+            border-radius: 16px;
+            border: 1px solid rgb(var(--border-rgb) / 0.9);
+            background: rgb(var(--surface-rgb) / 0.76);
         }
         .promo-card {
             padding: 1.6rem;
@@ -329,6 +353,7 @@
             .home-hero,
             .lead-grid,
             .promo-strip,
+            .mission-strip,
             .community-strip {
                 grid-template-columns: 1fr;
             }
@@ -353,15 +378,15 @@
                 <button type="button" class="railway-admin-seed-btn" data-railway-admin-seed>Dev admin login</button>
                 <div class="railway-admin-seed-status" data-railway-admin-seed-status aria-live="polite"></div>
             </div>
-            <span class="hero-kicker">Eastern Freestate local guide</span>
-            <h1 class="hero-heading">Local news, trusted businesses, community events, and space to promote what matters.</h1>
+            <span class="hero-kicker">A local guide that creates local work</span>
+            <h1 class="hero-heading">Local news, trusted businesses, community events, and paid work for people in our towns.</h1>
             <p class="hero-copy">
-                Life@ News is your digital guide to the Eastern Freestate — read local stories, discover businesses near you, find upcoming events, and connect with your community.
+                Life@ News is built as a job-creation platform first. Every listing, story, event, and advert helps grow a useful local information network while giving writers and sales staff real ways to earn.
             </p>
             <div class="hero-actions">
                 <a href="{{ route('directory.index') }}" class="hero-primary">Browse Directory <x-icon name="arrow-right" class="w-4 h-4" /></a>
                 <a href="{{ route('events.index') }}" class="hero-secondary">See Upcoming Events <x-icon name="arrow-right" class="w-4 h-4" /></a>
-                <a href="{{ route('advertise.index') }}" class="hero-secondary">Advertise With Us <x-icon name="arrow-right" class="w-4 h-4" /></a>
+                <a href="{{ route('advertise.index') }}" class="hero-secondary">Create local work <x-icon name="arrow-right" class="w-4 h-4" /></a>
             </div>
             <div class="stat-grid-home">
                 <div class="stat-tile">
@@ -380,7 +405,7 @@
             <div class="hero-meta" aria-label="Helpful links">
                 <span><a href="{{ route('articles.index') }}">Read the latest stories</a></span>
                 <span>·</span>
-                <span><a href="{{ route('add-listing.index') }}">Add your listing</a></span>
+                <span><a href="{{ route('add-listing.index') }}">Add your listing and support jobs</a></span>
                 <span>·</span>
                 <span><a href="{{ route('contact.index') }}">Contact the team</a></span>
             </div>
@@ -415,6 +440,37 @@
                 <p class="muted mt-065 mb-0">Tip: use a keyword + town name for the fastest results.</p>
             </div>
         </div>
+    </section>
+
+    <section class="section mission-strip">
+        <article class="mission-card">
+            <span class="eyebrow">Why the platform exists</span>
+            <h2 class="h2-block">Advertising here funds local earning opportunities.</h2>
+            <p class="muted">
+                Businesses get visibility, residents get useful local information, and the work of capturing listings, writing stories, assisting clients, and running campaigns creates income for people in the community.
+            </p>
+            <div class="hero-actions mt-10">
+                <a href="{{ route('advertise.index') }}" class="button">See how advertising creates work</a>
+                <a href="{{ route('staff-signup.create') }}" class="button-link">Apply to work with us</a>
+            </div>
+        </article>
+        <aside class="card">
+            <span class="eyebrow">Staff assisted vs self service</span>
+            <ul class="mission-list">
+                <li>
+                    <strong>Staff assisted costs less because it creates a job.</strong>
+                    <span class="muted">A local person helps capture, prepare, and support the business listing.</span>
+                </li>
+                <li>
+                    <strong>Self service costs more because it skips that work opportunity.</strong>
+                    <span class="muted">Owners get direct control, while the higher price helps protect the job-creation model.</span>
+                </li>
+                <li>
+                    <strong>Every add-on starts with a listing.</strong>
+                    <span class="muted">Events, banners, article placements, and push campaigns all grow from a verified local business profile.</span>
+                </li>
+            </ul>
+        </aside>
     </section>
 
     <section class="section">
@@ -474,9 +530,9 @@
 
                     <div class="promo-card">
                         <span class="eyebrow">Advertise with us</span>
-                        <h3 class="h3-block">Reach local readers with a featured listing or ad campaign.</h3>
-                        <p class="muted">Get your business seen by Eastern Freestate residents through directory placement, banner ads, and push notifications.</p>
-                        <a href="{{ route('advertise.index') }}" class="button mt-08">See advertising options</a>
+                        <h3 class="h3-block">Reach local readers and help create local work.</h3>
+                        <p class="muted">Start with a business listing, then add events, banner ads, article placements, and push notifications. Staff-assisted listings are intentionally cheaper because they put someone to work.</p>
+                        <a href="{{ route('advertise.index') }}" class="button mt-08">Build a visibility package</a>
                     </div>
                 </div>
             </div>
@@ -576,20 +632,20 @@
         <div class="promo-strip">
             <div class="promo-card">
                 <span class="eyebrow">Advertise locally</span>
-                <h2 class="h2-block">Put your business in front of local customers.</h2>
-                <p class="muted">Reach thousands of local readers with a featured listing, banner campaign, or event promotion across the Eastern Freestate.</p>
+                <h2 class="h2-block">Put your business in front of local customers while backing local jobs.</h2>
+                <p class="muted">Choose staff-assisted setup to support paid local sales and onboarding work, or self-service if you want direct control. Both paths start with a listing and unlock events, banners, article placements, and push campaigns.</p>
                 <div class="hero-actions mt-10">
-                    <a href="{{ route('advertise.index') }}" class="button">Explore packages</a>
+                    <a href="{{ route('advertise.index') }}" class="button">Explore job-creating packages</a>
                     <a href="{{ route('directory.index') }}" class="button-link btn-soft">See listing examples</a>
                 </div>
             </div>
             <div class="card">
                 <span class="eyebrow">Why this matters</span>
                 <ul class="list-spaced">
+                    <li>Staff-assisted setup gives local people paid work</li>
                     <li>Editorial traffic feeds business discovery</li>
-                    <li>Premium listings get homepage exposure</li>
-                    <li>Events get a clear discovery lane</li>
-                    <li>Advertisers get visible upgrade points</li>
+                    <li>Events and campaigns grow from verified listings</li>
+                    <li>Advertising revenue helps fund local content and support</li>
                 </ul>
             </div>
         </div>
@@ -636,8 +692,8 @@
             <div class="cta-grid">
                 <div class="cta-card">
                     <span class="eyebrow">For businesses</span>
-                    <h3 class="h3-cta">Promote your business</h3>
-                    <p class="muted">Use packages, featured placement, and event add-ons to reach local traffic.</p>
+                    <h3 class="h3-cta">Promote your business and create work</h3>
+                    <p class="muted">Use staff-assisted or self-service packages, featured placements, events, and campaign add-ons to reach local traffic.</p>
                     <a href="{{ route('advertise.index') }}">Start here</a>
                 </div>
                 <div class="cta-card">

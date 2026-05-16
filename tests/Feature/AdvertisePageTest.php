@@ -21,8 +21,9 @@ class AdvertisePageTest extends TestCase
         $response = $this->get(route('advertise.index'));
 
         $response->assertOk();
-        $response->assertSee('Build one business visibility package');
-        $response->assertSee('Listing first');
+        $response->assertSee('Put your business on the platform that is built to employ local people.');
+        $response->assertSee('Why self-service costs more');
+        $response->assertSee('Staff assisted is cheaper because it creates a job.');
         $response->assertSee('Business Directory Standard');
         $response->assertSee('Business Directory Self-Service');
         $response->assertSee('Event One-Off Package');

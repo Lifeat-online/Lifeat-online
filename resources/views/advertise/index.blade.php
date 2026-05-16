@@ -47,47 +47,94 @@
         .bundle-mini-grid { display:grid; gap:0.75rem; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); }
         .bundle-mini { border:1px solid rgb(var(--border-rgb) / 0.9); border-radius:14px; padding:0.9rem; background:rgb(var(--surface-rgb) / 0.72); }
         .bundle-mini strong { display:block; margin-bottom:0.3rem; }
+        .mission-hero {
+            display:grid;
+            gap:1rem;
+            grid-template-columns:minmax(0, 1.3fr) minmax(280px, 0.7fr);
+            align-items:stretch;
+        }
+        .mission-hero-panel {
+            border-radius:24px;
+            padding:1.75rem;
+            border:1px solid rgb(var(--border-rgb) / 0.9);
+            background:
+                linear-gradient(135deg, rgb(var(--accent-rgb) / 0.13), rgb(var(--brand-rgb) / 0.05)),
+                rgb(var(--surface-rgb) / 0.94);
+            box-shadow:var(--shadow-soft);
+        }
+        .price-logic {
+            display:grid;
+            gap:0.75rem;
+            margin-top:1rem;
+        }
+        .price-logic-item {
+            display:grid;
+            gap:0.25rem;
+            padding:0.85rem;
+            border-radius:14px;
+            border:1px solid rgb(var(--border-rgb) / 0.9);
+            background:rgb(var(--surface-rgb) / 0.76);
+        }
+        .price-logic-item strong { color:rgb(var(--text-rgb) / 0.96); }
         [x-cloak] { display:none !important; }
         @media (max-width: 920px) {
             .bundle-shell { grid-template-columns:1fr; }
+            .mission-hero { grid-template-columns:1fr; }
             .bundle-summary { position:static; }
         }
     </style>
 @endpush
 
 @section('content')
-    <section class="section">
-        <div class="section-head">
-            <div>
-                <span class="badge">Advertise</span>
-                <h2 class="h2-tight">Build one business visibility package</h2>
-                <p class="muted mb-0">Every advertiser starts with a listing. Switch events, advert placements, and push notifications on or off, then checkout with one combined order.</p>
-            </div>
-            <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+    <section class="section mission-hero">
+        <article class="mission-hero-panel">
+            <span class="badge">Advertise and create work</span>
+            <h2 class="h2-tight">Put your business on the platform that is built to employ local people.</h2>
+            <p class="muted mb-0">Life@ is a job-creation platform as much as it is a local media and directory platform. A business listing starts your advertising journey and helps fund the people who capture listings, support clients, write local stories, and run campaigns.</p>
+            <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:1rem;">
+                <a class="button" href="#build-package">Build your package</a>
+                <a class="button-link" href="{{ route('staff-signup.create') }}">Apply to work with us</a>
                 <a class="button-link" href="{{ route('directory.index') }}">View directory</a>
-                <a class="button-link" href="{{ route('contact.index') }}">Ask for help</a>
             </div>
-        </div>
+        </article>
+        <aside class="card">
+            <span class="eyebrow">Why self-service costs more</span>
+            <div class="price-logic">
+                <div class="price-logic-item">
+                    <strong>Staff assisted is cheaper because it creates a job.</strong>
+                    <span class="muted">A local staff member earns by helping capture and onboard the business.</span>
+                </div>
+                <div class="price-logic-item">
+                    <strong>Self service is for owners who want direct control.</strong>
+                    <span class="muted">It costs more because it bypasses the assisted work opportunity and helps protect the employment model.</span>
+                </div>
+                <div class="price-logic-item">
+                    <strong>Listing first, then everything else.</strong>
+                    <span class="muted">Events, article placements, banners, and push campaigns all require an active business listing.</span>
+                </div>
+            </div>
+        </aside>
     </section>
 
     <section class="section">
         <div class="bundle-mini-grid">
             <div class="bundle-mini">
                 <strong>Staff assisted</strong>
-                <span class="muted">A staff member captures the business details by visit, phone, WhatsApp, or form.</span>
+                <span class="muted">Lower price because a local person is paid to help capture and support the business.</span>
             </div>
             <div class="bundle-mini">
                 <strong>Self service</strong>
-                <span class="muted">The owner manages their own listing, campaigns, events, and renewals.</span>
+                <span class="muted">Higher price for direct owner control while still contributing to the job-creation model.</span>
             </div>
             <div class="bundle-mini">
-                <strong>Listing first</strong>
-                <span class="muted">Events, ads, banners, and push only activate once the business listing is active.</span>
+                <strong>Public impact</strong>
+                <span class="muted">Advertising revenue helps fund local stories, sales support, onboarding, and community discovery.</span>
             </div>
         </div>
     </section>
 
     <section
+        id="build-package"
         class="section bundle-shell"
         x-data="advertisingBundle({
             directories: @js($directoryOptions),
@@ -103,7 +150,7 @@
                         <span class="bundle-step">1</span>
                         <div>
                             <h3 class="h3-tight">Business listing</h3>
-                            <p class="muted mb-0">Required gateway package. Choose who will manage the listing setup.</p>
+                            <p class="muted mb-0">Required gateway package. Choose the setup model that matches your role in local job creation.</p>
                         </div>
                     </div>
                     <span class="badge">Required</span>
@@ -120,7 +167,7 @@
                                 <span class="bundle-price" x-text="money(option.amount)"></span>
                             </div>
                             <span class="muted" x-text="option.description"></span>
-                            <span class="mini-meta" x-text="option.is_self_service ? 'Self-service dashboard access' : 'Staff-assisted onboarding'"></span>
+                            <span class="mini-meta" x-text="option.is_self_service ? 'Higher-price owner-managed path that helps sustain the employment model' : 'Lower-price assisted path because a staff member earns from onboarding'"></span>
                         </label>
                     </template>
                 </div>
