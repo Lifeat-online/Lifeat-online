@@ -47,6 +47,8 @@
         .bundle-mini-grid { display:grid; gap:0.75rem; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); }
         .bundle-mini { border:1px solid rgb(var(--border-rgb) / 0.9); border-radius:14px; padding:0.9rem; background:rgb(var(--surface-rgb) / 0.72); }
         .bundle-mini strong { display:block; margin-bottom:0.3rem; }
+        .bundle-free-note { display:grid; gap:0.5rem; border-radius:14px; padding:0.9rem; border:1px solid rgb(22 163 74 / 0.3); background:rgb(22 163 74 / 0.08); }
+        .bundle-form-grid { display:grid; gap:0.75rem; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); }
         .mission-hero {
             display:grid;
             gap:1rem;
@@ -262,6 +264,69 @@
                     </label>
                 </div>
             </article>
+
+            <article class="bundle-panel">
+                <div class="bundle-panel-head">
+                    <div class="bundle-panel-title">
+                        <span class="bundle-step">5</span>
+                        <div>
+                            <h3 class="h3-tight">Voucher attraction offer</h3>
+                            <p class="muted mb-0">Free for listed companies. Use a strong once-off deal to bring in new clients who can spend on drinks, desserts, services, add-ons, and return visits.</p>
+                        </div>
+                    </div>
+                    <label class="bundle-toggle">
+                        <input type="checkbox" x-model="voucherEnabled">
+                        <span x-text="voucherEnabled ? 'On' : 'Off'"></span>
+                    </label>
+                </div>
+
+                <div class="bundle-options" x-show="voucherEnabled" x-cloak>
+                    <div class="bundle-free-note">
+                        <strong>Free acquisition tool, not a paid advert add-on.</strong>
+                        <span class="muted">Think meal at cost price, a complimentary room night, or a sharp introductory service offer. The voucher gets the customer in; the business earns from the full visit and the relationship that follows.</span>
+                    </div>
+
+                    <div class="bundle-form-grid">
+                        <label>
+                            <span class="lp-label">Voucher style</span>
+                            <select class="lp-select" x-model="voucherMode">
+                                <option value="once_off">Once-off voucher</option>
+                                <option value="numbered_uses">Numbered uses</option>
+                                <option value="date_window">Time/date based</option>
+                            </select>
+                        </label>
+                        <label x-show="voucherMode !== 'once_off'" x-cloak>
+                            <span class="lp-label" x-text="voucherMode === 'date_window' ? 'Maximum claims in window' : 'Number of uses'"></span>
+                            <input class="lp-input" type="number" min="1" x-model.number="voucherUsageLimit">
+                        </label>
+                    </div>
+
+                    <label>
+                        <span class="lp-label">Offer title</span>
+                        <input class="lp-input" type="text" x-model="voucherTitle" placeholder="Example: Burger at cost price">
+                    </label>
+                    <label>
+                        <span class="lp-label">Why this will attract new clients</span>
+                        <textarea class="lp-input" rows="3" x-model="voucherDescription" placeholder="Describe the deal and the reason customers should visit now."></textarea>
+                    </label>
+
+                    <div class="bundle-form-grid" x-show="voucherMode === 'date_window'" x-cloak>
+                        <label>
+                            <span class="lp-label">Starts</span>
+                            <input class="lp-input" type="datetime-local" x-model="voucherStartAt">
+                        </label>
+                        <label>
+                            <span class="lp-label">Ends</span>
+                            <input class="lp-input" type="datetime-local" x-model="voucherEndAt">
+                        </label>
+                    </div>
+
+                    <label>
+                        <span class="lp-label">Terms</span>
+                        <textarea class="lp-input" rows="2" x-model="voucherTerms" placeholder="Example: One voucher per customer. Booking required. Excludes public holidays."></textarea>
+                    </label>
+                </div>
+            </article>
         </div>
 
         <aside class="card bundle-summary">
@@ -292,6 +357,14 @@
                     <input type="hidden" name="event_package_slug" :value="eventEnabled ? eventPackage : ''">
                     <input type="hidden" name="event_title" :value="eventTitle">
                     <input type="hidden" name="push_package_slug" :value="pushEnabled ? pushPackage : ''">
+                    <input type="hidden" name="voucher_enabled" :value="voucherEnabled ? 1 : 0">
+                    <input type="hidden" name="voucher_redemption_model" :value="voucherMode">
+                    <input type="hidden" name="voucher_title" :value="voucherTitle">
+                    <input type="hidden" name="voucher_description" :value="voucherDescription">
+                    <input type="hidden" name="voucher_usage_limit" :value="resolvedVoucherUsageLimit">
+                    <input type="hidden" name="voucher_start_at" :value="voucherMode === 'date_window' ? voucherStartAt : ''">
+                    <input type="hidden" name="voucher_end_at" :value="voucherMode === 'date_window' ? voucherEndAt : ''">
+                    <input type="hidden" name="voucher_terms" :value="voucherTerms">
                     <template x-for="slug in (advertsEnabled ? advertPackages : [])" :key="slug">
                         <input type="hidden" name="advert_package_slugs[]" :value="slug">
                     </template>
@@ -338,6 +411,14 @@
                 advertPackages: [],
                 pushEnabled: false,
                 pushPackage: (config.pushes || [])[0]?.slug || '',
+                voucherEnabled: false,
+                voucherMode: 'once_off',
+                voucherTitle: '',
+                voucherDescription: '',
+                voucherUsageLimit: 10,
+                voucherStartAt: '',
+                voucherEndAt: '',
+                voucherTerms: '',
                 money(amount) {
                     return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(Number(amount || 0));
                 },
@@ -348,6 +429,11 @@
                     const reach = option.settings?.reach || 'selected inventory';
                     const placement = String(option.settings?.placement || 'advert').replaceAll('_', ' ');
                     return `${placement} · ${reach.replaceAll('_', ' ')}`;
+                },
+                voucherDetail() {
+                    if (this.voucherMode === 'date_window') return 'Free time/date based client-attraction offer';
+                    if (this.voucherMode === 'numbered_uses') return `Free numbered-use offer (${this.resolvedVoucherUsageLimit} claims)`;
+                    return 'Free once-off client-attraction offer';
                 },
                 get lines() {
                     const lines = [];
@@ -367,7 +453,15 @@
                     const push = this.pushEnabled ? this.find(this.pushes, this.pushPackage) : null;
                     if (push) lines.push({ key: 'push', name: push.name, detail: 'Push notification add-on', amount: push.amount });
 
+                    if (this.voucherEnabled) {
+                        lines.push({ key: 'voucher', name: this.voucherTitle || 'Voucher attraction offer', detail: this.voucherDetail(), amount: 0 });
+                    }
+
                     return lines;
+                },
+                get resolvedVoucherUsageLimit() {
+                    if (this.voucherMode === 'once_off') return 1;
+                    return Math.max(1, Number(this.voucherUsageLimit || 1));
                 },
                 get total() {
                     return this.lines.reduce((sum, line) => sum + Number(line.amount || 0), 0);

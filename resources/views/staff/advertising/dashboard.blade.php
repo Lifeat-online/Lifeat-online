@@ -98,6 +98,16 @@
 
                 <div class="cardx">
                     <div class="rowx">
+                        <div>
+                            <h3 style="font-weight:900; font-size:1.1rem;">Vouchers</h3>
+                            <p class="mutedx" style="margin-top:0.35rem;">Create free client-attraction offers for listed businesses, using once-off, numbered-use, or date-window vouchers.</p>
+                        </div>
+                        <a id="voucher-workspace" href="#" class="btnx" style="pointer-events:none; opacity:0.6;">Manage vouchers</a>
+                    </div>
+                </div>
+
+                <div class="cardx">
+                    <div class="rowx">
                         <h3 style="font-weight:900; font-size:1.1rem;">Ad campaigns (banner / pop-up)</h3>
                         <span class="mutedx" id="ad-count"></span>
                     </div>
@@ -208,6 +218,7 @@
             const workspaceUrls = @json($businesses->mapWithKeys(fn ($b) => [(string) $b->id => route('account.listings.show', $b)])->all());
             const select = document.getElementById('business_id');
             const openWorkspace = document.getElementById('open-workspace');
+            const voucherWorkspace = document.getElementById('voucher-workspace');
             const statusBox = document.getElementById('staff-ad-status');
             const summaryBox = document.getElementById('business-summary');
             const panels = document.getElementById('business-panels');
@@ -585,6 +596,11 @@
                     openWorkspace.href = url || '#';
                     openWorkspace.style.pointerEvents = url ? 'auto' : 'none';
                     openWorkspace.style.opacity = url ? '1' : '0.6';
+                }
+                if (voucherWorkspace) {
+                    voucherWorkspace.href = url ? url + '/vouchers' : '#';
+                    voucherWorkspace.style.pointerEvents = url ? 'auto' : 'none';
+                    voucherWorkspace.style.opacity = url ? '1' : '0.6';
                 }
                 await loadSummary(select.value);
             });

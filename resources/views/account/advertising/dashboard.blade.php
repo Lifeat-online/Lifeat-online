@@ -90,6 +90,11 @@
                     <div class="inline-actions" id="event-actions"></div>
                 </div>
                 <div class="module">
+                    <h4>Vouchers</h4>
+                    <p>Create free client-attraction offers for listed businesses, with once-off, numbered-use, or date-window controls.</p>
+                    <div class="inline-actions" id="voucher-actions"></div>
+                </div>
+                <div class="module">
                     <h4>Push notification campaigns</h4>
                     <p>Schedule targeted push notifications to reach local audiences.</p>
                     <div class="inline-actions" id="push-actions"></div>
@@ -215,6 +220,12 @@
                     listingBase ? actionBtn(listingBase + '/events', 'Manage') : actionPill('draft'),
                     listingBase ? actionBtn(listingBase + '/events/create', 'Create') : actionPill('draft'),
                     events[0] ? actionPill(events[0].status) : actionPill('draft'),
+                ]);
+
+                setActions('voucher-actions', [
+                    listingBase ? actionBtn(listingBase + '/vouchers', 'Manage') : actionPill('draft'),
+                    listingBase ? actionBtn(listingBase + '/vouchers/create', 'Create') : actionPill('draft'),
+                    actionPill('free'),
                 ]);
 
                 setActions('push-actions', [

@@ -8,6 +8,7 @@ use App\Services\AdvertisingBundleCheckoutService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class AdvertiseController extends Controller
 {
@@ -63,6 +64,14 @@ class AdvertiseController extends Controller
             'advert_package_slugs' => ['nullable', 'array'],
             'advert_package_slugs.*' => ['string', 'exists:packages,slug'],
             'push_package_slug' => ['nullable', 'string', 'exists:packages,slug'],
+            'voucher_enabled' => ['nullable', 'boolean'],
+            'voucher_redemption_model' => ['nullable', Rule::in(['once_off', 'numbered_uses', 'date_window'])],
+            'voucher_title' => ['required_if:voucher_enabled,1', 'nullable', 'string', 'max:255'],
+            'voucher_description' => ['nullable', 'string', 'max:2000'],
+            'voucher_usage_limit' => ['nullable', 'integer', 'min:1', 'max:10000'],
+            'voucher_start_at' => ['nullable', 'date'],
+            'voucher_end_at' => ['nullable', 'date', 'after_or_equal:voucher_start_at'],
+            'voucher_terms' => ['nullable', 'string', 'max:6000'],
         ]);
 
         $order = $bundleCheckout->create($request->user(), $validated);

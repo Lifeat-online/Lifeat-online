@@ -13,6 +13,7 @@ use App\Models\Payment;
 use App\Models\PushCampaign;
 use App\Models\Setting;
 use App\Models\User;
+use App\Models\Voucher;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -106,6 +107,31 @@ class AdvertisingBundleCheckoutService
                     'purchasable_id' => $pushCampaign->id,
                     'name' => $pushPackage->name,
                 ];
+            }
+
+            if ($this->voucherEnabled($data)) {
+                $voucherTitle = trim((string) ($data['voucher_title'] ?? ''));
+                $voucherMode = (string) ($data['voucher_redemption_model'] ?? 'once_off');
+
+                Voucher::create([
+                    'listing_id' => $listing->id,
+                    'created_by_user_id' => $user->id,
+                    'title' => $voucherTitle !== '' ? $voucherTitle : $listing->title.' attraction voucher',
+                    'slug' => Voucher::uniqueSlugForListing($listing->id, $voucherTitle !== '' ? $voucherTitle : $listing->title.' attraction voucher'),
+                    'description' => $data['voucher_description'] ?? null,
+                    'voucher_type' => Voucher::TYPE_PROMO_OFFER,
+                    'currency' => 'ZAR',
+                    'usage_limit' => $voucherMode === 'once_off' ? 1 : (int) ($data['voucher_usage_limit'] ?? 1),
+                    'start_at' => $voucherMode === 'date_window' ? ($data['voucher_start_at'] ?? null) : null,
+                    'end_at' => $voucherMode === 'date_window' ? ($data['voucher_end_at'] ?? null) : null,
+                    'terms' => $data['voucher_terms'] ?? null,
+                    'status' => 'draft',
+                    'meta_json' => [
+                        'source' => 'advertise_bundle',
+                        'redemption_model' => $voucherMode,
+                        'price_note' => 'Free for listed companies',
+                    ],
+                ]);
             }
 
             [$subtotal, $vatAmount, $total, $currency] = $this->totals($items);
@@ -208,6 +234,11 @@ class AdvertisingBundleCheckoutService
     private function placementLabel(string $placement): string
     {
         return Str::headline(str_replace('in_article', 'in article', $placement));
+    }
+
+    private function voucherEnabled(array $data): bool
+    {
+        return filter_var($data['voucher_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
     }
 
     private function uniqueSlug(string $modelClass, string $title, string $fallback): string
