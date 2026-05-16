@@ -475,10 +475,48 @@
                 }
             };
 
+            const metricTimers = new Map();
+            const metricLoading = new WeakSet();
+
+            const refreshMetrics = async (root) => {
+                if (document.hidden || metricLoading.has(root)) return;
+                metricLoading.add(root);
+                try {
+                    await tick(root);
+                } finally {
+                    metricLoading.delete(root);
+                }
+            };
+
+            const startMetricPolling = () => {
+                if (document.hidden) return;
+                roots.forEach((root) => {
+                    if (metricTimers.has(root)) return;
+                    metricTimers.set(root, window.setInterval(() => refreshMetrics(root), 15000));
+                });
+            };
+
+            const stopMetricPolling = () => {
+                metricTimers.forEach((timer) => window.clearInterval(timer));
+                metricTimers.clear();
+            };
+
+            const handleMetricVisibilityChange = () => {
+                if (document.hidden) {
+                    stopMetricPolling();
+                    return;
+                }
+
+                roots.forEach((root) => refreshMetrics(root));
+                startMetricPolling();
+            };
+
             roots.forEach((root) => {
-                tick(root);
-                window.setInterval(() => tick(root), 15000);
+                refreshMetrics(root);
             });
+            startMetricPolling();
+            document.addEventListener('visibilitychange', handleMetricVisibilityChange);
+            window.addEventListener('pagehide', stopMetricPolling);
 
             const testRunners = Array.from(document.querySelectorAll('[data-test-runner]'));
             testRunners.forEach((runner) => {

@@ -33,7 +33,7 @@ Route::middleware('auth')->prefix('api')->name('api.')->group(function () {
         Route::put('/listings/{listing}/integrations/{type}', [ClientAdvertisingApiController::class, 'updateIntegration'])->name('integrations.update');
     });
 
-    Route::middleware('role:staff')->prefix('staff/advertising')->name('staff.advertising.')->group(function () {
+    Route::middleware('role:staff,admin')->prefix('staff/advertising')->name('staff.advertising.')->group(function () {
         Route::get('/businesses', [StaffAdvertisingApiController::class, 'businesses'])->name('businesses');
         Route::get('/businesses/{listing}', [StaffAdvertisingApiController::class, 'summary'])->name('summary');
         Route::put('/ad-campaigns/{adCampaign}', [StaffAdvertisingApiController::class, 'updateAdCampaign'])->name('ad-campaigns.update');

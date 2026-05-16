@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdCampaign;
+use App\Models\Event;
 use App\Models\Listing;
 use App\Models\MarketingIntegration;
 use App\Models\PushCampaign;
@@ -37,10 +38,13 @@ class ClientAdvertisingApiController extends Controller
 
     public function summary(Request $request, Listing $listing)
     {
-        Gate::authorize('own', $listing);
+        if (! $request->user()->hasRole('admin')) {
+            Gate::authorize('own', $listing);
+        }
 
         $listing->load([
             'activeSubscription.package',
+            'events' => fn ($q) => $q->latest('start_at')->limit(20),
             'adCampaigns' => fn ($q) => $q->latest()->limit(20),
             'pushCampaigns' => fn ($q) => $q->latest()->limit(20),
             'marketingIntegrations' => fn ($q) => $q->orderBy('type'),
@@ -51,9 +55,22 @@ class ClientAdvertisingApiController extends Controller
                 'id' => $listing->id,
                 'title' => $listing->title,
                 'status' => $listing->status,
+                'slug' => $listing->slug,
+                'city' => $listing->city,
+                'region' => $listing->region,
+                'source_channel' => $listing->source_channel,
                 'has_active_business_entitlement' => $listing->hasActiveBusinessEntitlement(),
                 'updated_at' => $listing->updated_at?->toIso8601String(),
             ],
+            'events' => $listing->events->map(fn (Event $event) => [
+                'id' => $event->id,
+                'title' => $event->title,
+                'slug' => $event->slug,
+                'status' => $event->status,
+                'start_at' => $event->start_at?->toIso8601String(),
+                'has_active_event_entitlement' => $event->hasActiveEventEntitlement(),
+                'updated_at' => $event->updated_at?->toIso8601String(),
+            ])->values(),
             'ad_campaigns' => $listing->adCampaigns->map(fn (AdCampaign $campaign) => [
                 'id' => $campaign->id,
                 'title' => $campaign->title,
@@ -88,7 +105,9 @@ class ClientAdvertisingApiController extends Controller
 
     public function updateIntegration(Request $request, Listing $listing, string $type)
     {
-        Gate::authorize('own', $listing);
+        if (! $request->user()->hasRole('admin')) {
+            Gate::authorize('own', $listing);
+        }
 
         $validated = $request->validate([
             'provider' => ['nullable', 'string', 'max:255'],

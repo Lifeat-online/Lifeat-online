@@ -66,6 +66,7 @@
                         <div class="mutedx" style="font-weight:800; text-transform:uppercase; letter-spacing:0.08em; font-size:0.75rem;">Business details</div>
                         <h3 id="biz-title" style="font-weight:900; font-size:1.35rem; margin-top:0.35rem;"></h3>
                         <div class="mutedx" id="biz-owner" style="margin-top:0.35rem;"></div>
+                        <div class="mutedx" id="biz-location" style="margin-top:0.25rem;"></div>
                     </div>
                     <div class="pill" id="biz-entitlement" style="display:none;">
                         <span class="dot paused"></span>
@@ -75,6 +76,26 @@
             </div>
 
             <div class="gridx" style="grid-template-columns: 1fr; display:none;" id="business-panels">
+                <div class="cardx">
+                    <div class="rowx">
+                        <h3 style="font-weight:900; font-size:1.1rem;">Events</h3>
+                        <span class="mutedx" id="event-count"></span>
+                    </div>
+                    <div style="overflow:auto; margin-top:1rem;">
+                        <table class="tablex" id="event-table">
+                            <thead>
+                                <tr>
+                                    <th>Event</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th>Package</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <div class="cardx">
                     <div class="rowx">
                         <h3 style="font-weight:900; font-size:1.1rem;">Ad campaigns (banner / pop-up)</h3>
@@ -193,10 +214,13 @@
 
             const bizTitle = document.getElementById('biz-title');
             const bizOwner = document.getElementById('biz-owner');
+            const bizLocation = document.getElementById('biz-location');
             const bizEntitlement = document.getElementById('biz-entitlement');
 
+            const eventTbody = document.querySelector('#event-table tbody');
             const adTbody = document.querySelector('#ad-table tbody');
             const pushTbody = document.querySelector('#push-table tbody');
+            const eventCount = document.getElementById('event-count');
             const adCount = document.getElementById('ad-count');
             const pushCount = document.getElementById('push-count');
 
@@ -284,13 +308,19 @@
                 panels.style.display = 'grid';
 
                 bizTitle.textContent = data.listing.title || '';
+                bizLocation.textContent = [data.listing.city, data.listing.region, data.listing.source_channel ? data.listing.source_channel.replaceAll('_', ' ') : null].filter(Boolean).join(' · ');
                 bizOwner.textContent = data.listing.owner ? `${data.listing.owner.name} · ${data.listing.owner.email}` : 'No owner assigned';
                 bizEntitlement.style.display = data.listing.has_active_business_entitlement ? 'none' : 'inline-flex';
 
+                const events = data.events || [];
                 const adCampaigns = data.ad_campaigns || [];
                 const pushCampaigns = data.push_campaigns || [];
+                eventCount.textContent = `${events.length} total`;
                 adCount.textContent = `${adCampaigns.length} total`;
                 pushCount.textContent = `${pushCampaigns.length} total`;
+
+                eventTbody.innerHTML = '';
+                events.forEach((e) => eventTbody.appendChild(renderEventRow(e)));
 
                 adTbody.innerHTML = '';
                 adCampaigns.forEach((c) => adTbody.appendChild(renderAdRow(c)));
@@ -316,6 +346,20 @@
                 providerEl.dataset.expectedUpdatedAt = existing?.updated_at || '';
             }
 
+            function renderEventRow(e) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <div style="font-weight:900;">${escapeHtml(e.title || 'Event')}</div>
+                        <div class="mutedx">${escapeHtml(e.slug || '')}</div>
+                    </td>
+                    <td>${pill(e.status || 'draft')}</td>
+                    <td>${e.start_at ? new Date(e.start_at).toLocaleString() : '-'}</td>
+                    <td>${e.has_active_event_entitlement ? pill('active') : pill('draft')}</td>
+                `;
+                return tr;
+            }
+
             function renderAdRow(c) {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -330,7 +374,14 @@
                     </td>
                     <td>
                         <select class="selectx" data-field="placement">
-                            ${['banner','popup'].map(s => `<option value="${s}" ${c.placement===s?'selected':''}>${s}</option>`).join('')}
+                            ${[
+                                ['banner', 'section banner'],
+                                ['sitewide_banner', 'sitewide banner'],
+                                ['in_article_intro', 'after article intro'],
+                                ['in_article_mid', 'between article sections'],
+                                ['in_article_end', 'after article'],
+                                ['popup', 'promotional pop-up'],
+                            ].map(([s, label]) => `<option value="${s}" ${c.placement===s?'selected':''}>${label}</option>`).join('')}
                         </select>
                     </td>
                     <td>

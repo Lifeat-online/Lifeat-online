@@ -195,4 +195,44 @@ class AdvertisingDashboardsTest extends TestCase
 
         $this->assertDatabaseMissing('push_campaigns', ['id' => $push->id]);
     }
+
+    public function test_admin_dev_user_can_preview_self_service_and_staff_advertising_dashboards(): void
+    {
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        $owner = User::factory()->create();
+        $staff = User::factory()->create(['role' => 'sales_staff']);
+
+        $listing = Listing::factory()->create([
+            'user_id' => $owner->id,
+            'registered_by_user_id' => $staff->id,
+            'title' => 'Dev Preview Business',
+            'status' => 'published',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('account.index'))
+            ->assertOk()
+            ->assertSee('Advertising dashboard')
+            ->assertSee('Staff advertising dashboard');
+
+        $this->actingAs($admin)
+            ->get(route('account.advertising.index'))
+            ->assertOk()
+            ->assertSee('Dev Preview Business');
+
+        $this->actingAs($admin)
+            ->get(route('staff.advertising.index'))
+            ->assertOk()
+            ->assertSee('Dev Preview Business');
+
+        $this->actingAs($admin)
+            ->getJson(route('api.client.advertising.summary', $listing))
+            ->assertOk()
+            ->assertJsonPath('listing.id', $listing->id);
+
+        $this->actingAs($admin)
+            ->getJson(route('api.staff.advertising.summary', $listing))
+            ->assertOk()
+            ->assertJsonPath('listing.id', $listing->id);
+    }
 }

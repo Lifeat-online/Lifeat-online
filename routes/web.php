@@ -84,6 +84,7 @@ Route::scopeBindings()->group(function () {
     Route::post('/vouchers/{listing:slug}/{voucher:slug}/redeem', [VoucherRedemptionController::class, 'store'])->middleware(['auth', 'throttle:voucher-redemption'])->name('vouchers.redeem');
 });
 Route::get('/advertise', [AdvertiseController::class, 'index'])->name('advertise.index');
+Route::post('/advertise/start', [AdvertiseController::class, 'start'])->middleware('auth')->name('advertise.start');
 Route::get('/add-listing', [AddListingController::class, 'index'])->name('add-listing.index');
 Route::post('/add-listing/start', [AddListingController::class, 'start'])->middleware('auth')->name('add-listing.start');
 Route::get('/about', [AboutController::class, 'index'])->name('about.index');
@@ -188,7 +189,7 @@ Route::middleware(['auth', 'role:admin,editor,staff,writer'])->group(function ()
     Route::get('/staff/dashboard', \App\Http\Controllers\StaffDashboardController::class)->name('staff.dashboard');
 });
 
-Route::middleware(['auth', 'role:staff'])->group(function () {
+Route::middleware(['auth', 'role:staff,admin'])->group(function () {
     Route::get('/staff/advertising', [StaffAdvertisingDashboardController::class, 'index'])->name('staff.advertising.index');
 });
 

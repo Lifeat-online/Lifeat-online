@@ -93,6 +93,21 @@
                     </select>
                 </div>
                 <div>
+                    <label for="placement">Placement</label>
+                    <select id="placement" name="placement">
+                        @foreach ([
+                            'banner' => 'Section banner',
+                            'sitewide_banner' => 'Sitewide banner',
+                            'in_article_intro' => 'After article intro',
+                            'in_article_mid' => 'Between article sections',
+                            'in_article_end' => 'After article',
+                            'popup' => 'Promotional pop-up',
+                        ] as $value => $label)
+                            <option value="{{ $value }}" @selected(old('placement', $campaign->placement ?: 'banner') === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
                     <label for="event_id">Linked event</label>
                     <select id="event_id" name="event_id">
                         <option value="">No linked event</option>

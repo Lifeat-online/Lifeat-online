@@ -40,6 +40,14 @@
                             {{ __('Councillors') }}
                         </x-nav-link>
                     @endif
+                    @if (Auth::user()->hasRole('admin'))
+                        <x-nav-link :href="route('account.advertising.index')" :active="request()->routeIs('account.advertising.*')">
+                            {{ __('Self Service') }}
+                        </x-nav-link>
+                        <x-nav-link :href="route('staff.advertising.index')" :active="request()->routeIs('staff.advertising.*')">
+                            {{ __('Staff Ads') }}
+                        </x-nav-link>
+                    @endif
                     @if (Auth::user()->hasRole('councillor'))
                         <x-nav-link :href="route('councillor.faults.index')" :active="request()->routeIs('councillor.faults.*')">
                             {{ __('My Faults') }}
@@ -131,6 +139,14 @@
             @if (Auth::user()->hasRole('admin'))
                 <x-responsive-nav-link :href="route('admin.councillors.index')" :active="request()->routeIs('admin.councillors.*')">
                     {{ __('Councillors') }}
+                </x-responsive-nav-link>
+            @endif
+            @if (Auth::user()->hasRole('admin'))
+                <x-responsive-nav-link :href="route('account.advertising.index')" :active="request()->routeIs('account.advertising.*')">
+                    {{ __('Self Service') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('staff.advertising.index')" :active="request()->routeIs('staff.advertising.*')">
+                    {{ __('Staff Ads') }}
                 </x-responsive-nav-link>
             @endif
             @if (Auth::user()->hasRole('councillor'))

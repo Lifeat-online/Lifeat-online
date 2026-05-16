@@ -14,7 +14,7 @@ class StaffAdvertisingDashboardController extends Controller
 
         $businesses = Listing::query()
             ->with(['owner', 'activeSubscription.package'])
-            ->where('registered_by_user_id', $user->id)
+            ->when(! $user->hasRole('admin'), fn ($query) => $query->where('registered_by_user_id', $user->id))
             ->orderBy('title')
             ->get();
 
@@ -23,4 +23,3 @@ class StaffAdvertisingDashboardController extends Controller
         ]);
     }
 }
-

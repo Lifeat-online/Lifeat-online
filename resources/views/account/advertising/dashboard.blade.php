@@ -68,7 +68,9 @@
             </div>
 
             <div class="ad-metrics">
-                <div class="metric"><div class="muted">Active banner / popup ads</div><strong id="ads-active">—</strong></div>
+                <div class="metric"><div class="muted">Listing status</div><strong id="listing-status">—</strong></div>
+                <div class="metric"><div class="muted">Events</div><strong id="events-count">—</strong></div>
+                <div class="metric"><div class="muted">Active advert placements</div><strong id="ads-active">—</strong></div>
                 <div class="metric"><div class="muted">Active push campaigns</div><strong id="push-active">—</strong></div>
                 <div class="metric"><div class="muted">Total impressions</div><strong id="ads-impressions">—</strong></div>
                 <div class="metric"><div class="muted">Total clicks</div><strong id="ads-clicks">—</strong></div>
@@ -78,13 +80,23 @@
 
             <div class="module-grid">
                 <div class="module">
+                    <h4>Business listing</h4>
+                    <p id="listing-copy">Keep the business profile, contact details, photos, and subscription current.</p>
+                    <div class="inline-actions" id="listing-actions"></div>
+                </div>
+                <div class="module">
+                    <h4>Events</h4>
+                    <p>Create and manage event promotions linked to this business.</p>
+                    <div class="inline-actions" id="event-actions"></div>
+                </div>
+                <div class="module">
                     <h4>Push notification campaigns</h4>
                     <p>Schedule targeted push notifications to reach local audiences.</p>
                     <div class="inline-actions" id="push-actions"></div>
                 </div>
                 <div class="module">
                     <h4>Banner advertisements</h4>
-                    <p>Run banner campaigns across the platform with tracked clicks and impressions.</p>
+                    <p>Run section banners, sitewide banners, or article placements with tracked clicks and impressions.</p>
                     <div class="inline-actions" id="ad-actions"></div>
                 </div>
                 <div class="module">
@@ -169,12 +181,15 @@
 
                 const adCampaigns = data.ad_campaigns || [];
                 const pushCampaigns = data.push_campaigns || [];
+                const events = data.events || [];
 
                 const adsActive = adCampaigns.filter((c) => c.status === 'active').length;
                 const pushActive = pushCampaigns.filter((c) => c.status === 'active' || c.status === 'scheduled').length;
                 const impressions = adCampaigns.reduce((acc, c) => acc + Number(c.impressions || 0), 0);
                 const clicks = adCampaigns.reduce((acc, c) => acc + Number(c.clicks || 0), 0);
 
+                setText('listing-status', String(data.listing.status || 'draft').replaceAll('_', ' '));
+                setText('events-count', String(events.length));
                 setText('ads-active', String(adsActive));
                 setText('push-active', String(pushActive));
                 setText('ads-impressions', String(impressions));
@@ -183,6 +198,24 @@
                 const listingSlug = @json($listings->keyBy('id')->map->slug);
                 const slug = listingSlug[String(listingId)];
                 const listingBase = slug ? @json(url('/account/listings')) + '/' + slug : null;
+
+                const listingCopy = document.getElementById('listing-copy');
+                if (listingCopy) {
+                    const area = [data.listing.city, data.listing.region].filter(Boolean).join(', ');
+                    listingCopy.textContent = `${data.listing.source_channel ? data.listing.source_channel.replaceAll('_', ' ') : 'Business'} listing${area ? ' · ' + area : ''}.`;
+                }
+
+                setActions('listing-actions', [
+                    listingBase ? actionBtn(listingBase, 'Open') : actionPill('draft'),
+                    listingBase ? actionBtn(listingBase + '/edit', 'Edit') : actionPill('draft'),
+                    hasEntitlement ? actionPill('active') : actionBtn(@json(route('checkout.index')) + '?listing=' + encodeURIComponent(slug || ''), 'Activate listing'),
+                ]);
+
+                setActions('event-actions', [
+                    listingBase ? actionBtn(listingBase + '/events', 'Manage') : actionPill('draft'),
+                    listingBase ? actionBtn(listingBase + '/events/create', 'Create') : actionPill('draft'),
+                    events[0] ? actionPill(events[0].status) : actionPill('draft'),
+                ]);
 
                 setActions('push-actions', [
                     listingBase ? actionBtn(listingBase + '/push-campaigns', 'Manage') : actionPill('draft'),
@@ -214,16 +247,45 @@
             }
 
             let timer = null;
+            let loading = false;
             const startPolling = () => {
+                if (document.hidden) return;
                 if (timer) clearInterval(timer);
-                timer = setInterval(load, 15000);
+                timer = setInterval(refreshIfVisible, 15000);
             };
 
-            listingSelect?.addEventListener('change', () => { load(); startPolling(); });
+            const stopPolling = () => {
+                if (!timer) return;
+                clearInterval(timer);
+                timer = null;
+            };
 
-            load();
+            const refreshIfVisible = async () => {
+                if (document.hidden || loading) return;
+                loading = true;
+                try {
+                    await load();
+                } finally {
+                    loading = false;
+                }
+            };
+
+            const handleVisibilityChange = () => {
+                if (document.hidden) {
+                    stopPolling();
+                    return;
+                }
+
+                refreshIfVisible();
+                startPolling();
+            };
+
+            listingSelect?.addEventListener('change', () => { refreshIfVisible(); startPolling(); });
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            window.addEventListener('pagehide', stopPolling);
+
+            refreshIfVisible();
             startPolling();
         })();
     </script>
 @endpush
-

@@ -141,6 +141,7 @@ class AccountAdCampaignController extends Controller
             'body' => ['nullable', 'string'],
             'destination_url' => ['nullable', 'url'],
             'event_id' => ['nullable', 'integer', 'exists:events,id'],
+            'placement' => ['required', 'in:banner,sitewide_banner,in_article_intro,in_article_mid,in_article_end,popup'],
             'start_at' => ['nullable', 'date'],
             'end_at' => ['nullable', 'date', 'after_or_equal:start_at'],
             'creative_image_upload' => UploadRules::optionalPublicImage(),

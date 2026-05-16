@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AdCampaign;
 use App\Models\AuditLog;
+use App\Models\Event;
 use App\Models\Listing;
 use App\Models\MarketingIntegration;
 use App\Models\PushCampaign;
@@ -22,7 +23,7 @@ class StaffAdvertisingApiController extends Controller
         $businesses = Listing::query()
             ->with(['owner', 'activeSubscription.package'])
             ->withCount(['adCampaigns', 'pushCampaigns'])
-            ->where('registered_by_user_id', $user->id)
+            ->when(! $user->hasRole('admin'), fn ($query) => $query->where('registered_by_user_id', $user->id))
             ->orderBy('title')
             ->get();
 
@@ -49,6 +50,7 @@ class StaffAdvertisingApiController extends Controller
         $listing->load([
             'owner',
             'activeSubscription.package',
+            'events' => fn ($q) => $q->latest('start_at')->limit(50),
             'adCampaigns' => fn ($q) => $q->latest()->limit(50),
             'pushCampaigns' => fn ($q) => $q->latest()->limit(50),
             'marketingIntegrations' => fn ($q) => $q->orderBy('type'),
@@ -59,6 +61,10 @@ class StaffAdvertisingApiController extends Controller
                 'id' => $listing->id,
                 'title' => $listing->title,
                 'status' => $listing->status,
+                'slug' => $listing->slug,
+                'city' => $listing->city,
+                'region' => $listing->region,
+                'source_channel' => $listing->source_channel,
                 'has_active_business_entitlement' => $listing->hasActiveBusinessEntitlement(),
                 'owner' => $listing->owner ? [
                     'id' => $listing->owner->id,
@@ -66,6 +72,15 @@ class StaffAdvertisingApiController extends Controller
                     'email' => $listing->owner->email,
                 ] : null,
             ],
+            'events' => $listing->events->map(fn (Event $event) => [
+                'id' => $event->id,
+                'title' => $event->title,
+                'slug' => $event->slug,
+                'status' => $event->status,
+                'start_at' => $event->start_at?->toIso8601String(),
+                'has_active_event_entitlement' => $event->hasActiveEventEntitlement(),
+                'updated_at' => $event->updated_at?->toIso8601String(),
+            ])->values(),
             'ad_campaigns' => $listing->adCampaigns->map(fn (AdCampaign $campaign) => [
                 'id' => $campaign->id,
                 'title' => $campaign->title,
@@ -116,7 +131,7 @@ class StaffAdvertisingApiController extends Controller
         $validated = $request->validate([
             'expected_updated_at' => ['required', 'date'],
             'status' => ['required', Rule::in(['draft', 'ready', 'active', 'paused'])],
-            'placement' => ['required', Rule::in(['banner', 'popup'])],
+            'placement' => ['required', Rule::in(['banner', 'sitewide_banner', 'in_article_intro', 'in_article_mid', 'in_article_end', 'popup'])],
             'budget_amount' => ['nullable', 'numeric', 'min:0'],
             'budget_currency' => ['required', 'string', 'max:8'],
             'start_at' => ['nullable', 'date'],

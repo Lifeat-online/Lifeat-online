@@ -19,6 +19,10 @@ class ListingPolicy
 
     public function manageAssigned(User $user, Listing $listing): bool
     {
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
         return $user->hasRole('staff')
             && (int) $listing->registered_by_user_id === (int) $user->id;
     }

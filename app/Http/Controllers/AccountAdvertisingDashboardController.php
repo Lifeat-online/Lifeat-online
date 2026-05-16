@@ -11,7 +11,7 @@ class AccountAdvertisingDashboardController extends Controller
     public function index(Request $request): View
     {
         $listings = Listing::with(['activeSubscription.package'])
-            ->where('user_id', $request->user()->id)
+            ->when(! $request->user()->hasRole('admin'), fn ($query) => $query->where('user_id', $request->user()->id))
             ->orderByDesc('id')
             ->get();
 
@@ -20,4 +20,3 @@ class AccountAdvertisingDashboardController extends Controller
         ]);
     }
 }
-
