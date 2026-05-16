@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Classified;
+use App\Support\Validation\UploadRules;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -102,7 +103,7 @@ class ClassifiedSubmissionController extends Controller
             'price' => ['nullable', 'numeric', 'min:0'],
             'currency' => ['required', 'string', 'max:8'],
             'contact_for_price' => ['nullable', 'boolean'],
-            'featured_image' => ['nullable', 'image', 'max:2048'],
+            'featured_image' => UploadRules::optionalPublicImage(2048),
             'city' => ['nullable', 'string', 'max:255'],
             'region' => ['nullable', 'string', 'max:255'],
             'country' => ['nullable', 'string', 'max:255'],

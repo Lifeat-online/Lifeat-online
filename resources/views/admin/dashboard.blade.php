@@ -33,6 +33,13 @@
     @php
         $isAdmin = $dashboardRoleFlags['isAdmin'] ?? false;
         $isSupport = $dashboardRoleFlags['isSupport'] ?? false;
+        $devToolsAvailable = in_array((string) config('app.env'), ['local', 'testing'], true)
+            || filter_var((string) env('DEV_TOOLS_ENABLED', 'false'), FILTER_VALIDATE_BOOL);
+        $devTestRunnerAvailable = in_array((string) config('app.env'), ['local', 'testing'], true)
+            || (
+                $devToolsAvailable
+                && filter_var((string) env('DEV_TEST_RUNNER_ENABLED', 'false'), FILTER_VALIDATE_BOOL)
+            );
         $devMetricSections = [
             [
                 'title' => 'Civic Faults',
@@ -75,7 +82,9 @@
                 <div class="rounded-lg bg-white p-3 shadow-sm" data-dashboard-tabs>
                     <div class="flex flex-wrap gap-3">
                         <button type="button" data-tab-trigger="overview" class="rounded-md px-4 py-2 text-sm font-medium transition-colors">Overview</button>
-                        <button type="button" data-tab-trigger="dev" class="rounded-md px-4 py-2 text-sm font-medium transition-colors">Dev</button>
+                        @if ($devToolsAvailable)
+                            <button type="button" data-tab-trigger="dev" class="rounded-md px-4 py-2 text-sm font-medium transition-colors">Dev</button>
+                        @endif
                     </div>
                 </div>
             @endif
@@ -219,7 +228,7 @@
                 @endif
             </section>
 
-            @if ($isAdmin)
+            @if ($isAdmin && $devToolsAvailable)
                 <section data-tab-panel="dev" class="space-y-6" hidden>
                     <div class="rounded-lg bg-slate-950 p-6 text-white shadow-sm">
                         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -279,50 +288,32 @@
                         @endforeach
                     </div>
 
-                    <div class="grid gap-6 xl:grid-cols-2">
-                        <div class="rounded-lg bg-white p-6 shadow-sm" data-test-runner data-test-endpoint="{{ route('dev.tests.run') }}">
-                            <input type="hidden" name="_token" value="{{ csrf_token() }}">
-                            <div class="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                    <h3 class="text-lg font-semibold text-gray-900">Testing Area</h3>
-                                    <p class="mt-1 text-sm text-gray-500">Run the Laravel test suite from the Dev tab when validating changes on this server.</p>
+                    @if ($devTestRunnerAvailable)
+                        <div class="grid gap-6">
+                            <div class="rounded-lg bg-white p-6 shadow-sm" data-test-runner data-test-endpoint="{{ route('dev.tests.run') }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                <div class="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-gray-900">Testing Area</h3>
+                                        <p class="mt-1 text-sm text-gray-500">Run the Laravel test suite from the Dev tab when validating changes on this server.</p>
+                                    </div>
+                                    <p class="text-sm text-gray-500" data-test-status>Idle</p>
                                 </div>
-                                <p class="text-sm text-gray-500" data-test-status>Idle</p>
-                            </div>
-                            <div class="mt-4 grid gap-3 md:grid-cols-3">
-                                @foreach ($devTestSuites as $suite)
-                                    <button type="button" data-test-suite="{{ $suite['suite'] }}" data-test-label="{{ $suite['label'] }}" class="rounded-lg border border-slate-200 px-4 py-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50">
-                                        <span class="block text-sm font-semibold text-gray-900">{{ $suite['label'] }}</span>
-                                        <span class="mt-1 block text-sm text-gray-500">{{ $suite['description'] }}</span>
-                                    </button>
-                                @endforeach
-                            </div>
-                            <div class="mt-4 rounded-lg bg-slate-950 p-4 text-sm text-slate-100">
-                                <p class="font-medium text-slate-300">Latest Output</p>
-                                <pre class="mt-3 overflow-x-auto whitespace-pre-wrap text-xs text-slate-100" data-test-output>Choose a suite to run `php artisan test` on this host.</pre>
+                                <div class="mt-4 grid gap-3 md:grid-cols-3">
+                                    @foreach ($devTestSuites as $suite)
+                                        <button type="button" data-test-suite="{{ $suite['suite'] }}" data-test-label="{{ $suite['label'] }}" class="rounded-lg border border-slate-200 px-4 py-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50">
+                                            <span class="block text-sm font-semibold text-gray-900">{{ $suite['label'] }}</span>
+                                            <span class="mt-1 block text-sm text-gray-500">{{ $suite['description'] }}</span>
+                                        </button>
+                                    @endforeach
+                                </div>
+                                <div class="mt-4 rounded-lg bg-slate-950 p-4 text-sm text-slate-100">
+                                    <p class="font-medium text-slate-300">Latest Output</p>
+                                    <pre class="mt-3 overflow-x-auto whitespace-pre-wrap text-xs text-slate-100" data-test-output>Choose a suite to run `php artisan test` on this host.</pre>
+                                </div>
                             </div>
                         </div>
-
-                        <div class="rounded-lg bg-white p-6 shadow-sm" data-dev-tools>
-                            <input type="hidden" name="_token" value="{{ csrf_token() }}">
-                            <div class="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                    <h3 class="text-lg font-semibold text-gray-900">Server Operations</h3>
-                                    <p class="mt-1 text-sm text-gray-500">Inspect updater state and remote access before handling deployment or maintenance work.</p>
-                                </div>
-                                <p class="text-sm text-gray-500" data-dev-status>Idle</p>
-                            </div>
-                            <div class="mt-4 flex flex-wrap gap-3">
-                                <button type="button" data-dev-label="Updater status" data-dev-method="GET" data-dev-endpoint="{{ route('dev.updates.status') }}" class="rounded-md border border-slate-200 px-4 py-2 text-sm text-gray-700 transition hover:border-indigo-300 hover:bg-indigo-50">Check updater status</button>
-                                <button type="button" data-dev-label="Credential status" data-dev-method="GET" data-dev-endpoint="{{ route('dev.updates.credentials') }}" class="rounded-md border border-slate-200 px-4 py-2 text-sm text-gray-700 transition hover:border-indigo-300 hover:bg-indigo-50">Check credentials</button>
-                                <button type="button" data-dev-label="Remote access" data-dev-method="POST" data-dev-endpoint="{{ route('dev.updates.credentials.test') }}" class="rounded-md border border-slate-200 px-4 py-2 text-sm text-gray-700 transition hover:border-indigo-300 hover:bg-indigo-50">Test remote access</button>
-                            </div>
-                            <div class="mt-4 rounded-lg bg-slate-50 p-4">
-                                <p class="text-sm font-medium text-gray-900">Response</p>
-                                <pre class="mt-3 overflow-x-auto whitespace-pre-wrap text-xs text-gray-700" data-dev-output>Use the checks above to load updater and credential diagnostics.</pre>
-                            </div>
-                        </div>
-                    </div>
+                    @endif
 
                     <div class="grid gap-6 xl:grid-cols-[1.4fr,0.6fr]">
                         <div class="rounded-lg bg-white p-6 shadow-sm">
@@ -547,57 +538,6 @@
                 });
             });
 
-            const devTools = Array.from(document.querySelectorAll('[data-dev-tools]'));
-            devTools.forEach((panel) => {
-                const status = panel.querySelector('[data-dev-status]');
-                const output = panel.querySelector('[data-dev-output]');
-                const csrfToken = panel.querySelector('input[name="_token"]')?.value;
-                const buttons = Array.from(panel.querySelectorAll('[data-dev-endpoint]'));
-
-                const setBusy = (busy) => {
-                    buttons.forEach((button) => {
-                        button.disabled = busy;
-                        button.classList.toggle('opacity-60', busy);
-                        button.classList.toggle('cursor-not-allowed', busy);
-                    });
-                };
-
-                buttons.forEach((button) => {
-                    button.addEventListener('click', async () => {
-                        const endpoint = button.getAttribute('data-dev-endpoint');
-                        const method = (button.getAttribute('data-dev-method') || 'GET').toUpperCase();
-                        const label = button.getAttribute('data-dev-label') || 'Dev action';
-
-                        setBusy(true);
-                        if (status) status.textContent = `Running ${label}...`;
-                        if (output) output.textContent = 'Loading...';
-
-                        try {
-                            const response = await fetch(endpoint, {
-                                method,
-                                headers: {
-                                    Accept: 'application/json',
-                                    ...(method !== 'GET'
-                                        ? {
-                                            'Content-Type': 'application/json',
-                                            'X-CSRF-TOKEN': csrfToken || '',
-                                        }
-                                        : {}),
-                                },
-                                ...(method !== 'GET' ? { body: JSON.stringify({}) } : {}),
-                            });
-                            const payload = await response.json().catch(() => ({}));
-                            if (status) status.textContent = response.ok ? `${label} ready` : `${label} failed`;
-                            if (output) output.textContent = JSON.stringify(payload, null, 2);
-                        } catch (error) {
-                            if (status) status.textContent = 'Unavailable';
-                            if (output) output.textContent = error instanceof Error ? error.message : 'Unable to load server diagnostics.';
-                        } finally {
-                            setBusy(false);
-                        }
-                    });
-                });
-            });
         })();
     </script>
 </x-app-layout>

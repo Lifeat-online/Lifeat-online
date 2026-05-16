@@ -509,6 +509,11 @@ class AccountPageTest extends TestCase
             'id' => $photo->id,
         ]);
         Storage::disk('public')->assertMissing($photo->image_path);
+
+        $deleteListingResponse = $this->actingAs($owner)->delete(route('account.listings.destroy', $listing));
+        $deleteListingResponse->assertRedirect(route('account.listings.index'));
+
+        Storage::disk('public')->assertMissing($secondPhoto->image_path);
     }
 
     public function test_owner_can_manage_events_from_owned_listing_and_publishing_requires_active_listing(): void

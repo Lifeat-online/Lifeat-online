@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Article;
 use App\Models\ArticleWordLedger;
+use App\Models\AuditLog;
 use App\Models\User;
+use App\Models\WriterPaymentBatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -49,13 +51,29 @@ class WriterPaymentBatchTest extends TestCase
         $ledger->refresh();
         $this->assertSame('batched', $ledger->status);
 
-        $batch = \App\Models\WriterPaymentBatch::firstOrFail();
+        $batch = WriterPaymentBatch::firstOrFail();
+        $this->assertDatabaseHas('audit_logs', [
+            'actor_user_id' => $admin->id,
+            'action' => 'writer_payment_batch.created',
+            'subject_type' => WriterPaymentBatch::class,
+            'subject_id' => $batch->id,
+        ]);
+
         $this->actingAs($admin)->post(route('admin.writer-payments.batches.mark-paid', $batch))
             ->assertRedirect(route('admin.writer-payments.index'));
 
         $ledger->refresh();
         $this->assertSame('paid', $ledger->status);
         $this->assertNotNull($ledger->paid_at);
+        $this->assertDatabaseHas('audit_logs', [
+            'actor_user_id' => $admin->id,
+            'action' => 'writer_payment_batch.marked_paid',
+            'subject_type' => WriterPaymentBatch::class,
+            'subject_id' => $batch->id,
+        ]);
+
+        $paidAudit = AuditLog::where('action', 'writer_payment_batch.marked_paid')->firstOrFail();
+        $this->assertSame([$ledger->id], $paidAudit->after_json['ledger_ids']);
     }
 
     public function test_admin_can_export_writer_batch_csv(): void
@@ -85,7 +103,7 @@ class WriterPaymentBatchTest extends TestCase
         ]);
 
         $this->actingAs($admin)->post(route('admin.writer-payments.batches.store'));
-        $batch = \App\Models\WriterPaymentBatch::firstOrFail();
+        $batch = WriterPaymentBatch::firstOrFail();
 
         $response = $this->actingAs($admin)->get(route('admin.writer-payments.batches.export', $batch));
 

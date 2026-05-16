@@ -1,5 +1,3 @@
-@php use Illuminate\Support\Facades\Storage; @endphp
-
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between gap-4">
@@ -103,17 +101,17 @@
 
                         <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                             @if ($application->profile_photo_path)
-                                <a href="{{ Storage::disk('public')->url($application->profile_photo_path) }}" target="_blank" class="rounded-lg border border-gray-200 p-4 text-sm text-indigo-600">
+                                <a href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($application->profile_photo_path) }}" target="_blank" class="rounded-lg border border-gray-200 p-4 text-sm text-indigo-600">
                                     Open profile photo
                                 </a>
                             @endif
-                            <a href="{{ Storage::disk('public')->url($application->id_document_path) }}" target="_blank" class="rounded-lg border border-gray-200 p-4 text-sm text-indigo-600">
+                            <a href="{{ route('admin.writer-applications.documents.show', [$application, 'id']) }}" target="_blank" class="rounded-lg border border-gray-200 p-4 text-sm text-indigo-600">
                                 Open ID document
                             </a>
-                            <a href="{{ Storage::disk('public')->url($application->banking_document_path) }}" target="_blank" class="rounded-lg border border-gray-200 p-4 text-sm text-indigo-600">
+                            <a href="{{ route('admin.writer-applications.documents.show', [$application, 'banking']) }}" target="_blank" class="rounded-lg border border-gray-200 p-4 text-sm text-indigo-600">
                                 Open banking proof
                             </a>
-                            <a href="{{ Storage::disk('public')->url($application->proof_of_residence_path) }}" target="_blank" class="rounded-lg border border-gray-200 p-4 text-sm text-indigo-600">
+                            <a href="{{ route('admin.writer-applications.documents.show', [$application, 'residence']) }}" target="_blank" class="rounded-lg border border-gray-200 p-4 text-sm text-indigo-600">
                                 Open proof of residence
                             </a>
                         </div>

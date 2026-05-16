@@ -7,13 +7,14 @@ use App\Models\Listing;
 use App\Models\Voucher;
 use App\Models\VoucherRedemption;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
 class BusinessVoucherApiController extends Controller
 {
     public function index(Request $request, Listing $listing)
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        Gate::authorize('own', $listing);
 
         return response()->json([
             'data' => Voucher::withCount([
@@ -28,7 +29,7 @@ class BusinessVoucherApiController extends Controller
 
     public function store(Request $request, Listing $listing)
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        Gate::authorize('own', $listing);
 
         $data = $this->validated($request);
         $data['listing_id'] = $listing->id;
@@ -44,7 +45,7 @@ class BusinessVoucherApiController extends Controller
 
     public function update(Request $request, Listing $listing, Voucher $voucher)
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        Gate::authorize('own', $listing);
         abort_unless($voucher->listing_id === $listing->id, 404);
 
         $data = $this->validated($request);
@@ -59,7 +60,7 @@ class BusinessVoucherApiController extends Controller
 
     public function destroy(Request $request, Listing $listing, Voucher $voucher)
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        Gate::authorize('own', $listing);
         abort_unless($voucher->listing_id === $listing->id, 404);
 
         $voucher->delete();
@@ -69,7 +70,7 @@ class BusinessVoucherApiController extends Controller
 
     public function stats(Request $request, Listing $listing)
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        Gate::authorize('own', $listing);
 
         $voucherIds = Voucher::query()->where('listing_id', $listing->id)->pluck('id');
 
@@ -128,4 +129,3 @@ class BusinessVoucherApiController extends Controller
         return $data;
     }
 }
-

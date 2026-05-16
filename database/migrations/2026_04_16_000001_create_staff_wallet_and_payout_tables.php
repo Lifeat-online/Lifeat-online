@@ -68,7 +68,7 @@ return new class extends Migration
         // ── Commission rate setting ────────────────────────────────────────
         $now = now();
         DB::table('settings')->insertOrIgnore([
-            ['key' => 'commission.rate', 'value' => '0.10', 'type' => 'decimal', 'group' => 'commission', 'created_at' => $now, 'updated_at' => $now],
+            ['key' => 'commission.rate', 'value' => '0.50', 'type' => 'decimal', 'group' => 'commission', 'created_at' => $now, 'updated_at' => $now],
         ]);
     }
 

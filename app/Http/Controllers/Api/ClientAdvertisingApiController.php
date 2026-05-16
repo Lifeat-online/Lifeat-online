@@ -8,6 +8,7 @@ use App\Models\Listing;
 use App\Models\MarketingIntegration;
 use App\Models\PushCampaign;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
 class ClientAdvertisingApiController extends Controller
@@ -36,7 +37,7 @@ class ClientAdvertisingApiController extends Controller
 
     public function summary(Request $request, Listing $listing)
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        Gate::authorize('own', $listing);
 
         $listing->load([
             'activeSubscription.package',
@@ -87,7 +88,7 @@ class ClientAdvertisingApiController extends Controller
 
     public function updateIntegration(Request $request, Listing $listing, string $type)
     {
-        abort_unless($listing->user_id === $request->user()->id, 403);
+        Gate::authorize('own', $listing);
 
         $validated = $request->validate([
             'provider' => ['nullable', 'string', 'max:255'],
@@ -119,4 +120,3 @@ class ClientAdvertisingApiController extends Controller
         ]);
     }
 }
-

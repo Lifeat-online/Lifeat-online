@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Listing;
 use App\Services\AuditLogService;
+use App\Support\Validation\UploadRules;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
@@ -141,8 +142,7 @@ class ListingController extends Controller
     {
         $before = $listing->toArray();
         $audit->log($request, 'listing.deleted', $listing, $before, []);
-        $this->deleteFile($listing->featured_image);
-        $this->deleteFile($listing->logo_path);
+        $this->deleteListingFiles($listing);
         $listing->delete();
 
         if ($request->expectsJson()) {
@@ -173,8 +173,7 @@ class ListingController extends Controller
                 'feature' => $listing->update(['is_featured' => true]),
                 'unfeature' => $listing->update(['is_featured' => false]),
                 'delete' => (function () use ($listing) {
-                    $this->deleteFile($listing->featured_image);
-                    $this->deleteFile($listing->logo_path);
+                    $this->deleteListingFiles($listing);
                     $listing->delete();
                 })(),
             };
@@ -204,8 +203,8 @@ class ListingController extends Controller
             'region' => ['nullable', 'string', 'max:255'],
             'country' => ['nullable', 'string', 'max:255'],
             'postal_code' => ['nullable', 'string', 'max:255'],
-            'featured_image_upload' => ['nullable', 'image', 'max:5120'],
-            'logo_upload' => ['nullable', 'image', 'max:5120'],
+            'featured_image_upload' => UploadRules::optionalPublicImage(),
+            'logo_upload' => UploadRules::optionalPublicImage(),
             'remove_featured_image' => ['nullable', 'boolean'],
             'remove_logo' => ['nullable', 'boolean'],
             'status' => ['required', Rule::in(['draft', 'published'])],
@@ -254,6 +253,18 @@ class ListingController extends Controller
     {
         if ($path) {
             Storage::disk('public')->delete($path);
+        }
+    }
+
+    private function deleteListingFiles(Listing $listing): void
+    {
+        $listing->loadMissing('photos');
+
+        $this->deleteFile($listing->featured_image);
+        $this->deleteFile($listing->logo_path);
+
+        foreach ($listing->photos as $photo) {
+            $this->deleteFile($photo->image_path);
         }
     }
 }

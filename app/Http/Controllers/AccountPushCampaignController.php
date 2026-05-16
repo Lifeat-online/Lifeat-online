@@ -10,6 +10,7 @@ use App\Services\PushCampaignDispatchService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -17,7 +18,7 @@ class AccountPushCampaignController extends Controller
 {
     public function index(Request $request, Listing $listing): View
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
 
         return view('account.push-campaigns.index', [
             'listing' => $listing->load('activeSubscription.package'),
@@ -37,7 +38,7 @@ class AccountPushCampaignController extends Controller
 
     public function create(Request $request, Listing $listing): View
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
 
         return view('account.push-campaigns.form', [
             'listing' => $listing,
@@ -60,7 +61,7 @@ class AccountPushCampaignController extends Controller
 
     public function store(Request $request, Listing $listing): RedirectResponse
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
         $this->ensureEntitledListing($listing);
 
         $data = $this->validated($request, $listing);
@@ -81,7 +82,7 @@ class AccountPushCampaignController extends Controller
 
     public function edit(Request $request, Listing $listing, PushCampaign $pushCampaign): View
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
         abort_unless($pushCampaign->listing_id === $listing->id, 404);
 
         $pushCampaign->load([
@@ -118,7 +119,7 @@ class AccountPushCampaignController extends Controller
 
     public function update(Request $request, Listing $listing, PushCampaign $pushCampaign): RedirectResponse
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
         abort_unless($pushCampaign->listing_id === $listing->id, 404);
 
         $data = $this->validated($request, $listing);
@@ -137,7 +138,7 @@ class AccountPushCampaignController extends Controller
 
     public function dispatch(Request $request, Listing $listing, PushCampaign $pushCampaign, PushCampaignDispatchService $dispatchService): RedirectResponse
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
         abort_unless($pushCampaign->listing_id === $listing->id, 404);
 
         try {
@@ -167,7 +168,7 @@ class AccountPushCampaignController extends Controller
 
     public function destroy(Request $request, Listing $listing, PushCampaign $pushCampaign): RedirectResponse
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
         abort_unless($pushCampaign->listing_id === $listing->id, 404);
 
         $pushCampaign->delete();
@@ -234,11 +235,4 @@ class AccountPushCampaignController extends Controller
         return $slug;
     }
 
-    private function canAccessListing(Request $request, Listing $listing): bool
-    {
-        $user = $request->user();
-
-        return $listing->user_id === $user->id
-            || ($user->hasRole('staff') && $listing->registered_by_user_id === $user->id);
-    }
 }

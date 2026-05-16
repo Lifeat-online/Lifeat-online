@@ -26,6 +26,7 @@ class StaffSignupPageTest extends TestCase
     public function test_visitor_can_submit_a_staff_signup_application(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
 
         $response = $this->post(route('staff-signup.store'), [
             'first_name' => 'Lebo',
@@ -61,9 +62,12 @@ class StaffSignupPageTest extends TestCase
         $application = WriterApplication::query()->firstOrFail();
 
         Storage::disk('public')->assertExists($application->profile_photo_path);
-        Storage::disk('public')->assertExists($application->id_document_path);
-        Storage::disk('public')->assertExists($application->banking_document_path);
-        Storage::disk('public')->assertExists($application->proof_of_residence_path);
+        Storage::disk('local')->assertExists($application->id_document_path);
+        Storage::disk('local')->assertExists($application->banking_document_path);
+        Storage::disk('local')->assertExists($application->proof_of_residence_path);
+        Storage::disk('public')->assertMissing($application->id_document_path);
+        Storage::disk('public')->assertMissing($application->banking_document_path);
+        Storage::disk('public')->assertMissing($application->proof_of_residence_path);
 
         $this->followRedirects($response)
             ->assertSee('Application received')

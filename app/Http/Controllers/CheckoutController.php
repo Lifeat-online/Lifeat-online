@@ -20,6 +20,7 @@ use Illuminate\Http\Response;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -141,8 +142,8 @@ class CheckoutController extends Controller
             $event = $pushCampaign->event;
         }
 
-        if ($listing?->user_id && $listing->user_id !== $request->user()->id && ! $request->user()->hasRole('admin', 'staff')) {
-            abort(403);
+        if ($listing?->user_id) {
+            Gate::authorize('startCheckout', $listing);
         }
 
         if ($package->type?->slug === 'event_package') {
@@ -231,9 +232,7 @@ class CheckoutController extends Controller
 
     public function show(Request $request, Order $order): View
     {
-        if ($order->user_id !== $request->user()->id && ! $request->user()->hasRole('admin', 'staff')) {
-            abort(403);
-        }
+        Gate::authorize('manage', $order);
 
         $order->load(['items.package', 'items.purchasable', 'payments', 'invoices']);
 
@@ -247,9 +246,7 @@ class CheckoutController extends Controller
 
     public function payfastInitiate(Request $request, Order $order, PayFastCheckoutService $payFastCheckoutService): RedirectResponse
     {
-        if ($order->user_id !== $request->user()->id && ! $request->user()->hasRole('admin', 'staff')) {
-            abort(403);
-        }
+        Gate::authorize('manage', $order);
 
         $order->loadMissing(['user', 'payments']);
         $payment = $order->latestPayment() ?? $order->payments()->create([
@@ -274,9 +271,7 @@ class CheckoutController extends Controller
 
     public function retryPayment(Request $request, Order $order, PayFastCheckoutService $payFastCheckoutService): RedirectResponse
     {
-        if ($order->user_id !== $request->user()->id && ! $request->user()->hasRole('admin', 'staff')) {
-            abort(403);
-        }
+        Gate::authorize('manage', $order);
 
         if ($order->status === 'paid') {
             return redirect()->route('checkout.show', $order)->with('status', 'This order is already paid.');
@@ -307,9 +302,7 @@ class CheckoutController extends Controller
 
     public function sendInvoice(Request $request, Order $order): RedirectResponse
     {
-        if ($order->user_id !== $request->user()->id && ! $request->user()->hasRole('admin', 'staff')) {
-            abort(403);
-        }
+        Gate::authorize('manage', $order);
 
         $invoice = $order->latestInvoice() ?? $order->invoices()->firstOrFail();
         $invoice->loadMissing('order.user');
@@ -331,9 +324,7 @@ class CheckoutController extends Controller
     {
         $subscription->loadMissing(['package', 'subscribable']);
 
-        if ($subscription->user_id !== $request->user()->id && ! $request->user()->hasRole('admin', 'staff')) {
-            abort(403);
-        }
+        Gate::authorize('manage', $subscription);
 
         $entity = $subscription->subscribable;
 
@@ -375,7 +366,10 @@ class CheckoutController extends Controller
             'status' => ['required', 'string'],
             'provider_transaction_id' => ['nullable', 'string', 'max:255'],
             'failure_reason' => ['nullable', 'string'],
-            'signature' => ['nullable', 'string'],
+            'amount_gross' => ['nullable', 'numeric', 'min:0'],
+            'amount' => ['nullable', 'numeric', 'min:0'],
+            'currency' => ['nullable', 'string', 'size:3'],
+            'signature' => ['required', 'string'],
         ]);
 
         $order = Order::with('payments.attempts')->where('order_number', $validated['order_number'])->firstOrFail();
@@ -383,7 +377,7 @@ class CheckoutController extends Controller
         $normalizedStatus = strtolower($validated['status']);
         $latestAttempt = $payment->attempts()->latest()->first();
 
-        if (array_key_exists('signature', $validated) && ! app(PayFastCheckoutService::class)->verifyCallback($validated)) {
+        if (! app(PayFastCheckoutService::class)->verifyCallback($validated)) {
             $latestAttempt?->update([
                 'status' => 'invalid_signature',
                 'response_payload_json' => $validated,
@@ -396,10 +390,59 @@ class CheckoutController extends Controller
         }
 
         if (in_array($normalizedStatus, ['complete', 'completed', 'paid', 'success'], true)) {
+            $providerTransactionId = (string) ($validated['provider_transaction_id'] ?? '');
+
+            if ($providerTransactionId === '') {
+                throw ValidationException::withMessages([
+                    'provider_transaction_id' => 'A paid PayFast callback requires a transaction reference.',
+                ]);
+            }
+
+            $duplicatePayment = Payment::where('provider_transaction_id', $providerTransactionId)
+                ->whereKeyNot($payment->id)
+                ->first();
+
+            if ($duplicatePayment) {
+                $latestAttempt?->update([
+                    'status' => 'duplicate_transaction',
+                    'response_payload_json' => $validated,
+                ]);
+
+                return response()->json([
+                    'ok' => false,
+                    'error' => 'Duplicate PayFast transaction reference.',
+                ], Response::HTTP_CONFLICT);
+            }
+
+            $callbackAmount = $validated['amount_gross'] ?? $validated['amount'] ?? null;
+            if ($callbackAmount !== null && abs((float) $callbackAmount - (float) $payment->amount) > 0.01) {
+                $latestAttempt?->update([
+                    'status' => 'amount_mismatch',
+                    'response_payload_json' => $validated,
+                ]);
+
+                return response()->json([
+                    'ok' => false,
+                    'error' => 'Callback amount does not match the pending payment.',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            if (! empty($validated['currency']) && strtoupper($validated['currency']) !== strtoupper($payment->currency)) {
+                $latestAttempt?->update([
+                    'status' => 'currency_mismatch',
+                    'response_payload_json' => $validated,
+                ]);
+
+                return response()->json([
+                    'ok' => false,
+                    'error' => 'Callback currency does not match the pending payment.',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
             $payment->update([
                 'status' => 'paid',
                 'paid_at' => now(),
-                'provider_transaction_id' => $validated['provider_transaction_id'] ?: ('PF-'.Str::upper(Str::random(10))),
+                'provider_transaction_id' => $providerTransactionId,
                 'failure_reason' => null,
             ]);
             $latestAttempt?->update([

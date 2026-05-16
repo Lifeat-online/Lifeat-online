@@ -2,6 +2,24 @@
 
 namespace App\Providers;
 
+use App\Models\Listing;
+use App\Models\NotificationLog;
+use App\Models\Order;
+use App\Models\PayoutRequest;
+use App\Models\Payment;
+use App\Models\StaffWallet;
+use App\Models\Subscription;
+use App\Policies\ListingPolicy;
+use App\Policies\NotificationLogPolicy;
+use App\Policies\OrderPolicy;
+use App\Policies\PayoutRequestPolicy;
+use App\Policies\PaymentPolicy;
+use App\Policies\StaffWalletPolicy;
+use App\Policies\SubscriptionPolicy;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +37,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::policy(Listing::class, ListingPolicy::class);
+        Gate::policy(NotificationLog::class, NotificationLogPolicy::class);
+        Gate::policy(Order::class, OrderPolicy::class);
+        Gate::policy(PayoutRequest::class, PayoutRequestPolicy::class);
+        Gate::policy(Payment::class, PaymentPolicy::class);
+        Gate::policy(StaffWallet::class, StaffWalletPolicy::class);
+        Gate::policy(Subscription::class, SubscriptionPolicy::class);
+
+        $this->configureRateLimiters();
+
         if (app()->environment('production')) {
             \URL::forceScheme('https');
         }
@@ -34,5 +62,33 @@ class AppServiceProvider extends ServiceProvider
                 // Silently fail if database is not available (e.g. during build)
             }
         }
+    }
+
+    private function configureRateLimiters(): void
+    {
+        RateLimiter::for('auth-sensitive', function (Request $request) {
+            return Limit::perMinute(6)->by($this->rateLimitKey($request));
+        });
+
+        RateLimiter::for('public-form', function (Request $request) {
+            return Limit::perMinute(5)->by($this->rateLimitKey($request));
+        });
+
+        RateLimiter::for('voucher-redemption', function (Request $request) {
+            return Limit::perMinute(12)->by($this->rateLimitKey($request));
+        });
+
+        RateLimiter::for('payfast-callback', function (Request $request) {
+            return Limit::perMinute(30)->by($request->ip() ?: 'unknown');
+        });
+
+        RateLimiter::for('public-tracking', function (Request $request) {
+            return Limit::perMinute(120)->by($request->ip() ?: 'unknown');
+        });
+    }
+
+    private function rateLimitKey(Request $request): string
+    {
+        return ((string) ($request->user()?->id ?: 'guest')).'|'.($request->ip() ?: 'unknown');
     }
 }

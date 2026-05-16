@@ -22,7 +22,7 @@ class StaffCommissionService
             return null;
         }
 
-        $rate = (float) Setting::getValue('commission.rate', 0.10);
+        $rate = (float) Setting::getValue('commission.rate', 0.50);
 
         if ($rate <= 0) {
             return null;
@@ -32,6 +32,15 @@ class StaffCommissionService
 
         if ($commissionAmount <= 0) {
             return null;
+        }
+
+        $existingEntry = WalletLedgerEntry::where('entry_type', WalletLedgerEntry::TYPE_COMMISSION_CREDIT)
+            ->where('source_type', Payment::class)
+            ->where('source_id', $payment->id)
+            ->first();
+
+        if ($existingEntry) {
+            return $existingEntry;
         }
 
         $wallet = StaffWallet::firstOrCreate(
@@ -54,6 +63,51 @@ class StaffCommissionService
         ]);
 
         $wallet->increment('available_balance', $commissionAmount);
+
+        return $entry;
+    }
+
+    public function reverseForRefund(Payment $payment): ?WalletLedgerEntry
+    {
+        $credit = WalletLedgerEntry::where('entry_type', WalletLedgerEntry::TYPE_COMMISSION_CREDIT)
+            ->where('source_type', Payment::class)
+            ->where('source_id', $payment->id)
+            ->first();
+
+        if (! $credit) {
+            return null;
+        }
+
+        $existingReversal = WalletLedgerEntry::where('entry_type', WalletLedgerEntry::TYPE_ADJUSTMENT)
+            ->where('source_type', Payment::class)
+            ->where('source_id', $payment->id)
+            ->first();
+
+        if ($existingReversal) {
+            return $existingReversal;
+        }
+
+        $amount = round((float) $credit->net_amount, 2);
+
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $wallet = $credit->wallet;
+
+        $entry = WalletLedgerEntry::create([
+            'wallet_id'    => $wallet->id,
+            'entry_type'   => WalletLedgerEntry::TYPE_ADJUSTMENT,
+            'source_type'  => Payment::class,
+            'source_id'    => $payment->id,
+            'gross_amount' => -$amount,
+            'net_amount'   => -$amount,
+            'currency'     => $credit->currency,
+            'description'  => "Commission reversed after refund for payment #{$payment->id}",
+            'recorded_at'  => now(),
+        ]);
+
+        $wallet->decrement('available_balance', $amount);
 
         return $entry;
     }

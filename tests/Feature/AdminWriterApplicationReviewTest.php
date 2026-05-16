@@ -8,6 +8,7 @@ use App\Models\WriterApplication;
 use App\Notifications\WriterApplicationApprovedNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AdminWriterApplicationReviewTest extends TestCase
@@ -54,6 +55,42 @@ class AdminWriterApplicationReviewTest extends TestCase
             ->assertSee('Review Application')
             ->assertSee('Market growth story')
             ->assertSee('Open ID document');
+    }
+
+    public function test_admin_can_open_private_writer_application_document(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('writer-applications/id-documents/id.pdf', 'private id document');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $application = WriterApplication::create([
+            'first_name' => 'Private',
+            'last_name' => 'Applicant',
+            'email' => 'private@example.com',
+            'phone' => '082 000 0001',
+            'username' => 'private_writer',
+            'profile_bio' => str_repeat('Private document route coverage for sensitive application files. ', 3),
+            'profile_photo_path' => 'writer-applications/profile-photos/private.jpg',
+            'available_on_whatsapp' => true,
+            'sample_article_title' => 'Private article',
+            'sample_article_body' => str_repeat('This sample content supports private document route coverage. ', 6),
+            'sample_advert_title' => 'Private advert',
+            'sample_advert_body' => str_repeat('This advert sample supports private document route coverage. ', 3),
+            'id_document_path' => 'writer-applications/id-documents/id.pdf',
+            'banking_document_path' => 'writer-applications/banking-documents/bank.pdf',
+            'proof_of_residence_path' => 'writer-applications/proof-of-residence/home.pdf',
+            'bank_name' => 'Capitec',
+            'account_holder_name' => 'Private Applicant',
+            'account_number' => '1234567890',
+            'branch_code' => '470010',
+            'status' => WriterApplication::STATUS_PENDING,
+            'submitted_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.writer-applications.documents.show', [$application, 'id']))
+            ->assertOk()
+            ->assertHeader('content-type');
     }
 
     public function test_admin_queue_shows_access_summary_for_recently_contacted_application(): void

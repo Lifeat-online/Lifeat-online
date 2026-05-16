@@ -8,14 +8,13 @@ use App\Models\StaffWallet;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class AccountWalletController extends Controller
 {
     public function index(Request $request): View
     {
         $user = $request->user();
-
-        abort_unless($user->hasRole('staff'), 403);
 
         $wallet = StaffWallet::with([
             'ledgerEntries' => fn ($q) => $q->latest('recorded_at')->limit(50),
@@ -24,6 +23,8 @@ class AccountWalletController extends Controller
             ['user_id' => $user->id],
             ['currency' => 'ZAR']
         );
+
+        Gate::authorize('view', $wallet);
 
         return view('account.wallet.index', [
             'wallet' => $wallet,
@@ -36,9 +37,10 @@ class AccountWalletController extends Controller
     public function requestPayout(Request $request): RedirectResponse
     {
         $user = $request->user();
-        abort_unless($user->hasRole('staff'), 403);
 
         $wallet = StaffWallet::firstOrCreate(['user_id' => $user->id], ['currency' => 'ZAR']);
+
+        Gate::authorize('requestPayout', $wallet);
 
         abort_if($wallet->pendingPayoutRequest(), 422, 'You already have an active payout request.');
 
@@ -82,14 +84,14 @@ class AccountWalletController extends Controller
 
     public function cancelPayout(Request $request, PayoutRequest $payoutRequest): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($payoutRequest->requested_by_user_id === $user->id, 403);
+        Gate::authorize('cancel', $payoutRequest);
+
         abort_unless($payoutRequest->status === PayoutRequest::STATUS_REQUESTED, 422, 'Only pending requests can be cancelled.');
 
         $payoutRequest->update(['status' => PayoutRequest::STATUS_CANCELLED]);
 
         AuditLog::create([
-            'actor_user_id' => $user->id,
+            'actor_user_id' => $request->user()->id,
             'action'        => 'payout_request.cancelled_by_staff',
             'subject_type'  => PayoutRequest::class,
             'subject_id'    => $payoutRequest->id,

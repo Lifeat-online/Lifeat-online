@@ -4,68 +4,15 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\DevTestRunnerService;
-use App\Services\UpdateUtilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class DevUpdateController extends Controller
 {
-    public function status(Request $request, UpdateUtilityService $updater): JsonResponse
-    {
-        $this->ensureAdmin($request);
-
-        return response()->json($updater->status());
-    }
-
-    public function credentials(Request $request, UpdateUtilityService $updater): JsonResponse
-    {
-        $this->ensureAdmin($request);
-
-        return response()->json($updater->credentialsStatus());
-    }
-
-    public function saveCredentials(Request $request, UpdateUtilityService $updater): JsonResponse
-    {
-        $this->ensureAdmin($request);
-
-        $validated = $request->validate([
-            'origin_url' => ['nullable', 'string', 'max:255', function (string $attribute, mixed $value, \Closure $fail) use ($updater) {
-                if (! is_string($value) || trim($value) === '') {
-                    return;
-                }
-
-                if (! $updater->isValidOriginUrl(trim($value))) {
-                    $fail('Origin URL must be a valid git repository URL (SSH or HTTPS).');
-                }
-            }],
-            'token' => ['nullable', 'string', 'max:255'],
-            'clear_token' => ['nullable', 'boolean'],
-        ]);
-
-        $originUrl = array_key_exists('origin_url', $validated) ? $validated['origin_url'] : null;
-        $token = array_key_exists('token', $validated) ? $validated['token'] : null;
-        $clearToken = (bool) ($validated['clear_token'] ?? false);
-
-        return response()->json($updater->saveCredentials($originUrl, $token, $clearToken));
-    }
-
-    public function testCredentials(Request $request, UpdateUtilityService $updater): JsonResponse
-    {
-        $this->ensureAdmin($request);
-
-        return response()->json($updater->testRemoteAccess());
-    }
-
-    public function apply(Request $request, UpdateUtilityService $updater): JsonResponse
-    {
-        $this->ensureAdmin($request);
-
-        return response()->json($updater->apply());
-    }
-
     public function runTests(Request $request, DevTestRunnerService $runner): JsonResponse
     {
         $this->ensureAdmin($request);
+        $this->ensureDevToolsAvailable();
 
         if (! $this->testRunnerEnabled()) {
             return response()->json([
@@ -93,10 +40,27 @@ class DevUpdateController extends Controller
 
     private function testRunnerEnabled(): bool
     {
-        if (app()->environment(['local', 'testing'])) {
+        if (in_array((string) config('app.env'), ['local', 'testing'], true)) {
             return true;
         }
 
-        return filter_var((string) env('DEV_TEST_RUNNER_ENABLED', 'false'), FILTER_VALIDATE_BOOL);
+        return $this->devToolsAvailable()
+            && filter_var((string) env('DEV_TEST_RUNNER_ENABLED', 'false'), FILTER_VALIDATE_BOOL);
+    }
+
+    private function ensureDevToolsAvailable(): void
+    {
+        if (! $this->devToolsAvailable()) {
+            abort(403, 'Developer tools are disabled in this environment.');
+        }
+    }
+
+    private function devToolsAvailable(): bool
+    {
+        if (in_array((string) config('app.env'), ['local', 'testing'], true)) {
+            return true;
+        }
+
+        return filter_var((string) env('DEV_TOOLS_ENABLED', 'false'), FILTER_VALIDATE_BOOL);
     }
 }

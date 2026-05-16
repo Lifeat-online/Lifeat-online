@@ -13,12 +13,14 @@ use App\Models\PaymentRefund;
 use App\Models\Subscription;
 use App\Models\SubscriptionReminder;
 use App\Services\NotificationDispatchService;
+use App\Services\StaffCommissionService;
 use App\Services\SubscriptionLifecycleService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -26,6 +28,8 @@ class FinanceController extends Controller
 {
     public function orders(Request $request): View
     {
+        Gate::authorize('viewAnyFinance', Order::class);
+
         return view('admin.finance.orders', [
             'orders' => Order::with(['user', 'payments', 'invoices'])->latest()->paginate(25),
         ]);
@@ -33,6 +37,8 @@ class FinanceController extends Controller
 
     public function showOrder(Request $request, Order $order): View
     {
+        Gate::authorize('viewFinance', $order);
+
         $order->load(['user', 'referredBy', 'items.package', 'items.purchasable', 'payments.attempts', 'payments.refunds.processor', 'invoices', 'renewedSubscription']);
         $notifications = NotificationLog::where(function ($query) use ($order) {
             $query->where('notifiable_type', Invoice::class)->whereIn('notifiable_id', $order->invoices->modelKeys())
@@ -55,6 +61,8 @@ class FinanceController extends Controller
 
     public function setOrderAttribution(Request $request, Order $order): RedirectResponse
     {
+        Gate::authorize('setAttribution', $order);
+
         $validated = $request->validate([
             'referred_by_user_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
@@ -79,6 +87,8 @@ class FinanceController extends Controller
 
     public function payments(Request $request): View
     {
+        Gate::authorize('viewAnyFinance', Payment::class);
+
         $status = $request->string('status')->toString();
 
         return view('admin.finance.payments', [
@@ -93,6 +103,8 @@ class FinanceController extends Controller
 
     public function showPayment(Payment $payment): View
     {
+        Gate::authorize('viewFinance', $payment);
+
         $request = request();
         $payment->load(['order.items', 'user', 'attempts', 'refunds.processor']);
         $notifications = NotificationLog::where('notifiable_type', Order::class)
@@ -110,6 +122,8 @@ class FinanceController extends Controller
 
     public function subscriptions(Request $request): View
     {
+        Gate::authorize('viewAnyFinance', Subscription::class);
+
         $status = $request->string('status')->toString();
         $endingWithinDays = (int) $request->integer('ending_within_days', 0);
 
@@ -132,6 +146,8 @@ class FinanceController extends Controller
 
     public function notifications(Request $request): View
     {
+        Gate::authorize('viewAnyFinance', NotificationLog::class);
+
         $type = $request->string('type')->toString();
         $status = $request->string('status')->toString();
         $channel = $request->string('channel')->toString();
@@ -156,6 +172,8 @@ class FinanceController extends Controller
 
     public function showNotification(NotificationLog $notification): View
     {
+        Gate::authorize('viewFinance', $notification);
+
         $dispatchService = app(NotificationDispatchService::class);
         $availableAt = $dispatchService->resendAvailableAt($notification);
 
@@ -168,6 +186,8 @@ class FinanceController extends Controller
 
     public function resendNotification(Request $request, NotificationLog $notification): RedirectResponse
     {
+        Gate::authorize('resend', $notification);
+
         try {
             $resent = app(NotificationDispatchService::class)->resend($notification);
         } catch (\RuntimeException $exception) {
@@ -188,6 +208,8 @@ class FinanceController extends Controller
 
     public function showSubscription(Subscription $subscription): View
     {
+        Gate::authorize('viewFinance', $subscription);
+
         $request = request();
         $subscription->load(['user', 'package', 'subscribable', 'entitlements', 'reminders', 'payment']);
         $notifications = NotificationLog::where('notifiable_type', Subscription::class)
@@ -205,6 +227,8 @@ class FinanceController extends Controller
 
     public function index(Request $request): View
     {
+        Gate::authorize('viewAnyFinance', Order::class);
+
         $orderStatus = $request->string('order_status')->toString();
         $paymentStatus = $request->string('payment_status')->toString();
         $subscriptionStatus = $request->string('subscription_status')->toString();
@@ -234,6 +258,8 @@ class FinanceController extends Controller
 
     public function export(string $dataset): StreamedResponse
     {
+        Gate::authorize('exportFinance', Order::class);
+
         return match ($dataset) {
             'orders' => $this->streamOrders(),
             'payments' => $this->streamPayments(),
@@ -245,6 +271,8 @@ class FinanceController extends Controller
 
     public function markPaymentPaid(Request $request, Payment $payment): RedirectResponse
     {
+        Gate::authorize('reconcile', $payment);
+
         $before = $payment->only(['status', 'paid_at', 'provider_transaction_id', 'failure_reason']);
 
         $payment->update([
@@ -266,6 +294,8 @@ class FinanceController extends Controller
 
     public function markPaymentFailed(Request $request, Payment $payment): RedirectResponse
     {
+        Gate::authorize('reconcile', $payment);
+
         $before = $payment->only(['status', 'failure_reason']);
 
         $payment->update([
@@ -282,8 +312,10 @@ class FinanceController extends Controller
         return $this->redirectAfterAction($request, 'admin.finance.index', [], 'Payment marked failed.');
     }
 
-    public function refundPayment(Request $request, Payment $payment): RedirectResponse
+    public function refundPayment(Request $request, Payment $payment, StaffCommissionService $commissionService): RedirectResponse
     {
+        Gate::authorize('refund', $payment);
+
         $before = $payment->only(['status', 'failure_reason']);
         $validated = $request->validate([
             'refund_amount' => ['nullable', 'numeric', 'min:0.01'],
@@ -309,6 +341,8 @@ class FinanceController extends Controller
         ]);
 
         if ($amount >= (float) $payment->amount) {
+            $commissionService->reverseForRefund($payment);
+
             Subscription::where('payment_id', $payment->id)
                 ->get()
                 ->each(function (Subscription $subscription) use ($validated) {
@@ -323,6 +357,8 @@ class FinanceController extends Controller
 
     public function extendSubscription(Request $request, Subscription $subscription): RedirectResponse
     {
+        Gate::authorize('extend', $subscription);
+
         $before = $subscription->only(['status', 'starts_at', 'ends_at', 'renews_at']);
         $validated = $request->validate([
             'extension_days' => ['required', 'integer', 'min:1'],
@@ -337,6 +373,8 @@ class FinanceController extends Controller
 
     public function suspendSubscription(Request $request, Subscription $subscription): RedirectResponse
     {
+        Gate::authorize('suspend', $subscription);
+
         $before = $subscription->only(['status', 'ends_at', 'renews_at']);
         app(SubscriptionLifecycleService::class)->suspend($subscription, $request->input('suspension_reason'));
 
@@ -347,6 +385,8 @@ class FinanceController extends Controller
 
     public function sendSubscriptionReminder(Request $request, Subscription $subscription): RedirectResponse
     {
+        Gate::authorize('sendReminder', $subscription);
+
         $reminder = app(SubscriptionLifecycleService::class)->logReminder(
             $subscription,
             $request->input('reminder_type', 'expiry_notice'),

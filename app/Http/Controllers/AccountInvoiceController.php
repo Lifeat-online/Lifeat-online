@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Invoice;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class AccountInvoiceController extends Controller
 {
@@ -26,7 +27,8 @@ class AccountInvoiceController extends Controller
     public function show(Request $request, Invoice $invoice): View
     {
         $invoice->load(['order.user', 'order.items.package', 'order.items.purchasable', 'order.payments']);
-        abort_unless($invoice->order?->user_id === $request->user()->id, 403);
+        abort_unless($invoice->order, 404);
+        Gate::authorize('manage', $invoice->order);
 
         return view('account.invoices.show', [
             'invoice' => $invoice,

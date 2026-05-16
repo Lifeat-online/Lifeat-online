@@ -6,6 +6,7 @@ use App\Models\CivicFaultPhoto;
 use App\Models\CivicFaultReport;
 use App\Notifications\CivicFaultReportedNotification;
 use App\Services\CouncillorAssignmentService;
+use App\Support\Validation\UploadRules;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
@@ -38,7 +39,7 @@ class CivicFaultReportController extends Controller
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'address_label' => ['nullable', 'string', 'max:255'],
             'photos' => ['nullable', 'array', 'max:5'],
-            'photos.*' => ['file', 'image', 'max:5120'],
+            'photos.*' => UploadRules::requiredPublicImage(),
             'consent' => ['accepted'],
         ]);
 

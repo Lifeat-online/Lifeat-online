@@ -46,7 +46,7 @@ class PayFastCheckoutService
     public function verifyCallback(array $payload): bool
     {
         if (empty($payload['signature'])) {
-            return true;
+            return false;
         }
 
         $providedSignature = (string) $payload['signature'];

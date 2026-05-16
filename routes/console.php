@@ -7,12 +7,80 @@ use App\Services\NotificationDispatchService;
 use App\Services\PushCampaignDispatchService;
 use App\Services\SubscriptionLifecycleService;
 use App\Services\SubscriptionRenewalService;
+use App\Support\ProductionReadiness\EnvironmentCheck;
+use App\Support\Uploads\UploadReferenceIndex;
 use Illuminate\Foundation\Inspiring;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Artisan;
+use Symfony\Component\Console\Command\Command;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Artisan::command('production:check {--fail-on-warning : Return a failing exit code when warnings are present}', function (EnvironmentCheck $check) {
+    $findings = $check->run();
+    $errors = array_filter($findings, fn (array $finding) => $finding['level'] === 'error');
+    $warnings = array_filter($findings, fn (array $finding) => $finding['level'] === 'warning');
+
+    if ($findings === []) {
+        $this->info('Production readiness checks passed.');
+
+        return Command::SUCCESS;
+    }
+
+    foreach ($findings as $finding) {
+        $line = "[{$finding['key']}] {$finding['message']}";
+
+        if ($finding['level'] === 'error') {
+            $this->error($line);
+        } else {
+            $this->warn($line);
+        }
+    }
+
+    $this->newLine();
+    $this->line(count($errors).' error(s), '.count($warnings).' warning(s).');
+
+    if ($errors !== [] || ($this->option('fail-on-warning') && $warnings !== [])) {
+        return Command::FAILURE;
+    }
+
+    return Command::SUCCESS;
+})->purpose('Check production environment settings before deployment');
+
+Artisan::command('uploads:orphans {--disk=public : Storage disk to scan: public or local} {--delete : Delete orphaned files instead of only listing them}', function (UploadReferenceIndex $index) {
+    $disk = (string) $this->option('disk');
+
+    if (! in_array($disk, ['public', 'local'], true)) {
+        $this->error('The --disk option must be public or local.');
+
+        return Command::FAILURE;
+    }
+
+    $orphans = $index->orphaned($disk);
+
+    if ($orphans === []) {
+        $this->info("No orphaned {$disk} upload files found.");
+
+        return Command::SUCCESS;
+    }
+
+    foreach ($orphans as $path) {
+        $this->line($path);
+    }
+
+    if ($this->option('delete')) {
+        Storage::disk($disk)->delete($orphans);
+        $this->warn('Deleted '.count($orphans)." orphaned {$disk} upload file(s).");
+
+        return Command::SUCCESS;
+    }
+
+    $this->warn('Found '.count($orphans)." orphaned {$disk} upload file(s). Run again with --delete to remove them.");
+
+    return Command::FAILURE;
+})->purpose('Find or delete upload files that are no longer referenced by database records');
 
 Artisan::command('subscriptions:send-expiry-reminders {--days=7}', function (SubscriptionLifecycleService $lifecycleService, NotificationDispatchService $notificationDispatchService) {
     $days = (int) $this->option('days');

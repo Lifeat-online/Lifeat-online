@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ArticleWordLedger;
 use App\Models\WriterPaymentBatch;
 use App\Models\WriterPaymentBatchItem;
+use App\Services\AuditLogService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,7 +27,7 @@ class WriterPaymentController extends Controller
         ]);
     }
 
-    public function storeBatch(Request $request): RedirectResponse
+    public function storeBatch(Request $request, AuditLogService $audit): RedirectResponse
     {
         $ids = ArticleWordLedger::query()
             ->where('status', 'pending')
@@ -61,6 +62,13 @@ class WriterPaymentController extends Controller
             ]);
         }
 
+        $audit->log($request, 'writer_payment_batch.created', $batch, [], [
+            'status' => $batch->status,
+            'item_count' => $batch->item_count,
+            'gross_amount' => $batch->gross_amount,
+            'ledger_ids' => $ledgers->modelKeys(),
+        ]);
+
         return redirect()->route('admin.writer-payments.index')->with('status', 'Writer payment batch created.');
     }
 
@@ -89,13 +97,20 @@ class WriterPaymentController extends Controller
         }, $batch->reference.'.csv');
     }
 
-    public function markPaid(Request $request, WriterPaymentBatch $batch): RedirectResponse
+    public function markPaid(Request $request, WriterPaymentBatch $batch, AuditLogService $audit): RedirectResponse
     {
         if ($batch->status === 'paid') {
             return redirect()->route('admin.writer-payments.index')->with('status', 'Batch already marked paid.');
         }
 
         $batch->load('items.ledger');
+        $before = $batch->only(['status', 'paid_at']);
+        $ledgerIds = $batch->items
+            ->pluck('ledger')
+            ->filter()
+            ->pluck('id')
+            ->all();
+
         $batch->update([
             'status' => 'paid',
             'paid_at' => now(),
@@ -107,6 +122,12 @@ class WriterPaymentController extends Controller
                 'paid_at' => now(),
             ]);
         }
+
+        $audit->log($request, 'writer_payment_batch.marked_paid', $batch, $before, [
+            'status' => $batch->fresh()->status,
+            'paid_at' => optional($batch->fresh()->paid_at)?->toDateTimeString(),
+            'ledger_ids' => $ledgerIds,
+        ]);
 
         return redirect()->route('admin.writer-payments.index')->with('status', 'Batch marked paid.');
     }

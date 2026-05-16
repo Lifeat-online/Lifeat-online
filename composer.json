@@ -1,9 +1,9 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "jims-pos/jims-pos",
+    "name": "life-platform/life-platform",
     "version": "0.0.2",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "Local job-creation and monetisation platform built with Laravel.",
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {

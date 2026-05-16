@@ -1,64 +1,65 @@
 # Life Platform
 
-A modern, interactive community directory and event platform built with Laravel. This platform enables local businesses to manage their presence and promote events through a geo-aware interactive map interface.
+A Laravel platform for local job creation and community monetisation. The app combines paid local writing, business directory packages, staff-assisted sales, events, advertising, push campaigns, vouchers, classifieds, and civic/community workflows.
 
-## 🚀 Key Features
+## Key Features
 
-- **Interactive Directory**: Browse local businesses on a high-performance interactive map (Leaflet.js + OpenStreetMap).
-- **Event Management**: Specialized event discovery with proximity-based searching and fallback geolocation logic.
-- **Owner Dashboard**: Intuitive admin interface for business owners to manage listings, pick exact map locations, and track campaign performance.
-- **Geo-Aware Search**: "Near Me" functionality using browser geolocation to filter results by physical distance.
-- **Marker Clustering**: Optimized map performance for high-density areas.
-- **Premium Design**: Modern, responsive UI with full dark mode support and sleek animations.
+- **Job creation engine**: Writer applications, article workflow, word-count ledgers, and writer payment batches.
+- **Business directory**: Paid listings with owner and staff-assisted capture flows.
+- **Advertising revenue stack**: Advert campaigns, push campaigns, package entitlements, tracking counters, and admin approval flows.
+- **Commerce operations**: Checkout, PayFast payment attempts, invoices, subscriptions, renewals, refunds, and finance dashboards.
+- **Staff wallets**: Staff-attributed sales, commission ledger entries, payout requests, and admin payout processing.
+- **Community surfaces**: Events, articles, classifieds, vouchers, search, maps, and civic fault reporting.
 
-## 🛠 Tech Stack
+## Tech Stack
 
-- **Backend**: Laravel 11.x (PHP 8.2+)
-- **Frontend**: Blade, Vanilla CSS, JavaScript
-- **Mapping**: Leaflet.js, OpenStreetMap
-- **Database**: SQLite (Local Dev) / MySQL compatible (Production)
-- **Styling**: Modern CSS with CSS Variables for theme consistency
+- **Backend**: Laravel 13.x on PHP 8.4+
+- **Frontend**: Blade, Tailwind CSS, Alpine.js, Vite
+- **Database**: SQLite for local development, MySQL/PostgreSQL compatible for production
+- **Deployment**: Railway-managed deployment pipeline
+- **Payments**: PayFast integration foundations
 
-## 📦 Installation
+## Local Installation
 
-1. **Clone the repository**:
-   ```bash
-   git clone <repository-url>
-   cd life-platform
-   ```
+1. Install dependencies:
 
-2. **Install dependencies**:
    ```bash
    composer install
    npm install
    ```
 
-3. **Configure environment**:
+2. Configure the environment:
+
    ```bash
    cp .env.example .env
    php artisan key:generate
    ```
 
-4. **Setup Database**:
+3. Prepare the database:
+
    ```bash
-   touch database/database.sqlite
    php artisan migrate --seed
    ```
 
-5. **Run Development Server**:
+4. Run the app locally:
+
    ```bash
    php artisan serve
    npm run dev
    ```
 
-## 🗺 Interactive Mapping Logic
+For local PHPUnit runs, ensure the PHP CLI has these extensions enabled: `mbstring`, `openssl`, `fileinfo`, `gd`, `pdo_sqlite`, and `sqlite3`.
 
-The platform uses a custom Blade component `x-map-embed` that handles both single-pin (details pages) and multi-marker (index pages) modes. It includes built-in support for:
-- Dark mode tile filtering.
-- Automatic clustering for performance.
-- Distance calculation badges in popups.
-- Fallback coordinates (Event → Parent Listing).
+## Production Notes
 
-## 📄 License
+- Railway is responsible for deployment and release orchestration.
+- The in-app git update utility has been removed; do not reintroduce app-level `git pull` deployment controls.
+- Run `php artisan production:check` during deploy validation and resolve any errors before public launch.
+- On Railway, run separate worker and scheduler processes for `php artisan queue:work --sleep=3 --tries=3 --timeout=120` and `php artisan schedule:work`, then set `QUEUE_WORKER_ENABLED=true` and `SCHEDULER_ENABLED=true`.
+- For Railway uploads, prefer a durable volume mounted over `storage/app` and set `UPLOAD_STORAGE_BACKEND=railway_volume` plus `UPLOAD_STORAGE_MOUNT_PATH`.
+- Enable managed database backups and record a successful restore drill with `BACKUPS_ENABLED=true`, `BACKUP_PROVIDER`, `BACKUP_RESTORE_DRILL_COMPLETED=true`, and `BACKUP_LAST_RESTORE_DRILL_DATE`.
+- Use the production readiness tracker in `Planning/production-readiness-todo.md` for launch blockers, verification, and operational hardening.
 
-Open-source software licensed under the [MIT license](LICENSE).
+## License
+
+Open-source software licensed under the MIT license.

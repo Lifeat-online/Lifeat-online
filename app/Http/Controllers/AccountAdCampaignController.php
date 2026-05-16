@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\AdCampaign;
 use App\Models\Event;
 use App\Models\Listing;
+use App\Support\Validation\UploadRules;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -17,7 +19,7 @@ class AccountAdCampaignController extends Controller
 {
     public function index(Request $request, Listing $listing): View
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
 
         return view('account.ad-campaigns.index', [
             'listing' => $listing->load('activeSubscription.package'),
@@ -36,7 +38,7 @@ class AccountAdCampaignController extends Controller
 
     public function create(Request $request, Listing $listing): View
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
 
         return view('account.ad-campaigns.form', [
             'listing' => $listing,
@@ -56,7 +58,7 @@ class AccountAdCampaignController extends Controller
 
     public function store(Request $request, Listing $listing): RedirectResponse
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
         $this->ensureEntitledListing($listing);
 
         $data = $this->validated($request, $listing);
@@ -74,7 +76,7 @@ class AccountAdCampaignController extends Controller
 
     public function edit(Request $request, Listing $listing, AdCampaign $adCampaign): View
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
         abort_unless($adCampaign->listing_id === $listing->id, 404);
 
         $adCampaign->load([
@@ -105,7 +107,7 @@ class AccountAdCampaignController extends Controller
 
     public function update(Request $request, Listing $listing, AdCampaign $adCampaign): RedirectResponse
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
         abort_unless($adCampaign->listing_id === $listing->id, 404);
 
         $data = $this->validated($request, $listing);
@@ -120,7 +122,7 @@ class AccountAdCampaignController extends Controller
 
     public function destroy(Request $request, Listing $listing, AdCampaign $adCampaign): RedirectResponse
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
         abort_unless($adCampaign->listing_id === $listing->id, 404);
 
         $this->deleteFile($adCampaign->creative_image);
@@ -141,7 +143,7 @@ class AccountAdCampaignController extends Controller
             'event_id' => ['nullable', 'integer', 'exists:events,id'],
             'start_at' => ['nullable', 'date'],
             'end_at' => ['nullable', 'date', 'after_or_equal:start_at'],
-            'creative_image_upload' => ['nullable', 'image', 'max:5120'],
+            'creative_image_upload' => UploadRules::optionalPublicImage(),
             'remove_creative_image' => ['nullable', 'boolean'],
             'status' => ['required', 'in:draft,ready,active'],
         ] + ($listing->exists ? [] : []));
@@ -204,11 +206,4 @@ class AccountAdCampaignController extends Controller
         return $slug;
     }
 
-    private function canAccessListing(Request $request, Listing $listing): bool
-    {
-        $user = $request->user();
-
-        return $listing->user_id === $user->id
-            || ($user->hasRole('staff') && $listing->registered_by_user_id === $user->id);
-    }
 }

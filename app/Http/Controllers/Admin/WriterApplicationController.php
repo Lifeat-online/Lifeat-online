@@ -12,8 +12,10 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class WriterApplicationController extends Controller
 {
@@ -107,6 +109,20 @@ class WriterApplicationController extends Controller
             'resendAvailableAt' => $this->accessResendAvailableAt($writerApplication),
             'accessHistory' => $this->accessHistory($writerApplication),
         ]);
+    }
+
+    public function document(WriterApplication $writerApplication, string $document): StreamedResponse
+    {
+        $path = match ($document) {
+            'id' => $writerApplication->id_document_path,
+            'banking' => $writerApplication->banking_document_path,
+            'residence' => $writerApplication->proof_of_residence_path,
+            default => null,
+        };
+
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path);
     }
 
     public function review(Request $request, WriterApplication $writerApplication): RedirectResponse

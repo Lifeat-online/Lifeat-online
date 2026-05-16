@@ -9,8 +9,10 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Package;
 use App\Models\Payment;
+use App\Models\StaffWallet;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Models\WalletLedgerEntry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -84,6 +86,50 @@ class FinanceOperationsTest extends TestCase
             'action' => 'payment.marked_paid',
             'subject_type' => Payment::class,
             'subject_id' => $payment->id,
+        ]);
+    }
+
+    public function test_paid_staff_attributed_order_credits_fifty_percent_commission(): void
+    {
+        $staff = User::factory()->create(['role' => 'staff']);
+        $owner = User::factory()->create(['role' => 'business_owner']);
+
+        $order = Order::create([
+            'user_id' => $owner->id,
+            'referred_by_user_id' => $staff->id,
+            'order_number' => 'ORD-COMM-1',
+            'status' => 'pending_payment',
+            'currency' => 'ZAR',
+            'subtotal' => 500,
+            'vat_amount' => 0,
+            'total' => 500,
+        ]);
+
+        $payment = Payment::create([
+            'order_id' => $order->id,
+            'user_id' => $owner->id,
+            'provider' => 'manual',
+            'status' => 'pending',
+            'amount' => 500,
+            'currency' => 'ZAR',
+        ]);
+
+        $payment->update([
+            'status' => 'paid',
+            'paid_at' => now(),
+            'provider_transaction_id' => 'TX-COMM-1',
+        ]);
+
+        $wallet = StaffWallet::where('user_id', $staff->id)->firstOrFail();
+
+        $this->assertSame('250.00', $wallet->available_balance);
+        $this->assertDatabaseHas('wallet_ledger_entries', [
+            'wallet_id' => $wallet->id,
+            'entry_type' => WalletLedgerEntry::TYPE_COMMISSION_CREDIT,
+            'source_type' => Payment::class,
+            'source_id' => $payment->id,
+            'gross_amount' => 250.00,
+            'net_amount' => 250.00,
         ]);
     }
 

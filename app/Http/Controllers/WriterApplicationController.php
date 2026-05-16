@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\WriterApplication;
+use App\Support\Validation\UploadRules;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -37,9 +38,9 @@ class WriterApplicationController extends Controller
             'sample_article_body' => $data['sample_article_body'],
             'sample_advert_title' => $data['sample_advert_title'],
             'sample_advert_body' => $data['sample_advert_body'],
-            'id_document_path' => $this->storeUpload($data['id_document_upload'], 'writer-applications/id-documents'),
-            'banking_document_path' => $this->storeUpload($data['banking_document_upload'], 'writer-applications/banking-documents'),
-            'proof_of_residence_path' => $this->storeUpload($data['proof_of_residence_upload'], 'writer-applications/proof-of-residence'),
+            'id_document_path' => $this->storePrivateUpload($data['id_document_upload'], 'writer-applications/id-documents'),
+            'banking_document_path' => $this->storePrivateUpload($data['banking_document_upload'], 'writer-applications/banking-documents'),
+            'proof_of_residence_path' => $this->storePrivateUpload($data['proof_of_residence_upload'], 'writer-applications/proof-of-residence'),
             'bank_name' => $data['bank_name'],
             'account_holder_name' => $data['account_holder_name'],
             'account_number' => $data['account_number'],
@@ -94,16 +95,21 @@ class WriterApplicationController extends Controller
             'account_holder_name' => ['required', 'string', 'max:255'],
             'account_number' => ['required', 'string', 'max:60'],
             'branch_code' => ['required', 'string', 'max:30'],
-            'profile_photo_upload' => ['required', 'image', 'max:4096'],
-            'id_document_upload' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
-            'banking_document_upload' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
-            'proof_of_residence_upload' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'profile_photo_upload' => UploadRules::requiredPublicImage(4096),
+            'id_document_upload' => UploadRules::requiredPrivateDocument(),
+            'banking_document_upload' => UploadRules::requiredPrivateDocument(),
+            'proof_of_residence_upload' => UploadRules::requiredPrivateDocument(),
         ]);
     }
 
     private function storeUpload(UploadedFile $file, string $directory): string
     {
         return $file->store($directory, 'public');
+    }
+
+    private function storePrivateUpload(UploadedFile $file, string $directory): string
+    {
+        return $file->store($directory, 'local');
     }
 
     private function activeStatuses(): array

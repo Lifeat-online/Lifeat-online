@@ -9,11 +9,14 @@ use App\Services\StaffCommissionService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class PayoutRequestController extends Controller
 {
     public function index(Request $request): View
     {
+        Gate::authorize('viewAny', PayoutRequest::class);
+
         $status = $request->string('status')->toString();
 
         $requests = PayoutRequest::with(['requestedBy', 'reviewedBy', 'wallet.user'])
@@ -38,6 +41,8 @@ class PayoutRequestController extends Controller
 
     public function show(PayoutRequest $payoutRequest): View
     {
+        Gate::authorize('view', $payoutRequest);
+
         $payoutRequest->load(['requestedBy', 'reviewedBy', 'wallet.user', 'ledgerEntries']);
 
         return view('admin.payout-requests.show', [
@@ -47,6 +52,8 @@ class PayoutRequestController extends Controller
 
     public function approve(Request $request, PayoutRequest $payoutRequest): RedirectResponse
     {
+        Gate::authorize('approve', $payoutRequest);
+
         abort_unless($payoutRequest->status === PayoutRequest::STATUS_REQUESTED, 422, 'Only pending requests can be approved.');
 
         $before = ['status' => $payoutRequest->status];
@@ -64,6 +71,8 @@ class PayoutRequestController extends Controller
 
     public function reject(Request $request, PayoutRequest $payoutRequest): RedirectResponse
     {
+        Gate::authorize('reject', $payoutRequest);
+
         abort_unless($payoutRequest->status === PayoutRequest::STATUS_REQUESTED, 422, 'Only pending requests can be rejected.');
 
         $validated = $request->validate(['notes' => ['nullable', 'string', 'max:500']]);
@@ -84,6 +93,8 @@ class PayoutRequestController extends Controller
 
     public function markPaid(Request $request, PayoutRequest $payoutRequest, StaffCommissionService $commissionService): RedirectResponse
     {
+        Gate::authorize('markPaid', $payoutRequest);
+
         abort_unless($payoutRequest->status === PayoutRequest::STATUS_APPROVED, 422, 'Only approved requests can be marked paid.');
 
         $validated = $request->validate(['payment_reference' => ['nullable', 'string', 'max:100']]);

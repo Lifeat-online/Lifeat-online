@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', config('app.name', 'jims-pos'))</title>
+    <title>@yield('title', config('app.name', 'Life Platform'))</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="preload" as="image" href="{{ asset('branding/life-logo-light.svg') }}">
     <link rel="preload" as="image" href="{{ asset('branding/life-logo-dark.svg') }}">
@@ -148,13 +148,13 @@
             </div>
         </div>
         <div class="container">
-            <a href="{{ route('home') }}" class="brand-link" aria-label="{{ config('app.name', 'jims-pos') }} home">
+            <a href="{{ route('home') }}" class="brand-link" aria-label="{{ config('app.name', 'Life Platform') }} home">
                 <img
                     src="{{ asset('branding/life-logo-light.svg') }}"
                     data-theme-logo
                     data-logo-light="{{ asset('branding/life-logo-light.svg') }}"
                     data-logo-dark="{{ asset('branding/life-logo-dark.svg') }}"
-                    alt="{{ config('app.name', 'jims-pos') }}"
+                    alt="{{ config('app.name', 'Life Platform') }}"
                     class="brand-logo"
                     width="240"
                     height="56"

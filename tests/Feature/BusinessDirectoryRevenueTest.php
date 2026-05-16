@@ -147,6 +147,75 @@ class BusinessDirectoryRevenueTest extends TestCase
         ]);
     }
 
+    public function test_user_cannot_start_checkout_for_listing_they_do_not_manage(): void
+    {
+        $owner = User::factory()->create(['role' => 'business_owner']);
+        $otherUser = User::factory()->create(['role' => 'business_owner']);
+        $listing = Listing::create([
+            'user_id' => $owner->id,
+            'title' => 'Protected Checkout Listing',
+            'slug' => 'protected-checkout-listing',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($otherUser)->post(route('checkout.start'), [
+            'package_slug' => 'business-directory-standard-6m',
+            'listing_slug' => $listing->slug,
+        ])->assertForbidden();
+
+        $this->assertDatabaseMissing('orders', [
+            'user_id' => $otherUser->id,
+        ]);
+        $this->assertDatabaseCount('payments', 0);
+    }
+
+    public function test_inactive_package_cannot_start_checkout(): void
+    {
+        $owner = User::factory()->create(['role' => 'business_owner']);
+        $listing = Listing::create([
+            'user_id' => $owner->id,
+            'title' => 'Inactive Package Listing',
+            'slug' => 'inactive-package-listing',
+            'status' => 'draft',
+        ]);
+        Package::where('slug', 'business-directory-standard-6m')->update([
+            'status' => 'inactive',
+        ]);
+
+        $this->actingAs($owner)->post(route('checkout.start'), [
+            'package_slug' => 'business-directory-standard-6m',
+            'listing_slug' => $listing->slug,
+        ])->assertNotFound();
+
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('payments', 0);
+    }
+
+    public function test_package_without_current_price_cannot_start_checkout(): void
+    {
+        $owner = User::factory()->create(['role' => 'business_owner']);
+        $listing = Listing::create([
+            'user_id' => $owner->id,
+            'title' => 'Expired Price Listing',
+            'slug' => 'expired-price-listing',
+            'status' => 'draft',
+        ]);
+        Package::where('slug', 'business-directory-standard-6m')
+            ->firstOrFail()
+            ->prices()
+            ->update([
+                'effective_to' => now()->subDay(),
+            ]);
+
+        $this->actingAs($owner)->post(route('checkout.start'), [
+            'package_slug' => 'business-directory-standard-6m',
+            'listing_slug' => $listing->slug,
+        ])->assertSessionHasErrors('package_slug');
+
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('payments', 0);
+    }
+
     public function test_callback_route_marks_payment_paid_and_activates_listing(): void
     {
         $owner = User::factory()->create(['role' => 'business_owner']);
@@ -370,6 +439,186 @@ class BusinessDirectoryRevenueTest extends TestCase
         $response->assertStatus(422);
         $listing->refresh();
         $this->assertSame('draft', $listing->status);
+    }
+
+    public function test_payfast_callback_requires_signature(): void
+    {
+        $owner = User::factory()->create(['role' => 'business_owner']);
+        $listing = Listing::create([
+            'user_id' => $owner->id,
+            'title' => 'Unsigned Callback Listing',
+            'slug' => 'unsigned-callback-listing',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($owner)->post(route('checkout.start'), [
+            'package_slug' => 'business-directory-standard-6m',
+            'listing_slug' => $listing->slug,
+        ]);
+
+        $order = Order::firstOrFail();
+        $response = $this->post(route('checkout.payfast.callback'), [
+            'order_number' => $order->order_number,
+            'status' => 'paid',
+            'provider_transaction_id' => 'pf-unsigned',
+        ]);
+
+        $response->assertSessionHasErrors('signature');
+        $listing->refresh();
+        $this->assertSame('draft', $listing->status);
+    }
+
+    public function test_payfast_callback_rejects_amount_mismatch(): void
+    {
+        $owner = User::factory()->create(['role' => 'business_owner']);
+        $listing = Listing::create([
+            'user_id' => $owner->id,
+            'title' => 'Amount Mismatch Listing',
+            'slug' => 'amount-mismatch-listing',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($owner)->post(route('checkout.start'), [
+            'package_slug' => 'business-directory-standard-6m',
+            'listing_slug' => $listing->slug,
+        ]);
+
+        $order = Order::firstOrFail();
+        $payload = [
+            'order_number' => $order->order_number,
+            'status' => 'paid',
+            'provider_transaction_id' => 'pf-wrong-amount',
+            'amount_gross' => '1.00',
+            'currency' => 'ZAR',
+        ];
+        $payload['signature'] = app(PayFastCheckoutService::class)->generateSignature($payload);
+
+        $this->post(route('checkout.payfast.callback'), $payload)
+            ->assertStatus(422);
+
+        $listing->refresh();
+        $this->assertSame('draft', $listing->status);
+    }
+
+    public function test_payfast_callback_rejects_currency_mismatch(): void
+    {
+        $owner = User::factory()->create(['role' => 'business_owner']);
+        $listing = Listing::create([
+            'user_id' => $owner->id,
+            'title' => 'Currency Mismatch Listing',
+            'slug' => 'currency-mismatch-listing',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($owner)->post(route('checkout.start'), [
+            'package_slug' => 'business-directory-standard-6m',
+            'listing_slug' => $listing->slug,
+        ]);
+
+        $order = Order::firstOrFail();
+        $payload = [
+            'order_number' => $order->order_number,
+            'status' => 'paid',
+            'provider_transaction_id' => 'pf-wrong-currency',
+            'amount_gross' => '500.00',
+            'currency' => 'USD',
+        ];
+        $payload['signature'] = app(PayFastCheckoutService::class)->generateSignature($payload);
+
+        $this->post(route('checkout.payfast.callback'), $payload)
+            ->assertStatus(422);
+
+        $listing->refresh();
+        $this->assertSame('draft', $listing->status);
+        $this->assertSame('pending', $order->latestPayment()->fresh()->status);
+    }
+
+    public function test_duplicate_success_callback_for_same_payment_is_idempotent(): void
+    {
+        $owner = User::factory()->create(['role' => 'business_owner']);
+        $listing = Listing::create([
+            'user_id' => $owner->id,
+            'title' => 'Idempotent Callback Listing',
+            'slug' => 'idempotent-callback-listing',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($owner)->post(route('checkout.start'), [
+            'package_slug' => 'business-directory-standard-6m',
+            'listing_slug' => $listing->slug,
+        ]);
+
+        $order = Order::firstOrFail();
+        $payload = [
+            'order_number' => $order->order_number,
+            'status' => 'paid',
+            'provider_transaction_id' => 'pf-idempotent',
+            'amount_gross' => '500.00',
+            'currency' => 'ZAR',
+        ];
+        $payload['signature'] = app(PayFastCheckoutService::class)->generateSignature($payload);
+
+        $this->post(route('checkout.payfast.callback'), $payload)->assertOk();
+        $this->post(route('checkout.payfast.callback'), $payload)->assertOk();
+
+        $listing->refresh();
+        $this->assertSame('published', $listing->status);
+        $this->assertSame('paid', $order->latestPayment()->fresh()->status);
+        $this->assertDatabaseCount('payments', 1);
+        $this->assertDatabaseCount('subscriptions', 1);
+        $this->assertDatabaseCount('entitlements', 1);
+    }
+
+    public function test_payfast_callback_rejects_replayed_transaction_reference_for_another_payment(): void
+    {
+        $owner = User::factory()->create(['role' => 'business_owner']);
+        $firstListing = Listing::create([
+            'user_id' => $owner->id,
+            'title' => 'Replay First Listing',
+            'slug' => 'replay-first-listing',
+            'status' => 'draft',
+        ]);
+        $secondListing = Listing::create([
+            'user_id' => $owner->id,
+            'title' => 'Replay Second Listing',
+            'slug' => 'replay-second-listing',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($owner)->post(route('checkout.start'), [
+            'package_slug' => 'business-directory-standard-6m',
+            'listing_slug' => $firstListing->slug,
+        ]);
+        $firstOrder = Order::latest('id')->firstOrFail();
+        $firstPayload = [
+            'order_number' => $firstOrder->order_number,
+            'status' => 'paid',
+            'provider_transaction_id' => 'pf-replayed',
+            'amount_gross' => '500.00',
+            'currency' => 'ZAR',
+        ];
+        $firstPayload['signature'] = app(PayFastCheckoutService::class)->generateSignature($firstPayload);
+        $this->post(route('checkout.payfast.callback'), $firstPayload)->assertOk();
+
+        $this->actingAs($owner)->post(route('checkout.start'), [
+            'package_slug' => 'business-directory-standard-6m',
+            'listing_slug' => $secondListing->slug,
+        ]);
+        $secondOrder = Order::latest('id')->firstOrFail();
+        $secondPayload = [
+            'order_number' => $secondOrder->order_number,
+            'status' => 'paid',
+            'provider_transaction_id' => 'pf-replayed',
+            'amount_gross' => '500.00',
+            'currency' => 'ZAR',
+        ];
+        $secondPayload['signature'] = app(PayFastCheckoutService::class)->generateSignature($secondPayload);
+
+        $this->post(route('checkout.payfast.callback'), $secondPayload)
+            ->assertStatus(409);
+
+        $secondListing->refresh();
+        $this->assertSame('draft', $secondListing->status);
     }
 
     public function test_failed_payment_can_be_retried_with_new_attempt(): void

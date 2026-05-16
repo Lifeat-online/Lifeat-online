@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Event;
 use App\Models\Listing;
+use App\Support\Validation\UploadRules;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -18,7 +20,7 @@ class AccountEventController extends Controller
 {
     public function index(Request $request, Listing $listing): View
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
 
         return view('account.events.index', [
             'listing' => $listing->load('activeSubscription.package'),
@@ -37,7 +39,7 @@ class AccountEventController extends Controller
 
     public function create(Request $request, Listing $listing): View
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
 
         return view('account.events.form', [
             'listing' => $listing,
@@ -61,7 +63,7 @@ class AccountEventController extends Controller
 
     public function store(Request $request, Listing $listing): RedirectResponse
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
 
         $data = $this->validated($request);
         $this->ensurePublishableListing($data['status'], $listing);
@@ -82,7 +84,7 @@ class AccountEventController extends Controller
 
     public function edit(Request $request, Listing $listing, Event $event): View
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
         abort_unless($event->listing_id === $listing->id, 404);
         $event->load('categories');
         $event->load([
@@ -114,7 +116,7 @@ class AccountEventController extends Controller
 
     public function update(Request $request, Listing $listing, Event $event): RedirectResponse
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
         abort_unless($event->listing_id === $listing->id, 404);
 
         $data = $this->validated($request, $event);
@@ -133,7 +135,7 @@ class AccountEventController extends Controller
 
     public function destroy(Request $request, Listing $listing, Event $event): RedirectResponse
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
         abort_unless($event->listing_id === $listing->id, 404);
 
         if ($event->featured_image) {
@@ -162,7 +164,7 @@ class AccountEventController extends Controller
             'start_at' => ['required', 'date'],
             'end_at' => ['nullable', 'date', 'after_or_equal:start_at'],
             'website_url' => ['nullable', 'url'],
-            'featured_image_upload' => ['nullable', 'image', 'max:5120'],
+            'featured_image_upload' => UploadRules::optionalPublicImage(),
             'remove_featured_image' => ['nullable', 'boolean'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
@@ -239,11 +241,4 @@ class AccountEventController extends Controller
         return $slug;
     }
 
-    private function canAccessListing(Request $request, Listing $listing): bool
-    {
-        $user = $request->user();
-
-        return $listing->user_id === $user->id
-            || ($user->hasRole('staff') && $listing->registered_by_user_id === $user->id);
-    }
 }

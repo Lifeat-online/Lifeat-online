@@ -6,6 +6,8 @@ use App\Models\AuditLog;
 use App\Models\Classified;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ClassifiedModerationTest extends TestCase
@@ -44,6 +46,27 @@ class ClassifiedModerationTest extends TestCase
         $manageResponse->assertOk();
         $manageResponse->assertSee('Used Garden Tools');
         $manageResponse->assertSee('Pending');
+    }
+
+    public function test_classified_upload_rejects_unsupported_image_formats(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->from(route('classifieds.manage.create'))->post(route('classifieds.manage.store'), [
+            'title' => 'Used Garden Tools',
+            'description' => 'A full set of lightly used gardening tools.',
+            'price' => 350,
+            'currency' => 'ZAR',
+            'featured_image' => UploadedFile::fake()->create('animated.gif', 64, 'image/gif'),
+        ]);
+
+        $response->assertRedirect(route('classifieds.manage.create'));
+        $response->assertSessionHasErrors('featured_image');
+        $this->assertDatabaseMissing('classifieds', [
+            'title' => 'Used Garden Tools',
+        ]);
     }
 
     public function test_admin_can_publish_pending_classified_and_make_it_public(): void

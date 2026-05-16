@@ -6,10 +6,12 @@ use App\Models\Category;
 use App\Models\Listing;
 use App\Models\ListingPhoto;
 use App\Models\Review;
+use App\Support\Validation\UploadRules;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -40,7 +42,7 @@ class AccountListingController extends Controller
 
     public function show(Request $request, Listing $listing): View
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
 
         $listing->load([
             'categories',
@@ -73,7 +75,7 @@ class AccountListingController extends Controller
 
     public function edit(Request $request, Listing $listing): View
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
         $listing->load('categories');
 
         return view('account.listings.form', [
@@ -85,7 +87,7 @@ class AccountListingController extends Controller
 
     public function update(Request $request, Listing $listing): RedirectResponse
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
 
         $data = $this->validated($request);
         $data = $this->handleUploads($request, $data, $listing);
@@ -100,7 +102,7 @@ class AccountListingController extends Controller
 
     public function respondToReview(Request $request, Listing $listing, Review $review): RedirectResponse
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
         abort_unless($review->listing_id === $listing->id, 404);
         abort_unless($review->status === 'approved', 403);
 
@@ -121,10 +123,10 @@ class AccountListingController extends Controller
 
     public function storePhoto(Request $request, Listing $listing): RedirectResponse
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
 
         $data = $request->validate([
-            'photo_upload' => ['required', 'image', 'max:5120'],
+            'photo_upload' => UploadRules::requiredPublicImage(),
             'caption' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -141,7 +143,7 @@ class AccountListingController extends Controller
 
     public function destroyPhoto(Request $request, Listing $listing, ListingPhoto $photo): RedirectResponse
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
         abort_unless($photo->listing_id === $listing->id, 404);
 
         $this->deleteFile($photo->image_path);
@@ -154,7 +156,7 @@ class AccountListingController extends Controller
 
     public function makePrimaryPhoto(Request $request, Listing $listing, ListingPhoto $photo): RedirectResponse
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
         abort_unless($photo->listing_id === $listing->id, 404);
 
         $listing->photos()->increment('sort_order');
@@ -179,8 +181,8 @@ class AccountListingController extends Controller
             'region' => ['nullable', 'string', 'max:255'],
             'country' => ['nullable', 'string', 'max:255'],
             'postal_code' => ['nullable', 'string', 'max:255'],
-            'featured_image_upload' => ['nullable', 'image', 'max:5120'],
-            'logo_upload' => ['nullable', 'image', 'max:5120'],
+            'featured_image_upload' => UploadRules::optionalPublicImage(),
+            'logo_upload' => UploadRules::optionalPublicImage(),
             'remove_featured_image' => ['nullable', 'boolean'],
             'remove_logo' => ['nullable', 'boolean'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
@@ -225,10 +227,9 @@ class AccountListingController extends Controller
 
     public function destroy(Request $request, Listing $listing): RedirectResponse
     {
-        abort_unless($this->canAccessListing($request, $listing), 403);
+        Gate::authorize('manage', $listing);
 
-        $this->deleteFile($listing->featured_image);
-        $this->deleteFile($listing->logo_path);
+        $this->deleteListingFiles($listing);
         $listing->delete();
 
         return redirect()
@@ -236,11 +237,16 @@ class AccountListingController extends Controller
             ->with('status', 'Listing removed.');
     }
 
-    private function canAccessListing(Request $request, Listing $listing): bool
+    private function deleteListingFiles(Listing $listing): void
     {
-        $user = $request->user();
+        $listing->loadMissing('photos');
 
-        return $listing->user_id === $user->id
-            || ($user->hasRole('staff') && $listing->registered_by_user_id === $user->id);
+        $this->deleteFile($listing->featured_image);
+        $this->deleteFile($listing->logo_path);
+
+        foreach ($listing->photos as $photo) {
+            $this->deleteFile($photo->image_path);
+        }
     }
+
 }

@@ -9,6 +9,7 @@ use App\Models\Listing;
 use App\Models\MarketingIntegration;
 use App\Models\PushCampaign;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 
@@ -43,8 +44,7 @@ class StaffAdvertisingApiController extends Controller
 
     public function summary(Request $request, Listing $listing)
     {
-        $user = $request->user();
-        abort_unless($listing->registered_by_user_id === $user->id, 403);
+        Gate::authorize('manageAssigned', $listing);
 
         $listing->load([
             'owner',
@@ -110,8 +110,8 @@ class StaffAdvertisingApiController extends Controller
 
     public function updateAdCampaign(Request $request, AdCampaign $adCampaign)
     {
-        $user = $request->user();
-        abort_unless($adCampaign->listing?->registered_by_user_id === $user->id, 403);
+        abort_unless($adCampaign->listing, 404);
+        Gate::authorize('manageAssigned', $adCampaign->listing);
 
         $validated = $request->validate([
             'expected_updated_at' => ['required', 'date'],
@@ -154,8 +154,8 @@ class StaffAdvertisingApiController extends Controller
 
     public function updatePushCampaign(Request $request, PushCampaign $pushCampaign)
     {
-        $user = $request->user();
-        abort_unless($pushCampaign->listing?->registered_by_user_id === $user->id, 403);
+        abort_unless($pushCampaign->listing, 404);
+        Gate::authorize('manageAssigned', $pushCampaign->listing);
 
         $validated = $request->validate([
             'expected_updated_at' => ['required', 'date'],
@@ -199,7 +199,7 @@ class StaffAdvertisingApiController extends Controller
     public function updateIntegration(Request $request, Listing $listing, string $type)
     {
         $user = $request->user();
-        abort_unless($listing->registered_by_user_id === $user->id, 403);
+        Gate::authorize('manageAssigned', $listing);
 
         $validated = $request->validate([
             'expected_updated_at' => ['nullable', 'date'],
@@ -252,4 +252,3 @@ class StaffAdvertisingApiController extends Controller
         ]);
     }
 }
-

@@ -6,11 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\StaffWallet;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class WalletController extends Controller
 {
     public function index(Request $request): View
     {
+        Gate::authorize('viewAny', StaffWallet::class);
+
         $wallets = StaffWallet::with(['user', 'payoutRequests' => fn ($q) => $q->whereIn('status', ['requested', 'approved'])])
             ->withCount('ledgerEntries')
             ->orderByDesc('available_balance')
@@ -24,6 +27,8 @@ class WalletController extends Controller
 
     public function show(StaffWallet $staffWallet): View
     {
+        Gate::authorize('view', $staffWallet);
+
         $staffWallet->load([
             'user',
             'ledgerEntries' => fn ($q) => $q->latest('recorded_at'),

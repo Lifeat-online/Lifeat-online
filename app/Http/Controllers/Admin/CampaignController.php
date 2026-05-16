@@ -62,6 +62,8 @@ class CampaignController extends Controller
     public function adApprove(Request $request, AdCampaign $adCampaign, AuditLogService $audit)
     {
         abort_unless(in_array($adCampaign->status, ['ready', 'paused'], true), 422, 'Campaign is not in a state that can be approved.');
+        abort_unless($adCampaign->linkedListingHasActiveEntitlement(), 422, 'The linked business listing needs an active package before advert approval.');
+        abort_unless($adCampaign->hasActiveAdvertEntitlement(), 422, 'This advert campaign needs an active advert package before approval.');
 
         $before = ['status' => $adCampaign->status];
         $adCampaign->update([
@@ -127,6 +129,8 @@ class CampaignController extends Controller
             match ($validated['action']) {
                 'approve' => (function () use ($campaign) {
                     abort_unless(in_array($campaign->status, ['ready', 'paused'], true), 422, 'Campaign is not in a state that can be approved.');
+                    abort_unless($campaign->linkedListingHasActiveEntitlement(), 422, 'The linked business listing needs an active package before advert approval.');
+                    abort_unless($campaign->hasActiveAdvertEntitlement(), 422, 'This advert campaign needs an active advert package before approval.');
                     $campaign->update(['status' => 'active', 'published_at' => $campaign->published_at ?? now()]);
                 })(),
                 'pause' => (function () use ($campaign) {

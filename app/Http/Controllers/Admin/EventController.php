@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Event;
 use App\Models\Listing;
 use App\Services\AuditLogService;
+use App\Support\Validation\UploadRules;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
@@ -217,7 +218,7 @@ class EventController extends Controller
             'start_at' => ['required', 'date'],
             'end_at' => ['nullable', 'date', 'after_or_equal:start_at'],
             'website_url' => ['nullable', 'url'],
-            'featured_image_upload' => ['nullable', 'image', 'max:5120'],
+            'featured_image_upload' => UploadRules::optionalPublicImage(),
             'remove_featured_image' => ['nullable', 'boolean'],
             'status' => ['required', Rule::in(['draft', 'published'])],
             'published_at' => ['nullable', 'date'],

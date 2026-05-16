@@ -11,6 +11,7 @@ use App\Models\LocationNode;
 use App\Models\Setting;
 use App\Models\Tag;
 use App\Services\AuditLogService;
+use App\Support\Validation\UploadRules;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
@@ -224,7 +225,7 @@ class ArticleController extends Controller
             'body' => ['nullable', 'string'],
             'revision_note' => ['nullable', 'string'],
             'submitted_at' => ['nullable', 'date'],
-            'featured_image_upload' => ['nullable', 'image', 'max:5120'],
+            'featured_image_upload' => UploadRules::optionalPublicImage(),
             'remove_featured_image' => ['nullable', 'boolean'],
             'status' => ['required', Rule::in(['draft', 'pending_review', 'revision_requested', 'published'])],
             'published_at' => ['nullable', 'date'],
