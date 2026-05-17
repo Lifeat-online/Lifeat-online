@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\OpenRouterTranslationService;
 use App\Services\VapidKeySetupService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Http;
 use Mockery\MockInterface;
 use Tests\TestCase;
@@ -587,5 +588,49 @@ class DevToolsAccessTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Teken in');
+    }
+
+    public function test_interface_translations_apply_to_dynamic_text_prefixes(): void
+    {
+        InterfaceTranslation::create([
+            'locale' => 'af',
+            'source_hash' => hash('sha256', 'Hosted by'),
+            'source_text' => 'Hosted by',
+            'translated_text' => 'Aangebied deur',
+            'provider' => 'test',
+            'model' => 'test',
+            'translated_at' => now(),
+        ]);
+
+        InterfaceTranslation::create([
+            'locale' => 'af',
+            'source_hash' => hash('sha256', 'Address:'),
+            'source_text' => 'Address:',
+            'translated_text' => 'Adres:',
+            'provider' => 'test',
+            'model' => 'test',
+            'translated_at' => now(),
+        ]);
+
+        Route::middleware(['web', \App\Http\Middleware\SetLocale::class, \App\Http\Middleware\TranslateInterface::class])
+            ->get('/translation-prefix-test', fn () => response('<html><body><span>Hosted by Life Cafe</span><span>Address: Main Road</span></body></html>'));
+
+        $response = $this
+            ->withSession(['locale' => 'af'])
+            ->get('/translation-prefix-test');
+
+        $response->assertOk();
+        $response->assertSee('Aangebied deur Life Cafe', false);
+        $response->assertSee('Adres: Main Road', false);
+    }
+
+    public function test_interface_scanner_finds_dynamic_blade_fallback_strings(): void
+    {
+        $strings = app(\App\Services\PlatformInterfaceTranslationService::class)->sourceStrings();
+
+        $this->assertContains('Hosted by', $strings);
+        $this->assertContains('Location pending', $strings);
+        $this->assertContains('To be confirmed', $strings);
+        $this->assertContains('Address:', $strings);
     }
 }

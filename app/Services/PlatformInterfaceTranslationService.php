@@ -88,8 +88,8 @@ class PlatformInterfaceTranslationService
                     [
                         'source_text' => $sourceText,
                         'translated_text' => $translation,
-                        'provider' => 'openrouter',
-                        'model' => $this->translator->model(),
+                        'provider' => $this->translator->providerUsed(),
+                        'model' => $this->translator->modelUsed(),
                         'translated_at' => now(),
                     ]
                 );
@@ -129,8 +129,8 @@ class PlatformInterfaceTranslationService
                 [
                     'source_text' => $sourceText,
                     'translated_text' => $translation,
-                    'provider' => 'openrouter',
-                    'model' => $this->translator->model(),
+                    'provider' => $this->translator->providerUsed(),
+                    'model' => $this->translator->modelUsed(),
                     'translated_at' => now(),
                 ]
             );
@@ -217,12 +217,46 @@ class PlatformInterfaceTranslationService
 
         $matches = [];
         preg_match_all('/>([^<>]+)</u', $contents, $matches);
-        $textNodes = collect($matches[1] ?? []);
+        $textNodes = collect($matches[1] ?? [])
+            ->flatMap(fn (string $text): array => $this->extractTextNodeStrings($text));
 
         $attributeMatches = [];
-        preg_match_all('/\b(?:placeholder|aria-label|title|alt)\s*=\s*"([^"{]+)"/u', $contents, $attributeMatches);
+        preg_match_all('/\b(?:placeholder|aria-label|title|alt|value)\s*=\s*(["\'])([^"\']+)\1/u', $contents, $attributeMatches);
 
-        return $textNodes->merge($attributeMatches[1] ?? []);
+        $bladeMatches = [];
+        preg_match_all('/(?:\{\{|\{!!)(.*?)(?:\}\}|!!\})/s', $contents, $bladeMatches);
+        $bladeStrings = collect($bladeMatches[1] ?? [])
+            ->flatMap(fn (string $text): array => $this->extractQuotedStrings($text));
+
+        return $textNodes
+            ->merge($attributeMatches[2] ?? [])
+            ->merge($bladeStrings);
+    }
+
+    private function extractTextNodeStrings(string $text): array
+    {
+        $strings = collect([$text]);
+
+        if (str_contains($text, '{{') || str_contains($text, '{!!')) {
+            $fragments = preg_split('/(?:\{\{.*?\}\}|\{!!.*?!!\})/s', $text) ?: [];
+            $quoted = $this->extractQuotedStrings($text);
+            $strings = $strings->merge($fragments)->merge($quoted);
+        }
+
+        return $strings
+            ->map(fn (string $value): string => trim($value))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function extractQuotedStrings(string $text): array
+    {
+        preg_match_all('/([\'"])(.*?)(?<!\\\\)\1/s', $text, $matches);
+
+        return collect($matches[2] ?? [])
+            ->map(fn (string $value): string => stripcslashes($value))
+            ->all();
     }
 
     private function normalize(string $text): string
@@ -243,10 +277,18 @@ class PlatformInterfaceTranslationService
             return false;
         }
 
+        if (preg_match('/^[a-z_]+$/', $text)) {
+            return false;
+        }
+
         foreach (['{{', '}}', '$', '=>', '::', '@', '<', '>', 'csrf', 'route(', 'asset('] as $needle) {
             if (str_contains($text, $needle)) {
                 return false;
             }
+        }
+
+        if (preg_match('/^[a-z0-9_.-]+$/i', $text) && preg_match('/[_.-]/', $text)) {
+            return false;
         }
 
         return ! Str::startsWith($text, ['.', '#', 'http', 'data-', '--']);
