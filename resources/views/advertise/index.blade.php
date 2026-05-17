@@ -49,6 +49,15 @@
         .bundle-mini strong { display:block; margin-bottom:0.3rem; }
         .bundle-free-note { display:grid; gap:0.5rem; border-radius:14px; padding:0.9rem; border:1px solid rgb(22 163 74 / 0.3); background:rgb(22 163 74 / 0.08); }
         .bundle-form-grid { display:grid; gap:0.75rem; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); }
+        .staff-assist-panel { display:grid; gap:1rem; margin-top:1rem; padding:1rem; border-radius:14px; border:1px solid rgb(var(--brand-rgb) / 0.24); background:rgb(var(--brand-rgb) / 0.06); }
+        .staff-card-grid { display:grid; gap:0.85rem; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); }
+        .staff-card { display:grid; gap:0.75rem; padding:0.9rem; border-radius:14px; border:1px solid rgb(var(--border-rgb) / 0.9); background:rgb(var(--surface-rgb) / 0.86); }
+        .staff-card-head { display:flex; gap:0.75rem; align-items:center; }
+        .staff-avatar { width:3.25rem; height:3.25rem; flex:0 0 auto; border-radius:999px; overflow:hidden; display:inline-flex; align-items:center; justify-content:center; background:rgb(var(--brand-rgb)); color:#fff; font-weight:900; }
+        .staff-avatar img { width:100%; height:100%; object-fit:cover; }
+        .staff-actions { display:flex; gap:0.5rem; flex-wrap:wrap; }
+        .staff-action { display:inline-flex; align-items:center; justify-content:center; min-height:2.3rem; padding:0.45rem 0.7rem; border-radius:999px; border:1px solid rgb(var(--border-rgb) / 0.95); background:rgb(var(--surface-rgb)); color:rgb(var(--text-rgb)); font-weight:850; font-size:0.9rem; text-decoration:none; }
+        .staff-action.primary { border-color:rgb(22 163 74 / 0.38); background:rgb(22 163 74 / 0.1); color:rgb(21 128 61); }
         .mission-hero {
             display:grid;
             gap:1rem;
@@ -143,6 +152,7 @@
             events: @js($eventOptions),
             adverts: @js($advertOptions),
             pushes: @js($pushOptions),
+            approvedStaff: @js($approvedStaff),
         })"
     >
         <div class="bundle-builder">
@@ -171,6 +181,48 @@
                             <span class="muted" x-text="option.description"></span>
                             <span class="mini-meta" x-text="option.is_self_service ? 'Higher-price owner-managed path that helps sustain the employment model' : 'Lower-price assisted path because a staff member earns from onboarding'"></span>
                         </label>
+                    </template>
+                </div>
+
+                <div class="staff-assist-panel" x-show="selectedListing && ! selectedListing.is_self_service" x-cloak>
+                    <div>
+                        <h4 class="h3-tight" style="font-size:1.05rem;">Choose who assists your business</h4>
+                        <p class="muted mb-0">Approved staff can help you register the business and prepare your listing. Contact the person you want to work with before checkout.</p>
+                    </div>
+
+                    <template x-if="approvedStaff.length">
+                        <div class="staff-card-grid">
+                            <template x-for="staff in approvedStaff" :key="staff.email">
+                                <article class="staff-card">
+                                    <div class="staff-card-head">
+                                        <span class="staff-avatar">
+                                            <template x-if="staff.profile_photo_url">
+                                                <img :src="staff.profile_photo_url" :alt="staff.name">
+                                            </template>
+                                            <template x-if="! staff.profile_photo_url">
+                                                <span x-text="initials(staff.name)"></span>
+                                            </template>
+                                        </span>
+                                        <span>
+                                            <strong x-text="staff.name"></strong><br>
+                                            <span class="mini-meta">Approved staff assistant</span>
+                                        </span>
+                                    </div>
+                                    <p class="muted mb-0" x-text="shortBio(staff.bio)"></p>
+                                    <div class="staff-actions">
+                                        <a class="staff-action" :href="staff.phone_href">Call</a>
+                                        <template x-if="staff.available_on_whatsapp && staff.whatsapp_href">
+                                            <a class="staff-action primary" :href="staff.whatsapp_href" target="_blank" rel="noopener">WhatsApp</a>
+                                        </template>
+                                        <a class="staff-action" :href="`mailto:${staff.email}`">Email</a>
+                                    </div>
+                                </article>
+                            </template>
+                        </div>
+                    </template>
+
+                    <template x-if="! approvedStaff.length">
+                        <div class="empty-state">Approved staff assistants will appear here as soon as the admin team has onboarded them.</div>
                     </template>
                 </div>
             </article>
@@ -403,6 +455,7 @@
                 events: config.events || [],
                 adverts: config.adverts || [],
                 pushes: config.pushes || [],
+                approvedStaff: config.approvedStaff || [],
                 listingPackage: (config.directories || [])[0]?.slug || '',
                 eventEnabled: false,
                 eventPackage: (config.events || [])[0]?.slug || '',
@@ -424,6 +477,13 @@
                 },
                 find(items, slug) {
                     return (items || []).find((item) => item.slug === slug) || null;
+                },
+                initials(name) {
+                    return String(name || '?').split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+                },
+                shortBio(bio) {
+                    const text = String(bio || 'Ready to help with staff-assisted business onboarding.');
+                    return text.length > 150 ? `${text.slice(0, 147)}...` : text;
                 },
                 placementCopy(option) {
                     const reach = option.settings?.reach || 'selected inventory';
@@ -458,6 +518,9 @@
                     }
 
                     return lines;
+                },
+                get selectedListing() {
+                    return this.find(this.directories, this.listingPackage);
                 },
                 get resolvedVoucherUsageLimit() {
                     if (this.voucherMode === 'once_off') return 1;

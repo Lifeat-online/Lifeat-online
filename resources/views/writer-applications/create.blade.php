@@ -222,7 +222,7 @@
                 <input id="available_on_whatsapp" type="checkbox" name="available_on_whatsapp" value="1" @checked(old('available_on_whatsapp'))>
                 <span>
                     <strong>Available on WhatsApp</strong>
-                    <span class="helper" style="display:block;">Use this if the team may contact you on WhatsApp during the review process.</span>
+                    <span class="helper" style="display:block;">Use this if businesses may contact you on WhatsApp after your staff application is approved.</span>
                 </span>
             </label>
         </section>

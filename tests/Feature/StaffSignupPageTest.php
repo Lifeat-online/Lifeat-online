@@ -20,6 +20,7 @@ class StaffSignupPageTest extends TestCase
         $response->assertSee('Writer and staff application');
         $response->assertSee('Sample Content');
         $response->assertSee('Banking And Verification');
+        $response->assertSee('Use this if businesses may contact you on WhatsApp after your staff application is approved.');
         $response->assertSee('Submit staff application');
     }
 

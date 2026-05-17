@@ -10,6 +10,7 @@ use App\Models\Payment;
 use App\Models\PushCampaign;
 use App\Models\User;
 use App\Models\Voucher;
+use App\Models\WriterApplication;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -19,6 +20,80 @@ class AdvertisePageTest extends TestCase
 
     public function test_advertise_page_renders_monetisation_ladder_and_live_package_cards(): void
     {
+        WriterApplication::query()->create([
+            'first_name' => 'Lebo',
+            'last_name' => 'Mokoena',
+            'email' => 'lebo.staff@example.com',
+            'phone' => '082 000 0000',
+            'username' => 'lebo_staff',
+            'profile_bio' => str_repeat('Local business onboarding support with strong community contacts. ', 2),
+            'profile_photo_path' => 'writer-applications/profile-photos/lebo.jpg',
+            'available_on_whatsapp' => true,
+            'sample_article_title' => 'Market growth',
+            'sample_article_body' => str_repeat('Local article sample. ', 12),
+            'sample_advert_title' => 'Advert sample',
+            'sample_advert_body' => str_repeat('Advert copy sample. ', 8),
+            'id_document_path' => 'writer-applications/documents/id.pdf',
+            'banking_document_path' => 'writer-applications/documents/banking.pdf',
+            'proof_of_residence_path' => 'writer-applications/documents/residence.pdf',
+            'bank_name' => 'Capitec',
+            'account_holder_name' => 'Lebo Mokoena',
+            'account_number' => '1234567890',
+            'branch_code' => '470010',
+            'status' => WriterApplication::STATUS_APPROVED,
+            'assigned_role' => WriterApplication::ROLE_STAFF,
+            'submitted_at' => now(),
+            'reviewed_at' => now(),
+        ]);
+
+        WriterApplication::query()->create([
+            'first_name' => 'Pending',
+            'last_name' => 'Applicant',
+            'email' => 'pending.staff@example.com',
+            'phone' => '083 000 0000',
+            'username' => 'pending_staff',
+            'profile_bio' => str_repeat('Pending staff profile. ', 8),
+            'available_on_whatsapp' => true,
+            'sample_article_title' => 'Pending',
+            'sample_article_body' => str_repeat('Pending article sample. ', 12),
+            'sample_advert_title' => 'Pending advert',
+            'sample_advert_body' => str_repeat('Pending advert copy. ', 8),
+            'id_document_path' => 'writer-applications/documents/pending-id.pdf',
+            'banking_document_path' => 'writer-applications/documents/pending-banking.pdf',
+            'proof_of_residence_path' => 'writer-applications/documents/pending-residence.pdf',
+            'bank_name' => 'Capitec',
+            'account_holder_name' => 'Pending Applicant',
+            'account_number' => '1234567890',
+            'branch_code' => '470010',
+            'status' => WriterApplication::STATUS_PENDING,
+            'submitted_at' => now(),
+        ]);
+
+        WriterApplication::query()->create([
+            'first_name' => 'Writer',
+            'last_name' => 'Only',
+            'email' => 'writer.only@example.com',
+            'phone' => '084 000 0000',
+            'username' => 'writer_only',
+            'profile_bio' => str_repeat('Approved writer profile. ', 8),
+            'available_on_whatsapp' => true,
+            'sample_article_title' => 'Writer',
+            'sample_article_body' => str_repeat('Writer article sample. ', 12),
+            'sample_advert_title' => 'Writer advert',
+            'sample_advert_body' => str_repeat('Writer advert copy. ', 8),
+            'id_document_path' => 'writer-applications/documents/writer-id.pdf',
+            'banking_document_path' => 'writer-applications/documents/writer-banking.pdf',
+            'proof_of_residence_path' => 'writer-applications/documents/writer-residence.pdf',
+            'bank_name' => 'Capitec',
+            'account_holder_name' => 'Writer Only',
+            'account_number' => '1234567890',
+            'branch_code' => '470010',
+            'status' => WriterApplication::STATUS_APPROVED,
+            'assigned_role' => WriterApplication::ROLE_WRITER,
+            'submitted_at' => now(),
+            'reviewed_at' => now(),
+        ]);
+
         $response = $this->get(route('advertise.index'));
 
         $response->assertOk();
@@ -33,6 +108,11 @@ class AdvertisePageTest extends TestCase
         $response->assertSee('Voucher attraction offer');
         $response->assertSee('Free for listed companies');
         $response->assertSee('Free acquisition tool, not a paid advert add-on.');
+        $response->assertSee('Choose who assists your business');
+        $response->assertSee('Lebo Mokoena');
+        $response->assertSee('WhatsApp');
+        $response->assertDontSee('Pending Applicant');
+        $response->assertDontSee('Writer Only');
     }
 
     public function test_authenticated_user_can_create_advertising_bundle_order(): void

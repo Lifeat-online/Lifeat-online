@@ -26,6 +26,7 @@
         })();
     </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @include('partials.filter-dropdown-assets')
     @stack('styles')
 </head>
 <body class="lp">
