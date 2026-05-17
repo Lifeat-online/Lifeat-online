@@ -86,6 +86,18 @@ class OpenRouterTranslationService
             return [];
         }
 
+        if ($this->shouldUseGoogle()) {
+            $translated = $this->translateWithGoogle($content, $targetLocale, $sourceLocale);
+
+            if ($translated !== null) {
+                return $translated;
+            }
+
+            if (! $this->openRouterConfigured()) {
+                return null;
+            }
+        }
+
         if ($this->shouldUseAzure()) {
             $translated = $this->translateWithAzure($content, $targetLocale, $sourceLocale);
 
@@ -157,6 +169,66 @@ class OpenRouterTranslationService
             $this->lastFailureMessage = 'OpenRouter translation error: '.$exception->getMessage();
 
             Log::warning('OpenRouter translation exception.', [
+                'message' => $exception->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    private function translateWithGoogle(array $content, string $targetLocale, ?string $sourceLocale = null): ?array
+    {
+        $apiKey = $this->googleApiKey();
+
+        if ($apiKey === '') {
+            $this->lastFailureMessage = 'Google Translate API key is missing.';
+
+            return null;
+        }
+
+        try {
+            $keys = array_keys($content);
+            $response = Http::acceptJson()
+                ->asJson()
+                ->timeout((int) config('services.google_translate.timeout', 30))
+                ->post($this->googleEndpoint($apiKey), $this->googlePayload($content, $targetLocale, $sourceLocale));
+
+            if (! $response->successful()) {
+                $this->lastFailureStatus = $response->status();
+                $this->lastFailureMessage = 'Google Translate returned '.$response->status().': '.$this->providerErrorMessage($response);
+
+                Log::warning('Google translation failed.', [
+                    'status' => $response->status(),
+                    'body' => mb_substr($response->body(), 0, 500),
+                ]);
+
+                return null;
+            }
+
+            $rows = $response->json('data.translations');
+
+            if (! is_array($rows)) {
+                $this->lastFailureMessage = 'Google Translate returned an unexpected response.';
+
+                return null;
+            }
+
+            $translated = [];
+
+            foreach ($keys as $index => $key) {
+                $text = data_get($rows, "{$index}.translatedText");
+                $translated[$key] = is_string($text) && trim($text) !== ''
+                    ? html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8')
+                    : $content[$key];
+            }
+
+            $this->lastProvider = 'google';
+
+            return $translated;
+        } catch (Throwable $exception) {
+            $this->lastFailureMessage = 'Google Translate error: '.$exception->getMessage();
+
+            Log::warning('Google translation exception.', [
                 'message' => $exception->getMessage(),
             ]);
 
@@ -243,16 +315,18 @@ class OpenRouterTranslationService
 
     public function provider(): string
     {
-        $provider = (string) (Setting::getValue('translation.provider') ?: config('services.translation.provider', 'azure'));
+        $provider = (string) (Setting::getValue('translation.provider') ?: config('services.translation.provider', 'google'));
 
-        return in_array($provider, ['azure', 'openrouter'], true) ? $provider : 'azure';
+        return in_array($provider, ['google', 'azure', 'openrouter'], true) ? $provider : 'google';
     }
 
     public function model(): string
     {
-        return $this->provider() === 'azure'
-            ? 'azure-translator'
-            : $this->openRouterModel();
+        return match ($this->provider()) {
+            'google' => 'google-cloud-translation-basic-v2',
+            'azure' => 'azure-translator',
+            default => $this->openRouterModel(),
+        };
     }
 
     public function openRouterModel(): string
@@ -267,18 +341,36 @@ class OpenRouterTranslationService
 
     public function modelUsed(): string
     {
-        return $this->providerUsed() === 'azure' ? 'azure-translator' : $this->openRouterModel();
+        return match ($this->providerUsed()) {
+            'google' => 'google-cloud-translation-basic-v2',
+            'azure' => 'azure-translator',
+            default => $this->openRouterModel(),
+        };
     }
 
     public function configured(): bool
     {
         return $this->provider() === 'azure'
             ? $this->azureConfigured()
-            : $this->openRouterConfigured();
+            : ($this->provider() === 'google'
+                ? $this->googleConfigured()
+                : $this->openRouterConfigured());
     }
 
     public function apiKeySource(): string
     {
+        if ($this->provider() === 'google') {
+            if ((string) config('services.google_translate.key') !== '') {
+                return 'Environment';
+            }
+
+            if ((string) Setting::getValue('translation.google_api_key', '') !== '') {
+                return 'Settings';
+            }
+
+            return 'Missing';
+        }
+
         if ($this->provider() === 'azure') {
             if ((string) config('services.azure_translator.key') !== '') {
                 return 'Environment';
@@ -304,7 +396,11 @@ class OpenRouterTranslationService
 
     public function maskedApiKey(): string
     {
-        $apiKey = $this->provider() === 'azure' ? $this->azureApiKey() : $this->openRouterApiKey();
+        $apiKey = match ($this->provider()) {
+            'google' => $this->googleApiKey(),
+            'azure' => $this->azureApiKey(),
+            default => $this->openRouterApiKey(),
+        };
 
         if ($apiKey === '') {
             return '';
@@ -323,6 +419,11 @@ class OpenRouterTranslationService
         return $this->mask($this->azureApiKey());
     }
 
+    public function googleMaskedApiKey(): string
+    {
+        return $this->mask($this->googleApiKey());
+    }
+
     public function azureRegion(): string
     {
         return (string) (Setting::getValue('translation.azure_region') ?: config('services.azure_translator.region', ''));
@@ -331,6 +432,11 @@ class OpenRouterTranslationService
     public function azureConfigured(): bool
     {
         return $this->azureApiKey() !== '';
+    }
+
+    public function googleConfigured(): bool
+    {
+        return $this->googleApiKey() !== '';
     }
 
     public function openRouterConfigured(): bool
@@ -348,6 +454,16 @@ class OpenRouterTranslationService
         return (string) (config('services.azure_translator.key') ?: Setting::getValue('translation.azure_api_key', ''));
     }
 
+    private function googleApiKey(): string
+    {
+        return (string) (config('services.google_translate.key') ?: Setting::getValue('translation.google_api_key', ''));
+    }
+
+    private function shouldUseGoogle(): bool
+    {
+        return $this->provider() === 'google';
+    }
+
     private function shouldUseAzure(): bool
     {
         return $this->provider() === 'azure';
@@ -360,6 +476,35 @@ class OpenRouterTranslationService
         }
 
         return str_repeat('*', max(strlen($apiKey) - 4, 8)).substr($apiKey, -4);
+    }
+
+    private function googleEndpoint(string $apiKey): string
+    {
+        return rtrim((string) config('services.google_translate.endpoint', 'https://translation.googleapis.com/language/translate/v2'), '/')
+            .'?'.http_build_query(['key' => $apiKey]);
+    }
+
+    private function googlePayload(array $content, string $targetLocale, ?string $sourceLocale = null): array
+    {
+        $payload = [
+            'q' => array_values($content),
+            'target' => $this->googleLocale($targetLocale),
+            'format' => 'html',
+        ];
+
+        if (is_string($sourceLocale) && trim($sourceLocale) !== '' && $sourceLocale !== $targetLocale) {
+            $payload['source'] = $this->googleLocale($sourceLocale);
+        }
+
+        return $payload;
+    }
+
+    private function googleLocale(string $locale): string
+    {
+        return match (strtolower($locale)) {
+            'en-us', 'en-gb' => 'en',
+            default => strtolower($locale),
+        };
     }
 
     private function azureHeaders(string $apiKey): array

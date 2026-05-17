@@ -182,6 +182,28 @@ class DevToolsAccessTest extends TestCase
         $this->assertSame('azure', Setting::getValue('translation.provider'));
     }
 
+    public function test_dev_owner_can_save_google_translation_settings(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson(route('dev.translations.key.store'), [
+                'provider' => 'google',
+                'google_api_key' => 'google-test-translation-key',
+            ])
+            ->assertOk()
+            ->assertJsonPath('provider', 'google')
+            ->assertJsonPath('configured', true)
+            ->assertJsonPath('source', 'Settings')
+            ->assertJsonPath('model', 'google-cloud-translation-basic-v2');
+
+        $this->assertSame('google-test-translation-key', Setting::getValue('translation.google_api_key'));
+        $this->assertSame('google', Setting::getValue('translation.provider'));
+    }
+
     public function test_non_owner_cannot_save_openrouter_translation_key(): void
     {
         $admin = User::factory()->create([
@@ -427,6 +449,43 @@ class DevToolsAccessTest extends TestCase
         $this->assertSame(['title' => 'Gemeenskapsnuus'], $translated);
         $this->assertSame('azure', $translator->providerUsed());
         $this->assertSame('azure-translator', $translator->modelUsed());
+    }
+
+    public function test_google_translate_is_used_as_primary_translation_provider(): void
+    {
+        config([
+            'services.translation.provider' => 'google',
+            'services.google_translate.key' => 'google-test-key',
+            'services.google_translate.endpoint' => 'https://translation.googleapis.com/language/translate/v2',
+        ]);
+
+        Http::fake(function ($request) {
+            $this->assertStringStartsWith('https://translation.googleapis.com/language/translate/v2?', (string) $request->url());
+            $this->assertStringContainsString('key=google-test-key', (string) $request->url());
+            $this->assertSame([
+                'q' => ['Community News'],
+                'target' => 'af',
+                'format' => 'html',
+                'source' => 'en',
+            ], $request->data());
+
+            return Http::response([
+                'data' => [
+                    'translations' => [
+                        ['translatedText' => 'Gemeenskapsnuus &amp; gebeure'],
+                    ],
+                ],
+            ]);
+        });
+
+        $translator = app(OpenRouterTranslationService::class);
+        $translated = $translator->translateContent([
+            'title' => 'Community News',
+        ], 'af', 'en');
+
+        $this->assertSame(['title' => 'Gemeenskapsnuus & gebeure'], $translated);
+        $this->assertSame('google', $translator->providerUsed());
+        $this->assertSame('google-cloud-translation-basic-v2', $translator->modelUsed());
     }
 
     public function test_openrouter_translation_falls_back_to_json_mode_when_schema_is_rejected(): void

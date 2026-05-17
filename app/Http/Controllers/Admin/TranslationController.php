@@ -18,7 +18,8 @@ class TranslationController extends Controller
         $this->ensureDevOwner($request);
 
         $validated = $request->validate([
-            'provider' => ['required', 'string', Rule::in(['azure', 'openrouter'])],
+            'provider' => ['required', 'string', Rule::in(['google', 'azure', 'openrouter'])],
+            'google_api_key' => ['nullable', 'string', 'min:10', 'max:500'],
             'azure_api_key' => ['nullable', 'string', 'min:10', 'max:500'],
             'azure_region' => ['nullable', 'string', 'max:80'],
             'openrouter_api_key' => ['nullable', 'string', 'min:10', 'max:500'],
@@ -34,6 +35,18 @@ class TranslationController extends Controller
                 'updated_by_user_id' => $request->user()->id,
             ]
         );
+
+        if (filled($validated['google_api_key'] ?? null)) {
+            Setting::updateOrCreate(
+                ['key' => 'translation.google_api_key'],
+                [
+                    'value' => trim($validated['google_api_key']),
+                    'type' => 'secret',
+                    'group' => 'translations',
+                    'updated_by_user_id' => $request->user()->id,
+                ]
+            );
+        }
 
         if (filled($validated['azure_api_key'] ?? null)) {
             Setting::updateOrCreate(
@@ -93,6 +106,8 @@ class TranslationController extends Controller
             'azure_configured' => $translator->azureConfigured(),
             'azure_region' => $translator->azureRegion(),
             'azure_masked_key' => $translator->azureMaskedApiKey(),
+            'google_configured' => $translator->googleConfigured(),
+            'google_masked_key' => $translator->googleMaskedApiKey(),
             'openrouter_configured' => $translator->openRouterConfigured(),
             'openrouter_masked_key' => $translator->openRouterMaskedApiKey(),
             'model' => $translator->model(),

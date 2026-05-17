@@ -38,8 +38,14 @@ return [
         'timeout' => env('AZURE_TRANSLATOR_TIMEOUT', 30),
     ],
 
+    'google_translate' => [
+        'key' => env('GOOGLE_TRANSLATE_API_KEY'),
+        'endpoint' => env('GOOGLE_TRANSLATE_ENDPOINT', 'https://translation.googleapis.com/language/translate/v2'),
+        'timeout' => env('GOOGLE_TRANSLATE_TIMEOUT', 30),
+    ],
+
     'translation' => [
-        'provider' => env('TRANSLATION_PROVIDER', 'azure'),
+        'provider' => env('TRANSLATION_PROVIDER', 'google'),
     ],
 
     'ses' => [

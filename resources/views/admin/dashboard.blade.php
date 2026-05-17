@@ -243,7 +243,7 @@
                                 <p class="mt-1 text-sm text-gray-500">Keep articles available in every configured language. New published articles translate from their original language into the other supported language automatically.</p>
                             </div>
                             <div class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-gray-600">
-                                <p><strong>Provider:</strong> <span data-translation-provider-label>{{ $devTranslationStatus['provider'] === 'azure' ? 'Azure Translator' : 'OpenRouter' }}</span></p>
+                                <p><strong>Provider:</strong> <span data-translation-provider-label>{{ $devTranslationStatus['provider'] === 'google' ? 'Google Translate' : ($devTranslationStatus['provider'] === 'azure' ? 'Azure Translator' : 'OpenRouter') }}</span></p>
                                 <p><strong>Status:</strong> <span data-translation-configured>{{ $devTranslationStatus['configured'] ? 'Configured' : 'Missing key' }}</span></p>
                                 <p><strong>Source:</strong> <span data-translation-source>{{ $devTranslationStatus['source'] }}</span></p>
                             </div>
@@ -269,10 +269,11 @@
                         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div>
                                 <h3 class="text-lg font-semibold text-gray-900">Translation Provider</h3>
-                                <p class="mt-1 text-sm text-gray-500">Use Azure Translator for bulk platform translation. OpenRouter stays available as a fallback or manual model option.</p>
+                                <p class="mt-1 text-sm text-gray-500">Use Google Translate for bulk platform translation. Azure and OpenRouter stay available as fallback options.</p>
                             </div>
                             <div class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-gray-600">
                                 <p><strong>Active:</strong> <span data-provider-status>{{ $devTranslationStatus['configured'] ? 'Configured' : 'Missing key' }}</span></p>
+                                <p><strong>Google key:</strong> <span data-google-masked>{{ $devTranslationStatus['google_masked_key'] ?: 'Not saved' }}</span></p>
                                 <p><strong>Azure key:</strong> <span data-azure-masked>{{ $devTranslationStatus['azure_masked_key'] ?: 'Not saved' }}</span></p>
                                 <p><strong>OpenRouter key:</strong> <span data-openrouter-masked>{{ $devTranslationStatus['openrouter_masked_key'] ?: 'Not saved' }}</span></p>
                             </div>
@@ -281,29 +282,36 @@
                             <div>
                                 <label class="mb-1 block text-sm font-medium text-gray-700">Provider</label>
                                 <select class="w-full rounded-md border-gray-300" data-translation-provider>
+                                    <option value="google" @selected($devTranslationStatus['provider'] === 'google')>Google Translate</option>
                                     <option value="azure" @selected($devTranslationStatus['provider'] === 'azure')>Azure Translator</option>
                                     <option value="openrouter" @selected($devTranslationStatus['provider'] === 'openrouter')>OpenRouter</option>
                                 </select>
                             </div>
                             <div>
-                                <label class="mb-1 block text-sm font-medium text-gray-700">Azure API key</label>
-                                <input class="w-full rounded-md border-gray-300" type="password" autocomplete="off" data-azure-key placeholder="Azure Translator key">
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Google Translate API key</label>
+                                <input class="w-full rounded-md border-gray-300" type="password" autocomplete="off" data-google-key placeholder="Google Cloud Translation API key">
                             </div>
                             <div>
                                 <label class="mb-1 block text-sm font-medium text-gray-700">Azure region</label>
                                 <input class="w-full rounded-md border-gray-300" data-azure-region value="{{ $devTranslationStatus['azure_region'] }}" placeholder="global or your region">
                             </div>
                         </div>
-                        <div class="mt-4 grid gap-4 lg:grid-cols-[1fr,0.8fr,auto] lg:items-end">
+                        <div class="mt-4 grid gap-4 lg:grid-cols-[1fr,1fr,auto] lg:items-end">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Azure API key</label>
+                                <input class="w-full rounded-md border-gray-300" type="password" autocomplete="off" data-azure-key placeholder="Azure Translator key">
+                            </div>
                             <div>
                                 <label class="mb-1 block text-sm font-medium text-gray-700">OpenRouter API key</label>
                                 <input class="w-full rounded-md border-gray-300" type="password" autocomplete="off" data-openrouter-key placeholder="sk-or-...">
                             </div>
+                            <button type="button" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-translation-settings-submit>Save settings</button>
+                        </div>
+                        <div class="mt-4 grid gap-4 lg:grid-cols-[1fr,auto] lg:items-end">
                             <div>
                                 <label class="mb-1 block text-sm font-medium text-gray-700">OpenRouter model</label>
                                 <input class="w-full rounded-md border-gray-300" data-openrouter-model value="{{ $devTranslationStatus['openrouter_model'] }}">
                             </div>
-                            <button type="button" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-translation-settings-submit>Save settings</button>
                         </div>
                         <p class="mt-3 text-sm text-gray-500" data-translation-settings-message>Environment variables still take priority over saved keys.</p>
                     </div>
@@ -825,6 +833,7 @@
                 const endpoint = translationSettingsForm.getAttribute('data-endpoint');
                 const token = translationSettingsForm.querySelector('input[name="_token"]')?.value;
                 const providerInput = translationSettingsForm.querySelector('[data-translation-provider]');
+                const googleKeyInput = translationSettingsForm.querySelector('[data-google-key]');
                 const azureKeyInput = translationSettingsForm.querySelector('[data-azure-key]');
                 const azureRegionInput = translationSettingsForm.querySelector('[data-azure-region]');
                 const openRouterKeyInput = translationSettingsForm.querySelector('[data-openrouter-key]');
@@ -832,6 +841,7 @@
                 const button = translationSettingsForm.querySelector('[data-translation-settings-submit]');
                 const message = translationSettingsForm.querySelector('[data-translation-settings-message]');
                 const status = translationSettingsForm.querySelector('[data-provider-status]');
+                const googleMasked = translationSettingsForm.querySelector('[data-google-masked]');
                 const azureMasked = translationSettingsForm.querySelector('[data-azure-masked]');
                 const openRouterMasked = translationSettingsForm.querySelector('[data-openrouter-masked]');
                 const summaryProvider = document.querySelector('[data-translation-provider-label]');
@@ -850,7 +860,8 @@
                                 'X-CSRF-TOKEN': token || '',
                             },
                             body: JSON.stringify({
-                                provider: providerInput?.value || 'azure',
+                                provider: providerInput?.value || 'google',
+                                google_api_key: googleKeyInput?.value || '',
                                 azure_api_key: azureKeyInput?.value || '',
                                 azure_region: azureRegionInput?.value || '',
                                 openrouter_api_key: openRouterKeyInput?.value || '',
@@ -859,13 +870,17 @@
                         });
                         const payload = await response.json().catch(() => ({}));
                         if (message) message.textContent = payload.message || `Request finished with status ${response.status}.`;
-                        const providerLabel = payload.provider === 'openrouter' ? 'OpenRouter' : 'Azure Translator';
+                        const providerLabel = payload.provider === 'openrouter'
+                            ? 'OpenRouter'
+                            : (payload.provider === 'azure' ? 'Azure Translator' : 'Google Translate');
                         if (status) status.textContent = payload.configured ? 'Configured' : 'Missing key';
+                        if (googleMasked) googleMasked.textContent = payload.google_masked_key || 'Not saved';
                         if (azureMasked) azureMasked.textContent = payload.azure_masked_key || 'Not saved';
                         if (openRouterMasked) openRouterMasked.textContent = payload.openrouter_masked_key || 'Not saved';
                         if (summaryProvider) summaryProvider.textContent = providerLabel;
                         if (summaryConfigured) summaryConfigured.textContent = payload.configured ? 'Configured' : 'Missing key';
                         if (summarySource) summarySource.textContent = payload.source || 'Settings';
+                        if (googleKeyInput && response.ok) googleKeyInput.value = '';
                         if (azureKeyInput && response.ok) azureKeyInput.value = '';
                         if (openRouterKeyInput && response.ok) openRouterKeyInput.value = '';
                         if (azureRegionInput && payload.azure_region !== undefined) azureRegionInput.value = payload.azure_region || '';
