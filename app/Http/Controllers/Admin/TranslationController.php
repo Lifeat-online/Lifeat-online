@@ -18,25 +18,64 @@ class TranslationController extends Controller
         $this->ensureDevOwner($request);
 
         $validated = $request->validate([
-            'api_key' => ['required', 'string', 'min:10', 'max:500'],
-            'model' => ['nullable', 'string', 'max:255'],
+            'provider' => ['required', 'string', Rule::in(['azure', 'openrouter'])],
+            'azure_api_key' => ['nullable', 'string', 'min:10', 'max:500'],
+            'azure_region' => ['nullable', 'string', 'max:80'],
+            'openrouter_api_key' => ['nullable', 'string', 'min:10', 'max:500'],
+            'openrouter_model' => ['nullable', 'string', 'max:255'],
         ]);
 
         Setting::updateOrCreate(
-            ['key' => 'translation.openrouter_api_key'],
+            ['key' => 'translation.provider'],
             [
-                'value' => trim($validated['api_key']),
-                'type' => 'secret',
+                'value' => $validated['provider'],
+                'type' => 'string',
                 'group' => 'translations',
                 'updated_by_user_id' => $request->user()->id,
             ]
         );
 
-        if (filled($validated['model'] ?? null)) {
+        if (filled($validated['azure_api_key'] ?? null)) {
+            Setting::updateOrCreate(
+                ['key' => 'translation.azure_api_key'],
+                [
+                    'value' => trim($validated['azure_api_key']),
+                    'type' => 'secret',
+                    'group' => 'translations',
+                    'updated_by_user_id' => $request->user()->id,
+                ]
+            );
+        }
+
+        if (array_key_exists('azure_region', $validated)) {
+            Setting::updateOrCreate(
+                ['key' => 'translation.azure_region'],
+                [
+                    'value' => trim((string) ($validated['azure_region'] ?? '')),
+                    'type' => 'string',
+                    'group' => 'translations',
+                    'updated_by_user_id' => $request->user()->id,
+                ]
+            );
+        }
+
+        if (filled($validated['openrouter_api_key'] ?? null)) {
+            Setting::updateOrCreate(
+                ['key' => 'translation.openrouter_api_key'],
+                [
+                    'value' => trim($validated['openrouter_api_key']),
+                    'type' => 'secret',
+                    'group' => 'translations',
+                    'updated_by_user_id' => $request->user()->id,
+                ]
+            );
+        }
+
+        if (filled($validated['openrouter_model'] ?? null)) {
             Setting::updateOrCreate(
                 ['key' => 'translation.openrouter_model'],
                 [
-                    'value' => trim($validated['model']),
+                    'value' => trim($validated['openrouter_model']),
                     'type' => 'string',
                     'group' => 'translations',
                     'updated_by_user_id' => $request->user()->id,
@@ -46,10 +85,16 @@ class TranslationController extends Controller
 
         return response()->json([
             'ok' => true,
-            'message' => 'OpenRouter key saved.',
+            'message' => 'Translation settings saved.',
+            'provider' => $translator->provider(),
             'configured' => $translator->configured(),
             'source' => $translator->apiKeySource(),
             'masked_key' => $translator->maskedApiKey(),
+            'azure_configured' => $translator->azureConfigured(),
+            'azure_region' => $translator->azureRegion(),
+            'azure_masked_key' => $translator->azureMaskedApiKey(),
+            'openrouter_configured' => $translator->openRouterConfigured(),
+            'openrouter_masked_key' => $translator->openRouterMaskedApiKey(),
             'model' => $translator->model(),
         ]);
     }

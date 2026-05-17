@@ -13,6 +13,7 @@ class OpenRouterTranslationService
 {
     private ?string $lastFailureMessage = null;
     private ?int $lastFailureStatus = null;
+    private ?string $lastProvider = null;
 
     public function translateModel(Model $model, string $targetLocale = 'af', bool $force = false): array
     {
@@ -33,7 +34,11 @@ class OpenRouterTranslationService
             return ['ok' => true, 'message' => 'Translation is already current.', 'translation' => $existing];
         }
 
-        $translated = $this->translateContent($source, $targetLocale);
+        $translated = $this->translateContent(
+            $source,
+            $targetLocale,
+            method_exists($model, 'sourceLocale') ? $model->sourceLocale() : (string) config('localization.default', 'en')
+        );
 
         if ($translated === null) {
             return [
@@ -51,8 +56,8 @@ class OpenRouterTranslationService
                     ? $model->sourceLocale()
                     : (string) config('localization.default', 'en'),
                 'source_hash' => $sourceHash,
-                'provider' => 'openrouter',
-                'model' => $this->model(),
+                'provider' => $this->providerUsed(),
+                'model' => $this->modelUsed(),
                 'translated_at' => now(),
             ]
         );
@@ -60,24 +65,18 @@ class OpenRouterTranslationService
         return ['ok' => true, 'message' => 'Translation saved.', 'translation' => $translation];
     }
 
-    public function translateText(string $text, string $targetLocale = 'af'): ?string
+    public function translateText(string $text, string $targetLocale = 'af', ?string $sourceLocale = null): ?string
     {
-        $result = $this->translateContent(['text' => $text], $targetLocale);
+        $result = $this->translateContent(['text' => $text], $targetLocale, $sourceLocale);
 
         return is_array($result) ? ($result['text'] ?? null) : null;
     }
 
-    public function translateContent(array $content, string $targetLocale = 'af'): ?array
+    public function translateContent(array $content, string $targetLocale = 'af', ?string $sourceLocale = null): ?array
     {
         $this->lastFailureMessage = null;
         $this->lastFailureStatus = null;
-        $apiKey = $this->apiKey();
-
-        if ($apiKey === '') {
-            $this->lastFailureMessage = 'OpenRouter API key is missing.';
-
-            return null;
-        }
+        $this->lastProvider = null;
 
         $content = collect($content)
             ->filter(fn ($value): bool => is_string($value) && trim($value) !== '')
@@ -85,6 +84,31 @@ class OpenRouterTranslationService
 
         if ($content === []) {
             return [];
+        }
+
+        if ($this->shouldUseAzure()) {
+            $translated = $this->translateWithAzure($content, $targetLocale, $sourceLocale);
+
+            if ($translated !== null) {
+                return $translated;
+            }
+
+            if (! $this->openRouterConfigured()) {
+                return null;
+            }
+        }
+
+        return $this->translateWithOpenRouter($content, $targetLocale);
+    }
+
+    private function translateWithOpenRouter(array $content, string $targetLocale = 'af'): ?array
+    {
+        $apiKey = $this->openRouterApiKey();
+
+        if ($apiKey === '') {
+            $this->lastFailureMessage = 'OpenRouter API key is missing.';
+
+            return null;
         }
 
         try {
@@ -122,13 +146,79 @@ class OpenRouterTranslationService
                 return null;
             }
 
-            return collect($content)
+            $translated = collect($content)
                 ->mapWithKeys(fn ($value, $key): array => [$key => is_string($decoded[$key] ?? null) ? $decoded[$key] : $value])
                 ->all();
+
+            $this->lastProvider = 'openrouter';
+
+            return $translated;
         } catch (Throwable $exception) {
             $this->lastFailureMessage = 'OpenRouter translation error: '.$exception->getMessage();
 
             Log::warning('OpenRouter translation exception.', [
+                'message' => $exception->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    private function translateWithAzure(array $content, string $targetLocale, ?string $sourceLocale = null): ?array
+    {
+        $apiKey = $this->azureApiKey();
+
+        if ($apiKey === '') {
+            $this->lastFailureMessage = 'Azure Translator key is missing.';
+
+            return null;
+        }
+
+        try {
+            $keys = array_keys($content);
+            $response = Http::withHeaders($this->azureHeaders($apiKey))
+                ->acceptJson()
+                ->asJson()
+                ->timeout((int) config('services.azure_translator.timeout', 30))
+                ->post(
+                    $this->azureEndpoint($targetLocale, $sourceLocale),
+                    collect($content)->values()->map(fn (string $text): array => ['Text' => $text])->all()
+                );
+
+            if (! $response->successful()) {
+                $this->lastFailureStatus = $response->status();
+                $this->lastFailureMessage = 'Azure Translator returned '.$response->status().': '.$this->providerErrorMessage($response);
+
+                Log::warning('Azure translation failed.', [
+                    'status' => $response->status(),
+                    'body' => mb_substr($response->body(), 0, 500),
+                ]);
+
+                return null;
+            }
+
+            $rows = $response->json();
+
+            if (! is_array($rows)) {
+                $this->lastFailureMessage = 'Azure Translator returned an unexpected response.';
+
+                return null;
+            }
+
+            $translated = [];
+
+            foreach ($keys as $index => $key) {
+                $text = data_get($rows, "{$index}.translations.0.text");
+                $translated[$key] = is_string($text) && trim($text) !== '' ? $text : $content[$key];
+            }
+
+            $this->lastProvider = 'azure';
+
+            return $translated;
+        } catch (Throwable $exception) {
+            $this->lastFailureMessage = 'Azure Translator error: '.$exception->getMessage();
+
+            Log::warning('Azure translation exception.', [
                 'message' => $exception->getMessage(),
             ]);
 
@@ -151,18 +241,56 @@ class OpenRouterTranslationService
         return $this->lastFailureStatus === 429;
     }
 
+    public function provider(): string
+    {
+        $provider = (string) (Setting::getValue('translation.provider') ?: config('services.translation.provider', 'azure'));
+
+        return in_array($provider, ['azure', 'openrouter'], true) ? $provider : 'azure';
+    }
+
     public function model(): string
+    {
+        return $this->provider() === 'azure'
+            ? 'azure-translator'
+            : $this->openRouterModel();
+    }
+
+    public function openRouterModel(): string
     {
         return (string) (Setting::getValue('translation.openrouter_model') ?: config('services.openrouter.model', 'google/gemma-4-31b-it:free'));
     }
 
+    public function providerUsed(): string
+    {
+        return $this->lastProvider ?: $this->provider();
+    }
+
+    public function modelUsed(): string
+    {
+        return $this->providerUsed() === 'azure' ? 'azure-translator' : $this->openRouterModel();
+    }
+
     public function configured(): bool
     {
-        return $this->apiKey() !== '';
+        return $this->provider() === 'azure'
+            ? $this->azureConfigured()
+            : $this->openRouterConfigured();
     }
 
     public function apiKeySource(): string
     {
+        if ($this->provider() === 'azure') {
+            if ((string) config('services.azure_translator.key') !== '') {
+                return 'Environment';
+            }
+
+            if ((string) Setting::getValue('translation.azure_api_key', '') !== '') {
+                return 'Settings';
+            }
+
+            return 'Missing';
+        }
+
         if ((string) config('services.openrouter.key') !== '') {
             return 'Environment';
         }
@@ -176,7 +304,7 @@ class OpenRouterTranslationService
 
     public function maskedApiKey(): string
     {
-        $apiKey = $this->apiKey();
+        $apiKey = $this->provider() === 'azure' ? $this->azureApiKey() : $this->openRouterApiKey();
 
         if ($apiKey === '') {
             return '';
@@ -185,9 +313,98 @@ class OpenRouterTranslationService
         return str_repeat('*', max(strlen($apiKey) - 4, 8)).substr($apiKey, -4);
     }
 
-    private function apiKey(): string
+    public function openRouterMaskedApiKey(): string
+    {
+        return $this->mask($this->openRouterApiKey());
+    }
+
+    public function azureMaskedApiKey(): string
+    {
+        return $this->mask($this->azureApiKey());
+    }
+
+    public function azureRegion(): string
+    {
+        return (string) (Setting::getValue('translation.azure_region') ?: config('services.azure_translator.region', ''));
+    }
+
+    public function azureConfigured(): bool
+    {
+        return $this->azureApiKey() !== '';
+    }
+
+    public function openRouterConfigured(): bool
+    {
+        return $this->openRouterApiKey() !== '';
+    }
+
+    private function openRouterApiKey(): string
     {
         return (string) (config('services.openrouter.key') ?: Setting::getValue('translation.openrouter_api_key', ''));
+    }
+
+    private function azureApiKey(): string
+    {
+        return (string) (config('services.azure_translator.key') ?: Setting::getValue('translation.azure_api_key', ''));
+    }
+
+    private function shouldUseAzure(): bool
+    {
+        return $this->provider() === 'azure';
+    }
+
+    private function mask(string $apiKey): string
+    {
+        if ($apiKey === '') {
+            return '';
+        }
+
+        return str_repeat('*', max(strlen($apiKey) - 4, 8)).substr($apiKey, -4);
+    }
+
+    private function azureHeaders(string $apiKey): array
+    {
+        $headers = [
+            'Ocp-Apim-Subscription-Key' => $apiKey,
+        ];
+
+        $region = $this->azureRegion();
+
+        if ($region !== '') {
+            $headers['Ocp-Apim-Subscription-Region'] = $region;
+        }
+
+        return $headers;
+    }
+
+    private function azureEndpoint(string $targetLocale, ?string $sourceLocale = null): string
+    {
+        return rtrim((string) config('services.azure_translator.endpoint', 'https://api.cognitive.microsofttranslator.com'), '/')
+            .'/translate?'
+            .http_build_query($this->azureQuery($targetLocale, $sourceLocale));
+    }
+
+    private function azureQuery(string $targetLocale, ?string $sourceLocale = null): array
+    {
+        $query = [
+            'api-version' => '3.0',
+            'to' => $this->azureLocale($targetLocale),
+            'textType' => 'html',
+        ];
+
+        if (is_string($sourceLocale) && trim($sourceLocale) !== '' && $sourceLocale !== $targetLocale) {
+            $query['from'] = $this->azureLocale($sourceLocale);
+        }
+
+        return $query;
+    }
+
+    private function azureLocale(string $locale): string
+    {
+        return match (strtolower($locale)) {
+            'en-us', 'en-gb' => 'en',
+            default => strtolower($locale),
+        };
     }
 
     private function sendTranslationRequest(string $apiKey, array $content, string $targetLocale, bool $structured): Response
@@ -216,7 +433,7 @@ class OpenRouterTranslationService
     private function payload(array $content, string $targetLocale, bool $structured): array
     {
         $payload = [
-            'model' => $this->model(),
+            'model' => $this->openRouterModel(),
             'messages' => [
                 [
                     'role' => 'system',

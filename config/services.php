@@ -31,6 +31,17 @@ return [
         'structured_outputs' => env('OPENROUTER_STRUCTURED_OUTPUTS', true),
     ],
 
+    'azure_translator' => [
+        'key' => env('AZURE_TRANSLATOR_KEY'),
+        'region' => env('AZURE_TRANSLATOR_REGION'),
+        'endpoint' => env('AZURE_TRANSLATOR_ENDPOINT', 'https://api.cognitive.microsofttranslator.com'),
+        'timeout' => env('AZURE_TRANSLATOR_TIMEOUT', 30),
+    ],
+
+    'translation' => [
+        'provider' => env('TRANSLATION_PROVIDER', 'azure'),
+    ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),

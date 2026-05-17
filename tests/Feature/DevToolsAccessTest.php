@@ -137,10 +137,12 @@ class DevToolsAccessTest extends TestCase
 
         $this->actingAs($admin)
             ->postJson(route('dev.translations.key.store'), [
-                'api_key' => 'sk-or-test-translation-key',
-                'model' => 'google/gemma-4-31b-it:free',
+                'provider' => 'openrouter',
+                'openrouter_api_key' => 'sk-or-test-translation-key',
+                'openrouter_model' => 'google/gemma-4-31b-it:free',
             ])
             ->assertOk()
+            ->assertJsonPath('provider', 'openrouter')
             ->assertJsonPath('configured', true)
             ->assertJsonPath('source', 'Settings')
             ->assertJsonPath('model', 'google/gemma-4-31b-it:free');
@@ -155,6 +157,31 @@ class DevToolsAccessTest extends TestCase
         $this->assertTrue(app(OpenRouterTranslationService::class)->configured());
     }
 
+    public function test_dev_owner_can_save_azure_translation_settings(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson(route('dev.translations.key.store'), [
+                'provider' => 'azure',
+                'azure_api_key' => 'azure-test-translation-key',
+                'azure_region' => 'southafricanorth',
+            ])
+            ->assertOk()
+            ->assertJsonPath('provider', 'azure')
+            ->assertJsonPath('configured', true)
+            ->assertJsonPath('source', 'Settings')
+            ->assertJsonPath('model', 'azure-translator')
+            ->assertJsonPath('azure_region', 'southafricanorth');
+
+        $this->assertSame('azure-test-translation-key', Setting::getValue('translation.azure_api_key'));
+        $this->assertSame('southafricanorth', Setting::getValue('translation.azure_region'));
+        $this->assertSame('azure', Setting::getValue('translation.provider'));
+    }
+
     public function test_non_owner_cannot_save_openrouter_translation_key(): void
     {
         $admin = User::factory()->create([
@@ -164,7 +191,8 @@ class DevToolsAccessTest extends TestCase
 
         $this->actingAs($admin)
             ->postJson(route('dev.translations.key.store'), [
-                'api_key' => 'sk-or-test-translation-key',
+                'provider' => 'openrouter',
+                'openrouter_api_key' => 'sk-or-test-translation-key',
             ])
             ->assertForbidden();
     }
@@ -360,6 +388,45 @@ class DevToolsAccessTest extends TestCase
         ], 'af');
 
         $this->assertSame(['title' => 'Gemeenskapsnuus'], $translated);
+    }
+
+    public function test_azure_translator_is_used_as_primary_translation_provider(): void
+    {
+        config([
+            'services.translation.provider' => 'azure',
+            'services.azure_translator.key' => 'azure-test-key',
+            'services.azure_translator.region' => 'southafricanorth',
+            'services.azure_translator.endpoint' => 'https://api.cognitive.microsofttranslator.com',
+        ]);
+
+        Http::fake(function ($request) {
+            $this->assertStringStartsWith('https://api.cognitive.microsofttranslator.com/translate?', (string) $request->url());
+            $this->assertStringContainsString('api-version=3.0', (string) $request->url());
+            $this->assertStringContainsString('to=af', (string) $request->url());
+            $this->assertStringContainsString('from=en', (string) $request->url());
+            $this->assertTrue($request->hasHeader('Ocp-Apim-Subscription-Key', 'azure-test-key'));
+            $this->assertTrue($request->hasHeader('Ocp-Apim-Subscription-Region', 'southafricanorth'));
+            $this->assertSame([
+                ['Text' => 'Community News'],
+            ], $request->data());
+
+            return Http::response([
+                [
+                    'translations' => [
+                        ['text' => 'Gemeenskapsnuus', 'to' => 'af'],
+                    ],
+                ],
+            ]);
+        });
+
+        $translator = app(OpenRouterTranslationService::class);
+        $translated = $translator->translateContent([
+            'title' => 'Community News',
+        ], 'af', 'en');
+
+        $this->assertSame(['title' => 'Gemeenskapsnuus'], $translated);
+        $this->assertSame('azure', $translator->providerUsed());
+        $this->assertSame('azure-translator', $translator->modelUsed());
     }
 
     public function test_openrouter_translation_falls_back_to_json_mode_when_schema_is_rejected(): void

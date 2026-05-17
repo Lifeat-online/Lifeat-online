@@ -243,9 +243,9 @@
                                 <p class="mt-1 text-sm text-gray-500">Keep articles available in every configured language. New published articles translate from their original language into the other supported language automatically.</p>
                             </div>
                             <div class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-gray-600">
-                                <p><strong>Model:</strong> {{ $devTranslationStatus['model'] }}</p>
-                                <p><strong>Provider:</strong> {{ $devTranslationStatus['configured'] ? 'Configured' : 'Missing key' }}</p>
-                                <p><strong>Source:</strong> <span data-openrouter-source>{{ $devTranslationStatus['source'] }}</span></p>
+                                <p><strong>Provider:</strong> <span data-translation-provider-label>{{ $devTranslationStatus['provider'] === 'azure' ? 'Azure Translator' : 'OpenRouter' }}</span></p>
+                                <p><strong>Status:</strong> <span data-translation-configured>{{ $devTranslationStatus['configured'] ? 'Configured' : 'Missing key' }}</span></p>
+                                <p><strong>Source:</strong> <span data-translation-source>{{ $devTranslationStatus['source'] }}</span></p>
                             </div>
                         </div>
                         <div class="mt-5 grid gap-4 md:grid-cols-3">
@@ -264,30 +264,48 @@
                         </div>
                     </div>
 
-                    <div class="rounded-lg bg-white p-6 shadow-sm" data-openrouter-key-form data-endpoint="{{ route('dev.translations.key.store') }}">
+                    <div class="rounded-lg bg-white p-6 shadow-sm" data-translation-settings-form data-endpoint="{{ route('dev.translations.key.store') }}">
                         <input type="hidden" name="_token" value="{{ csrf_token() }}">
                         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div>
-                                <h3 class="text-lg font-semibold text-gray-900">OpenRouter Key</h3>
-                                <p class="mt-1 text-sm text-gray-500">Save the translation API key here when you do not want to edit server environment variables directly.</p>
+                                <h3 class="text-lg font-semibold text-gray-900">Translation Provider</h3>
+                                <p class="mt-1 text-sm text-gray-500">Use Azure Translator for bulk platform translation. OpenRouter stays available as a fallback or manual model option.</p>
                             </div>
                             <div class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-gray-600">
-                                <p><strong>Status:</strong> <span data-openrouter-status>{{ $devTranslationStatus['configured'] ? 'Configured' : 'Missing key' }}</span></p>
-                                <p><strong>Saved key:</strong> <span data-openrouter-masked>{{ $devTranslationStatus['masked_key'] ?: 'Not saved' }}</span></p>
+                                <p><strong>Active:</strong> <span data-provider-status>{{ $devTranslationStatus['configured'] ? 'Configured' : 'Missing key' }}</span></p>
+                                <p><strong>Azure key:</strong> <span data-azure-masked>{{ $devTranslationStatus['azure_masked_key'] ?: 'Not saved' }}</span></p>
+                                <p><strong>OpenRouter key:</strong> <span data-openrouter-masked>{{ $devTranslationStatus['openrouter_masked_key'] ?: 'Not saved' }}</span></p>
                             </div>
                         </div>
-                        <div class="mt-5 grid gap-4 lg:grid-cols-[1fr,0.8fr,auto] lg:items-end">
+                        <div class="mt-5 grid gap-4 lg:grid-cols-[0.6fr,1fr,0.6fr] lg:items-end">
                             <div>
-                                <label class="mb-1 block text-sm font-medium text-gray-700">API key</label>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Provider</label>
+                                <select class="w-full rounded-md border-gray-300" data-translation-provider>
+                                    <option value="azure" @selected($devTranslationStatus['provider'] === 'azure')>Azure Translator</option>
+                                    <option value="openrouter" @selected($devTranslationStatus['provider'] === 'openrouter')>OpenRouter</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Azure API key</label>
+                                <input class="w-full rounded-md border-gray-300" type="password" autocomplete="off" data-azure-key placeholder="Azure Translator key">
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Azure region</label>
+                                <input class="w-full rounded-md border-gray-300" data-azure-region value="{{ $devTranslationStatus['azure_region'] }}" placeholder="global or your region">
+                            </div>
+                        </div>
+                        <div class="mt-4 grid gap-4 lg:grid-cols-[1fr,0.8fr,auto] lg:items-end">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">OpenRouter API key</label>
                                 <input class="w-full rounded-md border-gray-300" type="password" autocomplete="off" data-openrouter-key placeholder="sk-or-...">
                             </div>
                             <div>
-                                <label class="mb-1 block text-sm font-medium text-gray-700">Model</label>
-                                <input class="w-full rounded-md border-gray-300" data-openrouter-model value="{{ $devTranslationStatus['model'] }}">
+                                <label class="mb-1 block text-sm font-medium text-gray-700">OpenRouter model</label>
+                                <input class="w-full rounded-md border-gray-300" data-openrouter-model value="{{ $devTranslationStatus['openrouter_model'] }}">
                             </div>
-                            <button type="button" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-openrouter-submit>Save key</button>
+                            <button type="button" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-translation-settings-submit>Save settings</button>
                         </div>
-                        <p class="mt-3 text-sm text-gray-500" data-openrouter-message>Environment variables still take priority when `OPENROUTER_API_KEY` is set.</p>
+                        <p class="mt-3 text-sm text-gray-500" data-translation-settings-message>Environment variables still take priority over saved keys.</p>
                     </div>
 
                     <div class="rounded-lg bg-white p-6 shadow-sm" data-translation-batch data-endpoint="{{ route('dev.translations.batch') }}">
@@ -802,17 +820,23 @@
                 });
             }
 
-            const openRouterKeyForm = document.querySelector('[data-openrouter-key-form]');
-            if (openRouterKeyForm) {
-                const endpoint = openRouterKeyForm.getAttribute('data-endpoint');
-                const token = openRouterKeyForm.querySelector('input[name="_token"]')?.value;
-                const keyInput = openRouterKeyForm.querySelector('[data-openrouter-key]');
-                const modelInput = openRouterKeyForm.querySelector('[data-openrouter-model]');
-                const button = openRouterKeyForm.querySelector('[data-openrouter-submit]');
-                const message = openRouterKeyForm.querySelector('[data-openrouter-message]');
-                const status = openRouterKeyForm.querySelector('[data-openrouter-status]');
-                const masked = openRouterKeyForm.querySelector('[data-openrouter-masked]');
-                const source = document.querySelector('[data-openrouter-source]');
+            const translationSettingsForm = document.querySelector('[data-translation-settings-form]');
+            if (translationSettingsForm) {
+                const endpoint = translationSettingsForm.getAttribute('data-endpoint');
+                const token = translationSettingsForm.querySelector('input[name="_token"]')?.value;
+                const providerInput = translationSettingsForm.querySelector('[data-translation-provider]');
+                const azureKeyInput = translationSettingsForm.querySelector('[data-azure-key]');
+                const azureRegionInput = translationSettingsForm.querySelector('[data-azure-region]');
+                const openRouterKeyInput = translationSettingsForm.querySelector('[data-openrouter-key]');
+                const openRouterModelInput = translationSettingsForm.querySelector('[data-openrouter-model]');
+                const button = translationSettingsForm.querySelector('[data-translation-settings-submit]');
+                const message = translationSettingsForm.querySelector('[data-translation-settings-message]');
+                const status = translationSettingsForm.querySelector('[data-provider-status]');
+                const azureMasked = translationSettingsForm.querySelector('[data-azure-masked]');
+                const openRouterMasked = translationSettingsForm.querySelector('[data-openrouter-masked]');
+                const summaryProvider = document.querySelector('[data-translation-provider-label]');
+                const summaryConfigured = document.querySelector('[data-translation-configured]');
+                const summarySource = document.querySelector('[data-translation-source]');
 
                 button?.addEventListener('click', async () => {
                     button.disabled = true;
@@ -826,17 +850,26 @@
                                 'X-CSRF-TOKEN': token || '',
                             },
                             body: JSON.stringify({
-                                api_key: keyInput?.value || '',
-                                model: modelInput?.value || '',
+                                provider: providerInput?.value || 'azure',
+                                azure_api_key: azureKeyInput?.value || '',
+                                azure_region: azureRegionInput?.value || '',
+                                openrouter_api_key: openRouterKeyInput?.value || '',
+                                openrouter_model: openRouterModelInput?.value || '',
                             }),
                         });
                         const payload = await response.json().catch(() => ({}));
                         if (message) message.textContent = payload.message || `Request finished with status ${response.status}.`;
+                        const providerLabel = payload.provider === 'openrouter' ? 'OpenRouter' : 'Azure Translator';
                         if (status) status.textContent = payload.configured ? 'Configured' : 'Missing key';
-                        if (masked) masked.textContent = payload.masked_key || 'Not saved';
-                        if (source) source.textContent = payload.source || 'Settings';
-                        if (keyInput && response.ok) keyInput.value = '';
-                        if (modelInput && payload.model) modelInput.value = payload.model;
+                        if (azureMasked) azureMasked.textContent = payload.azure_masked_key || 'Not saved';
+                        if (openRouterMasked) openRouterMasked.textContent = payload.openrouter_masked_key || 'Not saved';
+                        if (summaryProvider) summaryProvider.textContent = providerLabel;
+                        if (summaryConfigured) summaryConfigured.textContent = payload.configured ? 'Configured' : 'Missing key';
+                        if (summarySource) summarySource.textContent = payload.source || 'Settings';
+                        if (azureKeyInput && response.ok) azureKeyInput.value = '';
+                        if (openRouterKeyInput && response.ok) openRouterKeyInput.value = '';
+                        if (azureRegionInput && payload.azure_region !== undefined) azureRegionInput.value = payload.azure_region || '';
+                        if (openRouterModelInput && payload.model && payload.provider === 'openrouter') openRouterModelInput.value = payload.model;
                     } catch (error) {
                         if (message) message.textContent = error instanceof Error ? error.message : 'Unable to save key.';
                     } finally {
