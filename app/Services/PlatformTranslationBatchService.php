@@ -108,6 +108,7 @@ class PlatformTranslationBatchService
             'translated' => 0,
             'skipped' => 0,
             'failed' => 0,
+            'errors' => [],
             'sections' => [],
         ];
 
@@ -122,6 +123,7 @@ class PlatformTranslationBatchService
                 $summary['translated'] += $sectionSummary['translated'];
                 $summary['skipped'] += $sectionSummary['skipped'];
                 $summary['failed'] += $sectionSummary['failed'];
+                $summary['errors'] = $this->mergeErrors($summary['errors'], $sectionSummary['errors'] ?? []);
                 $summary['sections'][] = $sectionSummary;
                 continue;
             }
@@ -133,6 +135,7 @@ class PlatformTranslationBatchService
                 'translated' => 0,
                 'skipped' => 0,
                 'failed' => 0,
+                'errors' => [],
             ];
 
             $targets = $force
@@ -155,6 +158,11 @@ class PlatformTranslationBatchService
                     } else {
                         $sectionSummary['failed']++;
                         $summary['failed']++;
+                        $this->recordError(
+                            $sectionSummary,
+                            $summary,
+                            $result['message'] ?? 'Translation failed.'
+                        );
                     }
                 }
             }
@@ -165,6 +173,38 @@ class PlatformTranslationBatchService
         $summary['ok'] = $summary['failed'] === 0;
 
         return $summary;
+    }
+
+    private function recordError(array &$sectionSummary, array &$summary, string $message): void
+    {
+        $message = trim($message);
+
+        if ($message === '') {
+            return;
+        }
+
+        if (! in_array($message, $sectionSummary['errors'], true) && count($sectionSummary['errors']) < 5) {
+            $sectionSummary['errors'][] = $message;
+        }
+
+        $summary['errors'] = $this->mergeErrors($summary['errors'], [$message]);
+    }
+
+    private function mergeErrors(array $current, array $incoming): array
+    {
+        foreach ($incoming as $message) {
+            $message = trim((string) $message);
+
+            if ($message !== '' && ! in_array($message, $current, true)) {
+                $current[] = $message;
+            }
+
+            if (count($current) >= 5) {
+                break;
+            }
+        }
+
+        return $current;
     }
 
     private function queryFor(string $sectionKey): Builder

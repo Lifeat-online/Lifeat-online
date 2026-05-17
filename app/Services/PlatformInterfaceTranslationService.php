@@ -33,6 +33,7 @@ class PlatformInterfaceTranslationService
             'translated' => 0,
             'skipped' => 0,
             'failed' => 0,
+            'errors' => [],
         ];
 
         foreach ($this->targetLocales() as $locale) {
@@ -51,8 +52,7 @@ class PlatformInterfaceTranslationService
             $translated = $this->translator->translateContent($payload, $locale);
 
             if ($translated === null) {
-                $summary['processed'] += $items->count();
-                $summary['failed'] += $items->count();
+                $this->translateIndividually($items, $locale, $summary);
                 continue;
             }
 
@@ -84,6 +84,45 @@ class PlatformInterfaceTranslationService
         }
 
         return $summary;
+    }
+
+    private function translateIndividually(Collection $items, string $locale, array &$summary): void
+    {
+        foreach ($items->values() as $sourceText) {
+            $summary['processed']++;
+            $translation = $this->translator->translateText($sourceText, $locale);
+
+            if (! is_string($translation) || trim($translation) === '') {
+                $summary['failed']++;
+                $this->recordError($summary, $this->translator->lastFailureMessage() ?: 'Platform interface translation failed.');
+                continue;
+            }
+
+            InterfaceTranslation::updateOrCreate(
+                [
+                    'locale' => $locale,
+                    'source_hash' => $this->hash($sourceText),
+                ],
+                [
+                    'source_text' => $sourceText,
+                    'translated_text' => $translation,
+                    'provider' => 'openrouter',
+                    'model' => $this->translator->model(),
+                    'translated_at' => now(),
+                ]
+            );
+
+            $summary['translated']++;
+        }
+    }
+
+    private function recordError(array &$summary, string $message): void
+    {
+        $message = trim($message);
+
+        if ($message !== '' && ! in_array($message, $summary['errors'], true) && count($summary['errors']) < 5) {
+            $summary['errors'][] = $message;
+        }
     }
 
     public function translationsFor(string $locale): array

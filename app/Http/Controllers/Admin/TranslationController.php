@@ -109,9 +109,15 @@ class TranslationController extends Controller
             $request->boolean('force')
         );
 
+        $message = "Processed {$result['processed']} translation targets: {$result['translated']} translated, {$result['skipped']} current, {$result['failed']} failed.";
+
+        if (! empty($result['errors'])) {
+            $message .= ' First issue: '.collect($result['errors'])->first();
+        }
+
         return response()->json([
             ...$result,
-            'message' => "Processed {$result['processed']} translation targets: {$result['translated']} translated, {$result['skipped']} current, {$result['failed']} failed.",
+            'message' => $message,
             'status' => $batch->status(),
         ], $result['ok'] ? 200 : 422);
     }

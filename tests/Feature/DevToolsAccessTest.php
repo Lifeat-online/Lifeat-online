@@ -226,6 +226,45 @@ class DevToolsAccessTest extends TestCase
             ->assertJsonPath('translated', 1);
     }
 
+    public function test_translation_batch_response_includes_provider_error_details(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
+
+        $article = Article::create([
+            'user_id' => User::factory()->create(['role' => 'writer'])->id,
+            'title' => 'Provider Failure',
+            'slug' => 'provider-failure',
+            'excerpt' => 'Short excerpt',
+            'body' => 'This article will fail translation.',
+            'source_locale' => 'en',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $this->mock(OpenRouterTranslationService::class, function (MockInterface $mock) use ($article): void {
+            $mock->shouldReceive('translateModel')
+                ->once()
+                ->withArgs(fn (Article $target, string $locale, bool $force): bool => $target->is($article) && $locale === 'af' && $force === false)
+                ->andReturn(['ok' => false, 'message' => 'OpenRouter returned 429: Rate limit exceeded.']);
+        });
+
+        $this->actingAs($admin)
+            ->postJson(route('dev.translations.batch'), [
+                'section' => 'articles',
+                'limit' => 5,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('processed', 1)
+            ->assertJsonPath('failed', 1)
+            ->assertJsonPath('errors.0', 'OpenRouter returned 429: Rate limit exceeded.')
+            ->assertJsonFragment([
+                'message' => 'Processed 1 translation targets: 0 translated, 0 current, 1 failed. First issue: OpenRouter returned 429: Rate limit exceeded.',
+            ]);
+    }
+
     public function test_openrouter_translation_uses_structured_outputs_and_app_headers(): void
     {
         config([

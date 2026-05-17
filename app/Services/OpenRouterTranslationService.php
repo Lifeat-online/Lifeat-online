@@ -11,6 +11,8 @@ use Throwable;
 
 class OpenRouterTranslationService
 {
+    private ?string $lastFailureMessage = null;
+
     public function translateModel(Model $model, string $targetLocale = 'af', bool $force = false): array
     {
         if (! method_exists($model, 'translatableContent') || ! method_exists($model, 'contentTranslations')) {
@@ -33,7 +35,11 @@ class OpenRouterTranslationService
         $translated = $this->translateContent($source, $targetLocale);
 
         if ($translated === null) {
-            return ['ok' => false, 'message' => 'Translation provider is not configured or did not return usable content.'];
+            return [
+                'ok' => false,
+                'message' => $this->lastFailureMessage()
+                    ?: 'Translation provider is not configured or did not return usable content.',
+            ];
         }
 
         $translation = $model->contentTranslations()->updateOrCreate(
@@ -62,9 +68,12 @@ class OpenRouterTranslationService
 
     public function translateContent(array $content, string $targetLocale = 'af'): ?array
     {
+        $this->lastFailureMessage = null;
         $apiKey = $this->apiKey();
 
         if ($apiKey === '') {
+            $this->lastFailureMessage = 'OpenRouter API key is missing.';
+
             return null;
         }
 
@@ -84,6 +93,8 @@ class OpenRouterTranslationService
             }
 
             if (! $response->successful()) {
+                $this->lastFailureMessage = 'OpenRouter returned '.$response->status().': '.$this->providerErrorMessage($response);
+
                 Log::warning('OpenRouter translation failed.', [
                     'status' => $response->status(),
                     'body' => mb_substr($response->body(), 0, 500),
@@ -95,6 +106,8 @@ class OpenRouterTranslationService
             $message = $response->json('choices.0.message.content');
 
             if (! is_string($message) || trim($message) === '') {
+                $this->lastFailureMessage = 'OpenRouter response did not include translated content.';
+
                 return null;
             }
 
@@ -108,12 +121,19 @@ class OpenRouterTranslationService
                 ->mapWithKeys(fn ($value, $key): array => [$key => is_string($decoded[$key] ?? null) ? $decoded[$key] : $value])
                 ->all();
         } catch (Throwable $exception) {
+            $this->lastFailureMessage = 'OpenRouter translation error: '.$exception->getMessage();
+
             Log::warning('OpenRouter translation exception.', [
                 'message' => $exception->getMessage(),
             ]);
 
             return null;
         }
+    }
+
+    public function lastFailureMessage(): ?string
+    {
+        return $this->lastFailureMessage;
     }
 
     public function model(): string
@@ -257,6 +277,19 @@ class OpenRouterTranslationService
         }
 
         return $message;
+    }
+
+    private function providerErrorMessage(Response $response): string
+    {
+        $message = $response->json('error.message')
+            ?: $response->json('message')
+            ?: $response->body();
+
+        $message = trim((string) $message);
+
+        return $message === ''
+            ? 'Provider returned an empty error response.'
+            : mb_substr($message, 0, 240);
     }
 
     private function systemPrompt(string $targetLocale): string
