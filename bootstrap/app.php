@@ -1,15 +1,23 @@
 <?php
 
+use App\Http\Middleware\EnsureTransportDriverOnDuty;
 use App\Http\Middleware\EnsureUserHasRole;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 
+foreach (['SIGINT' => 2, 'SIGTERM' => 15, 'SIGTSTP' => 20] as $signal => $value) {
+    if (! defined($signal)) {
+        define($signal, $value);
+    }
+}
+
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
+        channels: __DIR__.'/../routes/channels.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -24,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
+            'transport.on_duty' => EnsureTransportDriverOnDuty::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -15,6 +15,9 @@
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('transport.requests.create')" :active="request()->routeIs('transport.requests.*')">
+                        {{ __('Taxi / Delivery') }}
+                    </x-nav-link>
                     @if (Auth::user()->hasRole('admin', 'editor', 'support'))
                         <x-nav-link :href="route('admin.finance.index')" :active="request()->routeIs('admin.finance.*')">
                             {{ __('Finance') }}
@@ -41,12 +44,30 @@
                         </x-nav-link>
                     @endif
                     @if (Auth::user()->hasRole('admin'))
+                        <x-nav-link :href="route('dev.transport.setup')" :active="request()->routeIs('dev.transport.*')">
+                            {{ __('Transport Setup') }}
+                        </x-nav-link>
                         <x-nav-link :href="route('account.advertising.index')" :active="request()->routeIs('account.advertising.*')">
                             {{ __('Self Service') }}
                         </x-nav-link>
                         <x-nav-link :href="route('staff.advertising.index')" :active="request()->routeIs('staff.advertising.*')">
                             {{ __('Staff Ads') }}
                         </x-nav-link>
+                    @endif
+                    @if (Auth::user()->hasRole('transport_manager', 'admin'))
+                        <x-nav-link :href="route('transport.manager.dashboard')" :active="request()->routeIs('transport.manager.*')">
+                            {{ __('Transport') }}
+                        </x-nav-link>
+                    @endif
+                    @if (Auth::user()->hasRole('transport_driver', 'admin'))
+                        <x-nav-link :href="route('transport.driver.duty')" :active="request()->routeIs('transport.driver.duty')">
+                            {{ __('Driver Duty') }}
+                        </x-nav-link>
+                        @if (Auth::user()->transportDriver?->activeDutySession)
+                            <x-nav-link :href="route('transport.driver.workspace')" :active="request()->routeIs('transport.driver.workspace')">
+                                {{ __('Driver Live') }}
+                            </x-nav-link>
+                        @endif
                     @endif
                     @if (Auth::user()->hasRole('councillor'))
                         <x-nav-link :href="route('councillor.faults.index')" :active="request()->routeIs('councillor.faults.*')">
@@ -116,6 +137,9 @@
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('transport.requests.create')" :active="request()->routeIs('transport.requests.*')">
+                {{ __('Taxi / Delivery') }}
+            </x-responsive-nav-link>
             @if (Auth::user()->hasRole('admin', 'editor', 'support'))
                 <x-responsive-nav-link :href="route('admin.finance.index')" :active="request()->routeIs('admin.finance.*')">
                     {{ __('Finance') }}
@@ -142,12 +166,30 @@
                 </x-responsive-nav-link>
             @endif
             @if (Auth::user()->hasRole('admin'))
+                <x-responsive-nav-link :href="route('dev.transport.setup')" :active="request()->routeIs('dev.transport.*')">
+                    {{ __('Transport Setup') }}
+                </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('account.advertising.index')" :active="request()->routeIs('account.advertising.*')">
                     {{ __('Self Service') }}
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('staff.advertising.index')" :active="request()->routeIs('staff.advertising.*')">
                     {{ __('Staff Ads') }}
                 </x-responsive-nav-link>
+            @endif
+            @if (Auth::user()->hasRole('transport_manager', 'admin'))
+                <x-responsive-nav-link :href="route('transport.manager.dashboard')" :active="request()->routeIs('transport.manager.*')">
+                    {{ __('Transport') }}
+                </x-responsive-nav-link>
+            @endif
+            @if (Auth::user()->hasRole('transport_driver', 'admin'))
+                <x-responsive-nav-link :href="route('transport.driver.duty')" :active="request()->routeIs('transport.driver.duty')">
+                    {{ __('Driver Duty') }}
+                </x-responsive-nav-link>
+                @if (Auth::user()->transportDriver?->activeDutySession)
+                    <x-responsive-nav-link :href="route('transport.driver.workspace')" :active="request()->routeIs('transport.driver.workspace')">
+                        {{ __('Driver Live') }}
+                    </x-responsive-nav-link>
+                @endif
             @endif
             @if (Auth::user()->hasRole('councillor'))
                 <x-responsive-nav-link :href="route('councillor.faults.index')" :active="request()->routeIs('councillor.faults.*')">

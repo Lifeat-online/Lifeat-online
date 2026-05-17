@@ -301,6 +301,49 @@ const initSupabase = () => {
     }
 };
 
+const initTransportRealtime = () => {
+    const root = document.querySelector('[data-transport-realtime]');
+    if (!root) return;
+
+    const echo = typeof window.getTransportEcho === 'function' ? window.getTransportEcho() : window.Echo;
+    if (!echo) return;
+
+    const channel = root.getAttribute('data-channel');
+    if (!channel) return;
+
+    const statusTarget = document.querySelector('[data-transport-status]');
+    const noticeTarget = document.querySelector('[data-transport-notice]');
+
+    try {
+        echo.private(channel)
+            .listen('.transport.request.offered', (event) => {
+                if (noticeTarget) {
+                    noticeTarget.textContent = `New request ${event.request_number} is available. Refresh if it does not appear in the list.`;
+                }
+            })
+            .listen('.transport.request.accepted', (event) => {
+                if (statusTarget && event.status) {
+                    statusTarget.textContent = event.status.replaceAll('_', ' ');
+                }
+                if (noticeTarget) {
+                    noticeTarget.textContent = event.driver_name
+                        ? `${event.driver_name} accepted this request.`
+                        : 'A driver accepted this request.';
+                }
+            })
+            .listen('.transport.request.status', (event) => {
+                if (statusTarget && event.status) {
+                    statusTarget.textContent = event.status.replaceAll('_', ' ');
+                }
+                if (noticeTarget && event.note) {
+                    noticeTarget.textContent = event.note;
+                }
+            });
+    } catch (error) {
+        console.error('Transport realtime initialization failed:', error);
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     initThemeToggle();
     initReveal();
@@ -309,4 +352,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initSectionHighlighting();
     initScopedServiceWorker();
     initSupabase();
+    initTransportRealtime();
 });

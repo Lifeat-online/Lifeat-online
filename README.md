@@ -56,6 +56,7 @@ For local PHPUnit runs, ensure the PHP CLI has these extensions enabled: `mbstri
 - The in-app git update utility has been removed; do not reintroduce app-level `git pull` deployment controls.
 - Run `php artisan production:check` during deploy validation and resolve any errors before public launch.
 - On Railway, run separate worker and scheduler processes for `php artisan queue:work --sleep=3 --tries=3 --timeout=120` and `php artisan schedule:work`, then set `QUEUE_WORKER_ENABLED=true` and `SCHEDULER_ENABLED=true`.
+- Transport realtime uses Laravel Reverb. Run it online as a separate Railway service/process with `php artisan reverb:start --host=0.0.0.0 --port=$PORT`, set `BROADCAST_CONNECTION=reverb`, and point `REVERB_HOST` / `VITE_REVERB_HOST` at that service's public HTTPS domain.
 - For Railway uploads, prefer a durable volume mounted over `storage/app` and set `UPLOAD_STORAGE_BACKEND=railway_volume` plus `UPLOAD_STORAGE_MOUNT_PATH`.
 - Enable managed database backups and record a successful restore drill with `BACKUPS_ENABLED=true`, `BACKUP_PROVIDER`, `BACKUP_RESTORE_DRILL_COMPLETED=true`, and `BACKUP_LAST_RESTORE_DRILL_DATE`.
 - Use the production readiness tracker in `Planning/production-readiness-todo.md` for launch blockers, verification, and operational hardening.

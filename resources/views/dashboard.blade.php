@@ -115,6 +115,8 @@
                         <a href="{{ route('admin.campaigns.push.index') }}" class="btn-mgmt btn-slate">Push Campaigns</a>
                         <a href="{{ route('admin.wallet.index') }}" class="btn-mgmt btn-slate">Staff Wallets</a>
                         <a href="{{ route('admin.payout-requests.index') }}" class="btn-mgmt btn-slate">Payout Requests</a>
+                        <a href="{{ route('dev.transport.setup') }}" class="btn-mgmt btn-slate">Transport Setup</a>
+                        <a href="{{ route('transport.manager.dashboard') }}" class="btn-mgmt btn-slate">Transport Manager</a>
                         <a href="{{ route('admin.classifieds.index') }}" class="btn-mgmt btn-slate">Moderate Classifieds</a>
                         <a href="{{ route('admin.listings.create') }}" class="btn-mgmt btn-indigo">New Listing</a>
                         <a href="{{ route('admin.events.create') }}" class="btn-mgmt btn-indigo">New Event</a>

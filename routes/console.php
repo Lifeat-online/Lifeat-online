@@ -10,13 +10,90 @@ use App\Services\SubscriptionRenewalService;
 use App\Support\ProductionReadiness\EnvironmentCheck;
 use App\Support\Uploads\UploadReferenceIndex;
 use Illuminate\Foundation\Inspiring;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Artisan;
+use Laravel\Pulse\Pulse;
+use Laravel\Reverb\Contracts\ApplicationProvider;
+use Laravel\Reverb\Contracts\Logger;
+use Laravel\Reverb\Jobs\PingInactiveConnections;
+use Laravel\Reverb\Jobs\PruneStaleConnections;
+use Laravel\Reverb\Loggers\CliLogger;
+use Laravel\Reverb\Protocols\Pusher\Contracts\ChannelManager;
+use Laravel\Reverb\ServerProviderManager;
+use Laravel\Reverb\Servers\Reverb\Contracts\PubSubProvider;
+use Laravel\Reverb\Servers\Reverb\Factory as ReverbServerFactory;
+use Laravel\Telescope\Contracts\EntriesRepository;
+use Laravel\Telescope\Telescope;
+use React\EventLoop\Loop;
 use Symfony\Component\Console\Command\Command;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Artisan::command('reverb:start-railway
+    {--host= : The IP address the server should bind to}
+    {--port= : The port the server should listen on}
+    {--path= : The path the server should prefix to all routes}
+    {--hostname= : The hostname the server is accessible from}
+    {--debug : Indicates whether debug messages should be displayed in the terminal}', function () {
+    if ($this->option('debug')) {
+        app()->instance(Logger::class, new CliLogger($this->output));
+    }
+
+    $config = app('config')['reverb.servers.reverb'];
+    $loop = Loop::get();
+
+    $server = ReverbServerFactory::make(
+        $host = $this->option('host') ?: $config['host'],
+        $port = $this->option('port') ?: $config['port'],
+        $path = $this->option('path') ?: $config['path'] ?? '',
+        $hostname = $this->option('hostname') ?: $config['hostname'],
+        $config['max_request_size'] ?? 10_000,
+        $config['options'] ?? [],
+        loop: $loop
+    );
+
+    if (app(ServerProviderManager::class)->driver('reverb')->subscribesToEvents()) {
+        app(PubSubProvider::class)->connect($loop);
+    }
+
+    $loop->addPeriodicTimer(60, function () {
+        PruneStaleConnections::dispatch();
+        PingInactiveConnections::dispatch();
+    });
+
+    $lastRestart = Cache::get('laravel:reverb:restart');
+    $loop->addPeriodicTimer(5, function () use ($server, $host, $port, $lastRestart) {
+        if ($lastRestart === Cache::get('laravel:reverb:restart')) {
+            return;
+        }
+
+        app(ApplicationProvider::class)
+            ->all()
+            ->each(function ($application) {
+                collect(app(ChannelManager::class)->for($application)->connections())
+                    ->each
+                    ->disconnect();
+            });
+
+        $server->stop();
+        $this->components->info("Stopping server on {$host}:{$port}");
+    });
+
+    if (app()->bound(Pulse::class)) {
+        $loop->addPeriodicTimer($config['pulse_ingest_interval'], fn () => app(Pulse::class)->ingest());
+    }
+
+    if (app()->bound(EntriesRepository::class)) {
+        $loop->addPeriodicTimer($config['telescope_ingest_interval'] ?? 15, fn () => Telescope::store(app(EntriesRepository::class)));
+    }
+
+    $this->components->info('Starting '.($server->isSecure() ? 'secure ' : '')."server on {$host}:{$port}{$path}".(($hostname && $hostname !== $host) ? " ({$hostname})" : ''));
+
+    $server->start();
+})->purpose('Start the Reverb server on hosts without pcntl signal support');
 
 Artisan::command('production:check {--fail-on-warning : Return a failing exit code when warnings are present}', function (EnvironmentCheck $check) {
     $findings = $check->run();

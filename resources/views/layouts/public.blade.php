@@ -35,6 +35,7 @@
             ['label' => 'Articles', 'url' => route('articles.index'), 'active' => request()->routeIs('articles.*')],
             ['label' => 'Classifieds', 'url' => route('classifieds.index'), 'active' => request()->routeIs('classifieds.*')],
             ['label' => 'Advertise', 'url' => route('advertise.index'), 'active' => request()->routeIs('advertise.*')],
+            ['label' => 'Taxi / Delivery', 'url' => route('transport.index'), 'active' => request()->routeIs('transport.*')],
             ['label' => 'Search', 'url' => route('search.index'), 'active' => request()->routeIs('search.*')],
             ['label' => 'Faults', 'url' => route('faults.index'), 'active' => request()->routeIs('faults.*')],
             ['label' => 'About', 'url' => route('about.index'), 'active' => request()->routeIs('about.*')],
@@ -99,6 +100,9 @@
                 break;
             case 'advertise.index':
                 $pushCrumb('Advertise', route('advertise.index'));
+                break;
+            case 'transport.index':
+                $pushCrumb('Taxi / Delivery', route('transport.index'));
                 break;
             case 'search.index':
                 $pushCrumb('Search', route('search.index'));
@@ -287,6 +291,7 @@
                 <strong>Grow</strong>
                 <p><a href="{{ route('advertise.index') }}">Advertise With Us</a></p>
                 <p><a href="{{ route('add-listing.index') }}">Add Listing</a></p>
+                <p><a href="{{ route('transport.index') }}">Taxi / Delivery</a></p>
                 <p><a href="{{ route('classifieds.index') }}">Community Classifieds</a></p>
                 <p><a href="{{ route('staff-signup.create') }}">Join As Writer Or Staff</a></p>
                 <p><a href="{{ route('contact.index') }}">Contact Us</a></p>

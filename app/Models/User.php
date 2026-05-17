@@ -86,6 +86,11 @@ class User extends Authenticatable
         return $this->hasMany(Order::class);
     }
 
+    public function transportRequests(): HasMany
+    {
+        return $this->hasMany(TransportRequest::class);
+    }
+
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
@@ -99,6 +104,16 @@ class User extends Authenticatable
     public function councillorProfile(): HasOne
     {
         return $this->hasOne(Councillor::class);
+    }
+
+    public function transportDriver(): HasOne
+    {
+        return $this->hasOne(TransportDriver::class);
+    }
+
+    public function managedTransportDrivers(): HasMany
+    {
+        return $this->hasMany(TransportDriver::class, 'manager_user_id');
     }
 
     public function roles(): BelongsToMany

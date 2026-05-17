@@ -32,6 +32,9 @@ Use this checklist before a production launch or major Railway redeploy.
 - `SCHEDULER_ENABLED=true` is set only after a Railway scheduler service or cron is configured.
 - Scheduler service command: `php artisan schedule:work`, or a Railway cron that runs `php artisan schedule:run` once per minute.
 - `SCHEDULER_COMMAND` records the command used by the scheduler/cron service.
+- Transport realtime is deployed as a separate Reverb service/process when taxi/delivery realtime is enabled.
+- Reverb service command: `php artisan reverb:start --host=0.0.0.0 --port=$PORT`.
+- App service variables include `BROADCAST_CONNECTION=reverb`, `REVERB_APP_ID`, `REVERB_APP_KEY`, `REVERB_APP_SECRET`, `REVERB_HOST`, `REVERB_PORT=443`, `REVERB_SCHEME=https`, and matching `VITE_REVERB_*` values before rebuilding frontend assets.
 - Failed queue jobs are monitored.
 - Mail, subscription reminders, expiry sweeps, and push dispatch jobs are covered.
 

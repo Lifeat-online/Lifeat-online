@@ -52,6 +52,14 @@ use App\Http\Controllers\AccountVoucherRedemptionController;
 use App\Http\Controllers\StaffVoucherRedemptionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\WriterApplicationController;
+use App\Http\Controllers\Transport\DriverOfferController as TransportDriverOfferController;
+use App\Http\Controllers\Transport\DriverDutyController as TransportDriverDutyController;
+use App\Http\Controllers\Transport\DriverWorkspaceController as TransportDriverWorkspaceController;
+use App\Http\Controllers\Transport\Manager\DashboardController as TransportManagerDashboardController;
+use App\Http\Controllers\Transport\Manager\DriverController as TransportManagerDriverController;
+use App\Http\Controllers\Transport\Manager\VehicleController as TransportManagerVehicleController;
+use App\Http\Controllers\Transport\Admin\SetupController as TransportAdminSetupController;
+use App\Http\Controllers\Transport\RequestController as TransportRequestController;
 use App\Http\Controllers\AccountAdvertisingDashboardController;
 use App\Http\Controllers\StaffAdvertisingDashboardController;
 use App\Http\Controllers\CivicFaultMapController;
@@ -87,6 +95,7 @@ Route::get('/advertise', [AdvertiseController::class, 'index'])->name('advertise
 Route::post('/advertise/start', [AdvertiseController::class, 'start'])->middleware('auth')->name('advertise.start');
 Route::get('/add-listing', [AddListingController::class, 'index'])->name('add-listing.index');
 Route::post('/add-listing/start', [AddListingController::class, 'start'])->middleware('auth')->name('add-listing.start');
+Route::view('/transport', 'transport.index')->name('transport.index');
 Route::get('/about', [AboutController::class, 'index'])->name('about.index');
 
 Route::get('/faults', [CivicFaultMapController::class, 'index'])->name('faults.index');
@@ -99,6 +108,29 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 Route::middleware(['auth', 'role:admin'])->prefix('dev')->name('dev.')->group(function () {
     Route::post('/tests/run', [AdminDevUpdateController::class, 'runTests'])->middleware('throttle:2,1')->name('tests.run');
+    Route::get('/transport', [TransportAdminSetupController::class, 'index'])->name('transport.setup');
+    Route::post('/transport/managers', [TransportAdminSetupController::class, 'storeManager'])->name('transport.managers.store');
+    Route::put('/transport/settings', [TransportAdminSetupController::class, 'updateSettings'])->name('transport.settings.update');
+});
+
+Route::middleware(['auth'])->prefix('transport')->name('transport.')->group(function () {
+    Route::get('/requests/create', [TransportRequestController::class, 'create'])->name('requests.create');
+    Route::post('/requests', [TransportRequestController::class, 'store'])->name('requests.store');
+    Route::get('/requests/{transportRequest}', [TransportRequestController::class, 'show'])->name('requests.show');
+
+    Route::middleware('role:transport_manager,admin')->prefix('manager')->name('manager.')->group(function () {
+        Route::get('/', TransportManagerDashboardController::class)->name('dashboard');
+        Route::post('/drivers', [TransportManagerDriverController::class, 'store'])->name('drivers.store');
+        Route::post('/vehicles', [TransportManagerVehicleController::class, 'store'])->name('vehicles.store');
+    });
+
+    Route::middleware('role:transport_driver,admin')->prefix('driver')->name('driver.')->group(function () {
+        Route::get('/duty', [TransportDriverDutyController::class, 'show'])->name('duty');
+        Route::post('/clock-in', [TransportDriverDutyController::class, 'clockIn'])->name('clock-in');
+        Route::post('/clock-out', [TransportDriverDutyController::class, 'clockOut'])->name('clock-out');
+        Route::post('/offers/{offer}/accept', [TransportDriverOfferController::class, 'accept'])->middleware('transport.on_duty')->name('offers.accept');
+        Route::get('/', TransportDriverWorkspaceController::class)->middleware('transport.on_duty')->name('workspace');
+    });
 });
 
 require __DIR__.'/web_api.php';
