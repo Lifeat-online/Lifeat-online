@@ -919,29 +919,74 @@
                     });
                 };
 
+                const missingFor = (sections, selectedSection) => {
+                    if (!Array.isArray(sections)) return 0;
+                    if (selectedSection === 'all') {
+                        return sections.reduce((total, section) => total + Number(section.missing || 0), 0);
+                    }
+
+                    return Number(sections.find((item) => item.key === selectedSection)?.missing || 0);
+                };
+
+                const runBatch = async (section) => {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': token || '',
+                        },
+                        body: JSON.stringify({
+                            section,
+                            limit: Number(limit?.value || 20),
+                            force: Boolean(force?.checked),
+                        }),
+                    });
+
+                    return response.json().catch(() => ({}));
+                };
+
                 buttons.forEach((button) => {
                     button.addEventListener('click', async () => {
                         const section = button.getAttribute('data-batch-section') || 'all';
                         setBusy(true);
-                        if (status) status.textContent = section === 'all' ? 'Translating platform content...' : `Translating ${section}...`;
+                        const label = section === 'all' ? 'platform content' : section;
+                        if (status) status.textContent = `Translating ${label}...`;
 
                         try {
-                            const response = await fetch(endpoint, {
-                                method: 'POST',
-                                headers: {
-                                    Accept: 'application/json',
-                                    'Content-Type': 'application/json',
-                                    'X-CSRF-TOKEN': token || '',
-                                },
-                                body: JSON.stringify({
-                                    section,
-                                    limit: Number(limit?.value || 20),
-                                    force: Boolean(force?.checked),
-                                }),
-                            });
-                            const payload = await response.json().catch(() => ({}));
-                            renderBatchStatus(payload.status);
-                            if (status) status.textContent = payload.message || `Request finished with status ${response.status}.`;
+                            let runs = 0;
+                            let totalProcessed = 0;
+                            let totalTranslated = 0;
+                            let totalFailed = 0;
+                            let payload = {};
+
+                            do {
+                                runs++;
+                                payload = await runBatch(section);
+                                renderBatchStatus(payload.status);
+                                totalProcessed += Number(payload.processed || 0);
+                                totalTranslated += Number(payload.translated || 0);
+                                totalFailed += Number(payload.failed || 0);
+
+                                const remaining = missingFor(payload.status, section);
+                                if (status) {
+                                    status.textContent = `${payload.message || 'Translation run finished.'} Remaining: ${remaining}. Runs: ${runs}.`;
+                                }
+
+                                if (Boolean(force?.checked) || remaining === 0 || payload.halted || payload.failed > 0) {
+                                    break;
+                                }
+
+                                if (Number(payload.translated || 0) === 0 && Number(payload.skipped || 0) === 0) {
+                                    if (status) status.textContent = `${payload.message || 'Translation run finished.'} Stopped because no progress was made.`;
+                                    break;
+                                }
+                            } while (runs < 200);
+
+                            const remaining = missingFor(payload.status, section);
+                            if (status && remaining === 0 && !Boolean(force?.checked)) {
+                                status.textContent = `Translation complete. Processed ${totalProcessed} targets across ${runs} run${runs === 1 ? '' : 's'}: ${totalTranslated} translated, ${totalFailed} failed.`;
+                            }
                         } catch (error) {
                             if (status) status.textContent = error instanceof Error ? error.message : 'Unable to run translations.';
                         } finally {
