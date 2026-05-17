@@ -169,6 +169,28 @@ class DevToolsAccessTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_translation_preview_returns_json_message_when_provider_is_missing(): void
+    {
+        config(['services.openrouter.key' => '']);
+        Http::fake();
+
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson(route('dev.translations.preview'), [
+                'text' => 'Translate this preview.',
+                'target_locale' => 'af',
+            ])
+            ->assertOk()
+            ->assertJsonPath('ok', false)
+            ->assertJsonPath('message', 'Translation provider is not configured or returned no text.');
+
+        Http::assertNothingSent();
+    }
+
     public function test_dev_owner_can_run_article_translation_batch(): void
     {
         $admin = User::factory()->create([

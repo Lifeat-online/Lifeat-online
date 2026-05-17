@@ -345,7 +345,7 @@
                                 </div>
                                 <div>
                                     <label class="mb-1 block text-sm font-medium text-gray-700">Source text</label>
-                                    <textarea class="w-full rounded-md border-gray-300" rows="5" data-translation-source></textarea>
+                                    <textarea class="w-full rounded-md border-gray-300" rows="5" required data-translation-source></textarea>
                                 </div>
                                 <button type="button" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-translation-submit>Translate</button>
                                 <p class="text-sm text-gray-500" data-translation-status>Idle</p>
@@ -914,6 +914,15 @@
                 const button = translationPreview.querySelector('[data-translation-submit]');
 
                 button?.addEventListener('click', async () => {
+                    const text = source?.value?.trim() || '';
+
+                    if (text === '') {
+                        if (output) output.value = '';
+                        if (status) status.textContent = 'Add text to translate first.';
+                        source?.focus();
+                        return;
+                    }
+
                     button.disabled = true;
                     if (status) status.textContent = 'Translating...';
                     try {
@@ -925,13 +934,16 @@
                                 'X-CSRF-TOKEN': token || '',
                             },
                             body: JSON.stringify({
-                                text: source?.value || '',
+                                text,
                                 target_locale: locale?.value || 'af',
                             }),
                         });
                         const payload = await response.json().catch(() => ({}));
                         if (output) output.value = payload.translated || '';
-                        if (status) status.textContent = payload.message || `Request finished with status ${response.status}.`;
+                        const validationMessage = payload.message
+                            || Object.values(payload.errors || {}).flat().join(' ')
+                            || `Request finished with status ${response.status}.`;
+                        if (status) status.textContent = validationMessage;
                     } catch (error) {
                         if (status) status.textContent = error instanceof Error ? error.message : 'Unable to translate.';
                     } finally {

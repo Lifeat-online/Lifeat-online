@@ -70,7 +70,7 @@ class TranslationController extends Controller
             'message' => $translated === null ? 'Translation provider is not configured or returned no text.' : 'Translated.',
             'translated' => $translated,
             'model' => $translator->model(),
-        ], $translated === null ? 422 : 200);
+        ]);
     }
 
     public function translateArticle(Request $request, Article $article, OpenRouterTranslationService $translator): JsonResponse
