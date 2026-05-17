@@ -17,7 +17,7 @@ class AddListingPageTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Add Listing');
-        $response->assertSee('Launch your business listing the right way');
+        $response->assertSee('Launch a polished local business listing in minutes.');
         $response->assertSee('Choose Your Listing Path');
         $response->assertSee('Business Directory Standard');
         $response->assertSee('Business Directory Self-Service');

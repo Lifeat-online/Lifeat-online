@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Listing;
 use App\Models\User;
+use App\Models\Voucher;
 use App\Services\VapidKeySetupService;
 use App\Services\WebPushDeliveryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -26,6 +28,7 @@ class AdminPushNotificationTest extends TestCase
             ->assertOk()
             ->assertSee('Push Notifications')
             ->assertSee('Hero Image URL')
+            ->assertSee('Marketing attachment')
             ->assertSee('Preview tone')
             ->assertSee('Web Push topic')
             ->assertSee('Send Push');
@@ -131,6 +134,68 @@ class AdminPushNotificationTest extends TestCase
             ])
             ->assertRedirect()
             ->assertSessionHas('status', 'Push attempted for 1 subscription(s): 1 sent, 0 failed.');
+    }
+
+    public function test_admin_can_attach_voucher_to_manual_push_payload(): void
+    {
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        $listing = Listing::factory()->create([
+            'title' => 'Lifeat Cafe',
+            'slug' => 'lifeat-cafe',
+            'featured_image' => 'listings/lifeat-cafe.jpg',
+        ]);
+        $voucher = Voucher::factory()->create([
+            'listing_id' => $listing->id,
+            'title' => 'Lunch special',
+            'slug' => 'lunch-special',
+            'discount_percent' => 15,
+        ]);
+        $voucherUrl = route('vouchers.show', ['listing' => $listing, 'voucher' => $voucher]);
+
+        $this->mock(WebPushDeliveryService::class, function (MockInterface $mock) use ($admin, $voucherUrl): void {
+            $mock->shouldReceive('sendManual')
+                ->once()
+                ->withArgs(fn (User $user, array $payload, string $audience, array $options): bool => $user->is($admin)
+                    && $audience === 'all'
+                    && $payload['url'] === $voucherUrl
+                    && $payload['image'] === asset('storage/listings/lifeat-cafe.jpg')
+                    && $payload['actions'][0]['title'] === 'Claim voucher'
+                    && $payload['actions'][0]['url'] === $voucherUrl
+                    && $payload['actions'][1]['title'] === 'View business')
+                ->andReturn([
+                    'configured' => true,
+                    'attempted' => 2,
+                    'sent' => 2,
+                    'failed' => 0,
+                    'expired' => 0,
+                ]);
+        });
+
+        $this->actingAs($admin)
+            ->post(route('admin.push-notifications.store'), [
+                'audience' => 'all',
+                'title' => 'Lunch special',
+                'body' => 'Claim the new Lifeat Cafe voucher today.',
+                'attachment_type' => 'voucher',
+                'attachment_id' => $voucher->id,
+                'urgency' => 'normal',
+                'ttl' => 86400,
+                'tone' => 'chime',
+                'vibration' => 'double',
+                'action_1_title' => 'Claim voucher',
+                'action_1_url' => $voucherUrl,
+                'action_2_title' => 'View business',
+                'action_2_url' => route('directory.show', $listing),
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('status', 'Push attempted for 2 subscription(s): 2 sent, 0 failed.');
+
+        $this->assertDatabaseHas('notification_logs', [
+            'channel' => 'push',
+            'notification_type' => 'admin_manual_push_sent',
+            'recipient' => 'all active browser subscriptions',
+            'status' => 'sent',
+        ]);
     }
 
     public function test_web_push_notice_about_optional_math_extensions_does_not_break_manual_send(): void
