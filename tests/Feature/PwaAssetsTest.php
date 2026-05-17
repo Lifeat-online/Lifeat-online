@@ -36,6 +36,8 @@ class PwaAssetsTest extends TestCase
 
         $this->assertStringContainsString('life-pwa-', $serviceWorker);
         $this->assertStringContainsString('/offline.html', $serviceWorker);
+        $this->assertStringContainsString('const responseForCache = response.clone();', $serviceWorker);
+        $this->assertStringContainsString('await cache.put(request, responseForCache);', $serviceWorker);
         $this->assertStringContainsString('You are offline', $offlineShell);
     }
 }

@@ -2,7 +2,12 @@
     <x-slot name="header">
         <div class="flex items-center justify-between gap-4">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">Push Campaigns</h2>
-            <a href="{{ route('admin.campaigns.ads.index') }}" class="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700">View Ad Campaigns</a>
+            <div class="flex flex-wrap gap-2">
+                @if (auth()->user()?->hasRole('admin', 'editor', 'staff'))
+                    <a href="{{ route('admin.campaigns.push.create') }}" class="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white">Add push campaign</a>
+                @endif
+                <a href="{{ route('admin.campaigns.ads.index') }}" class="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700">View Ad Campaigns</a>
+            </div>
         </div>
     </x-slot>
 

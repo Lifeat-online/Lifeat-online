@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\BrowserPushSubscription;
 use App\Models\PushCampaign;
+use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Minishlink\WebPush\Subscription as WebPushSubscription;
 use Minishlink\WebPush\WebPush;
@@ -88,10 +89,119 @@ class WebPushDeliveryService
         ];
     }
 
-    private function isConfigured(): bool
+    public function sendTest(User $user, array $payload): array
+    {
+        return $this->sendManual($user, $payload, 'self');
+    }
+
+    public function sendManual(User $sender, array $payload, string $audience = 'all'): array
+    {
+        if (! $this->isConfigured()) {
+            return [
+                'configured' => false,
+                'attempted' => 0,
+                'sent' => 0,
+                'failed' => 0,
+                'expired' => 0,
+            ];
+        }
+
+        $webPush = $this->webPush();
+        $encodedPayload = json_encode([
+            'title' => $payload['title'],
+            'body' => $payload['body'],
+            'url' => $payload['url'],
+            'tag' => 'admin-manual-push-'.$sender->getKey().'-'.now()->timestamp,
+            'icon' => asset('pwa/icon-192.png'),
+            'badge' => asset('pwa/favicon-32x32.png'),
+            'data' => [
+                'manual' => true,
+                'audience' => $audience,
+                'sent_by_user_id' => $sender->getKey(),
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $attempted = 0;
+        $query = BrowserPushSubscription::active()->orderBy('id');
+
+        if ($audience === 'self') {
+            $query->where('user_id', $sender->getKey());
+        }
+
+        $query->chunkById(100, function ($subscriptions) use ($webPush, $encodedPayload, &$attempted): void {
+            foreach ($subscriptions as $subscription) {
+                $attempted++;
+                $webPush->queueNotification(
+                    WebPushSubscription::create([
+                        'endpoint' => $subscription->endpoint,
+                        'publicKey' => $subscription->public_key,
+                        'authToken' => $subscription->auth_token,
+                        'contentEncoding' => $subscription->content_encoding,
+                    ]),
+                    $encodedPayload
+                );
+            }
+        });
+
+        return $this->flush($webPush, $attempted);
+    }
+
+    public function isConfigured(): bool
     {
         return filled(config('services.webpush.public_key'))
             && filled(config('services.webpush.private_key'));
+    }
+
+    private function webPush(): WebPush
+    {
+        return new WebPush([
+            'VAPID' => [
+                'subject' => config('services.webpush.subject') ?: config('app.url'),
+                'publicKey' => config('services.webpush.public_key'),
+                'privateKey' => config('services.webpush.private_key'),
+            ],
+        ]);
+    }
+
+    private function flush(WebPush $webPush, int $attempted): array
+    {
+        $sent = 0;
+        $failed = 0;
+        $expired = 0;
+
+        foreach ($webPush->flush() as $report) {
+            $subscription = BrowserPushSubscription::where('endpoint_hash', BrowserPushSubscription::endpointHash($report->getEndpoint()))->first();
+
+            if ($report->isSuccess()) {
+                $sent++;
+                $subscription?->forceFill([
+                    'last_seen_at' => now(),
+                    'failure_count' => 0,
+                ])->save();
+                continue;
+            }
+
+            $failed++;
+            if ($report->isSubscriptionExpired()) {
+                $expired++;
+            }
+
+            $subscription?->markFailed($report->isSubscriptionExpired());
+
+            Log::warning('Browser push delivery failed.', [
+                'endpoint_hash' => $subscription?->endpoint_hash,
+                'reason' => $report->getReason(),
+                'expired' => $report->isSubscriptionExpired(),
+            ]);
+        }
+
+        return [
+            'configured' => true,
+            'attempted' => $attempted,
+            'sent' => $sent,
+            'failed' => $failed,
+            'expired' => $expired,
+        ];
     }
 
     private function payloadForCampaign(PushCampaign $campaign): array

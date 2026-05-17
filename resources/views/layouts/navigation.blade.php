@@ -50,6 +50,9 @@
                         <x-nav-link :href="route('staff.advertising.index')" :active="request()->routeIs('staff.advertising.*')">
                             {{ __('Staff Ads') }}
                         </x-nav-link>
+                        <x-nav-link :href="route('admin.push-notifications.index')" :active="request()->routeIs('admin.push-notifications.*')">
+                            {{ __('Push') }}
+                        </x-nav-link>
                     @endif
                     @if (Auth::user()->hasRole('transport_manager', 'admin'))
                         <x-nav-link :href="route('transport.manager.dashboard')" :active="request()->routeIs('transport.manager.*')">
@@ -169,6 +172,9 @@
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('staff.advertising.index')" :active="request()->routeIs('staff.advertising.*')">
                     {{ __('Staff Ads') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.push-notifications.index')" :active="request()->routeIs('admin.push-notifications.*')">
+                    {{ __('Push') }}
                 </x-responsive-nav-link>
             @endif
             @if (Auth::user()->hasRole('transport_manager', 'admin'))

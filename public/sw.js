@@ -72,8 +72,9 @@ const shouldCacheAsset = (url) => {
 
 const cacheResponse = async (cacheName, request, response) => {
   if (!response || !response.ok) return;
+  const responseForCache = response.clone();
   const cache = await caches.open(cacheName);
-  await cache.put(request, response.clone());
+  await cache.put(request, responseForCache);
 };
 
 self.addEventListener('install', (event) => {

@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Admin\VoucherController as AdminVoucherController;
 use App\Http\Controllers\Admin\MarketingIntegrationController as AdminMarketingIntegrationController;
 use App\Http\Controllers\Admin\AuditLogController as AdminAuditLogController;
+use App\Http\Controllers\Admin\PushNotificationTestController as AdminPushNotificationTestController;
 use App\Http\Controllers\Admin\WriterApplicationController as AdminWriterApplicationController;
 use App\Http\Controllers\Admin\WriterPaymentController as AdminWriterPaymentController;
 use App\Http\Controllers\Admin\CouncillorController as AdminCouncillorController;
@@ -243,6 +244,10 @@ Route::middleware(['auth', 'verified', 'role:councillor'])->prefix('councillor')
 Route::middleware(['auth', 'role:admin,editor,staff,support'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', AdminDashboardController::class)->name('dashboard');
     Route::get('/metrics', AdminMetricsController::class)->name('metrics');
+    Route::get('/push-notifications', [AdminPushNotificationTestController::class, 'index'])->middleware('role:admin,editor')->name('push-notifications.index');
+    Route::post('/push-notifications', [AdminPushNotificationTestController::class, 'store'])->middleware('role:admin,editor')->name('push-notifications.store');
+    Route::get('/push-notifications/test', [AdminPushNotificationTestController::class, 'index'])->middleware('role:admin,editor')->name('push-notifications.test');
+    Route::post('/push-notifications/test', [AdminPushNotificationTestController::class, 'store'])->middleware('role:admin,editor')->name('push-notifications.test.store');
     Route::get('/finance', [AdminFinanceController::class, 'index'])->middleware('role:admin,editor,support')->name('finance.index');
     Route::get('/finance/export/{dataset}', [AdminFinanceController::class, 'export'])->middleware('role:admin,editor')->name('finance.export');
     Route::post('/finance/payments/{payment}/mark-paid', [AdminFinanceController::class, 'markPaymentPaid'])->middleware('role:admin,editor')->name('finance.payments.mark-paid');
@@ -313,12 +318,16 @@ Route::middleware(['auth', 'role:admin,editor,staff,support'])->prefix('admin')-
     Route::post('/payout-requests/{payoutRequest}/mark-paid', [AdminPayoutRequestController::class, 'markPaid'])->middleware('role:admin')->name('payout-requests.mark-paid');
     // Ad / Push Campaigns
     Route::get('/campaigns/ads', [AdminCampaignController::class, 'adIndex'])->name('campaigns.ads.index');
+    Route::get('/campaigns/ads/create', [AdminCampaignController::class, 'adCreate'])->middleware('role:admin,editor,staff')->name('campaigns.ads.create');
+    Route::post('/campaigns/ads', [AdminCampaignController::class, 'adStore'])->middleware('role:admin,editor,staff')->name('campaigns.ads.store');
     Route::post('/campaigns/ads/bulk', [AdminCampaignController::class, 'adBulk'])->middleware('role:admin,editor')->name('campaigns.ads.bulk');
     Route::get('/campaigns/ads/{adCampaign}', [AdminCampaignController::class, 'adShow'])->name('campaigns.ads.show');
     Route::post('/campaigns/ads/{adCampaign}/approve', [AdminCampaignController::class, 'adApprove'])->middleware('role:admin,editor')->name('campaigns.ads.approve');
     Route::post('/campaigns/ads/{adCampaign}/pause', [AdminCampaignController::class, 'adPause'])->middleware('role:admin,editor')->name('campaigns.ads.pause');
     Route::post('/campaigns/ads/{adCampaign}/resume', [AdminCampaignController::class, 'adResume'])->middleware('role:admin,editor')->name('campaigns.ads.resume');
     Route::get('/campaigns/push', [AdminCampaignController::class, 'pushIndex'])->name('campaigns.push.index');
+    Route::get('/campaigns/push/create', [AdminCampaignController::class, 'pushCreate'])->middleware('role:admin,editor,staff')->name('campaigns.push.create');
+    Route::post('/campaigns/push', [AdminCampaignController::class, 'pushStore'])->middleware('role:admin,editor,staff')->name('campaigns.push.store');
     Route::post('/campaigns/push/bulk', [AdminCampaignController::class, 'pushBulk'])->middleware('role:admin,editor')->name('campaigns.push.bulk');
     Route::get('/campaigns/push/{pushCampaign}', [AdminCampaignController::class, 'pushShow'])->name('campaigns.push.show');
     Route::post('/campaigns/push/{pushCampaign}/dispatch', [AdminCampaignController::class, 'pushDispatch'])->middleware('role:admin,editor')->name('campaigns.push.dispatch');
