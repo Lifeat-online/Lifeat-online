@@ -119,6 +119,37 @@
 }
 
 @layer components {
+    .backend-nav-scroll {
+        align-items: stretch;
+        flex: 1 1 auto;
+        gap: 1.5rem;
+        min-width: 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+        scrollbar-color: rgb(var(--border-rgb) / 0.95) transparent;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .backend-nav-scroll::-webkit-scrollbar {
+        height: 0.45rem;
+    }
+
+    .backend-nav-scroll::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .backend-nav-scroll::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        background: rgb(var(--border-rgb) / 0.95);
+    }
+
+    @media (min-width: 1280px) {
+        .backend-nav-scroll {
+            gap: 2rem;
+        }
+    }
+
     .lp-skip-link {
         position: absolute;
         left: 1rem;
@@ -137,8 +168,9 @@
     }
 
     .site-header {
+        position: relative;
         z-index: 40;
-        overflow: hidden;
+        overflow: visible;
         border-bottom: 1px solid rgb(var(--border-rgb) / 0.8);
         background: rgb(var(--surface-rgb) / 0.92);
         box-shadow: 0 1px 3px rgb(2 6 23 / 0.10), 0 1px 2px rgb(2 6 23 / 0.06);
