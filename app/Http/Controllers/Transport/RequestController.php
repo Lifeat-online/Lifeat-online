@@ -34,6 +34,8 @@ class RequestController extends Controller
             'pickup_latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'pickup_longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'dropoff_address' => ['required', 'string', 'max:255'],
+            'dropoff_latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'dropoff_longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'distance_km' => ['required', 'numeric', 'min:0.1', 'max:2000'],
             'passenger_count' => ['nullable', 'integer', 'min:0', 'max:80'],
             'parcel_weight_kg' => ['nullable', 'numeric', 'min:0', 'max:999999'],
@@ -42,6 +44,8 @@ class RequestController extends Controller
         ]);
 
         $isScheduled = $data['request_timing'] === 'scheduled';
+        $isPassengerRide = $data['service_type'] === 'ride';
+        $carriesParcelWeight = in_array($data['service_type'], ['parcel', 'heavy_goods'], true);
 
         $transportRequest = TransportRequest::create([
             'user_id' => $request->user()->id,
@@ -56,9 +60,11 @@ class RequestController extends Controller
             'pickup_latitude' => $data['pickup_latitude'] ?? null,
             'pickup_longitude' => $data['pickup_longitude'] ?? null,
             'dropoff_address' => $data['dropoff_address'],
+            'dropoff_latitude' => $data['dropoff_latitude'] ?? null,
+            'dropoff_longitude' => $data['dropoff_longitude'] ?? null,
             'distance_km' => $data['distance_km'],
-            'passenger_count' => $data['service_type'] === 'ride' ? ($data['passenger_count'] ?? 1) : 0,
-            'parcel_weight_kg' => $data['parcel_weight_kg'] ?? null,
+            'passenger_count' => $isPassengerRide ? ($data['passenger_count'] ?? 1) : 0,
+            'parcel_weight_kg' => $carriesParcelWeight ? ($data['parcel_weight_kg'] ?? null) : null,
             'required_vehicle_type' => $data['required_vehicle_type'] ?? null,
             'client_notes' => $data['client_notes'] ?? null,
             'quoted_amount' => 0,

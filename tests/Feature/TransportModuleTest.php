@@ -208,7 +208,10 @@ class TransportModuleTest extends TestCase
                 'pickup_latitude' => '-33.9249',
                 'pickup_longitude' => '18.4241',
                 'dropoff_address' => '22 Market Road',
+                'dropoff_latitude' => '-33.9180',
+                'dropoff_longitude' => '18.4233',
                 'distance_km' => '4',
+                'passenger_count' => '4',
                 'parcel_weight_kg' => '2',
                 'required_vehicle_type' => 'bicycle',
                 'client_notes' => 'Small parcel.',
@@ -221,6 +224,10 @@ class TransportModuleTest extends TestCase
         $this->assertSame(34.0, (float) $transportRequest->quoted_amount);
         $this->assertSame(-33.9249, (float) $transportRequest->pickup_latitude);
         $this->assertSame(18.4241, (float) $transportRequest->pickup_longitude);
+        $this->assertSame(-33.9180, (float) $transportRequest->dropoff_latitude);
+        $this->assertSame(18.4233, (float) $transportRequest->dropoff_longitude);
+        $this->assertSame(0, $transportRequest->passenger_count);
+        $this->assertSame(2.0, (float) $transportRequest->parcel_weight_kg);
         $this->assertSame(3.4, (float) $offer->platform_fee);
         $this->assertSame($session->id, $offer->transport_duty_session_id);
 
@@ -262,8 +269,13 @@ class TransportModuleTest extends TestCase
             ->assertOk()
             ->assertSee('No drivers are online right now')
             ->assertSee('My Location')
+            ->assertSee('data-address-autocomplete', false)
+            ->assertSee('data-service-field="ride"', false)
+            ->assertSee('data-service-field="parcel heavy_goods"', false)
             ->assertSee('name="pickup_latitude"', false)
-            ->assertSee('name="pickup_longitude"', false);
+            ->assertSee('name="pickup_longitude"', false)
+            ->assertSee('name="dropoff_latitude"', false)
+            ->assertSee('name="dropoff_longitude"', false);
 
         $this->actingAs($client)
             ->post(route('transport.requests.store'), [
@@ -275,6 +287,7 @@ class TransportModuleTest extends TestCase
                 'dropoff_address' => '2 Station Street',
                 'distance_km' => '8',
                 'passenger_count' => '2',
+                'parcel_weight_kg' => '15',
                 'required_vehicle_type' => 'car',
             ])
             ->assertRedirect();
@@ -284,6 +297,8 @@ class TransportModuleTest extends TestCase
             'service_type' => 'ride',
             'status' => TransportRequest::STATUS_SCHEDULED,
             'request_timing' => 'scheduled',
+            'passenger_count' => 2,
+            'parcel_weight_kg' => null,
             'accepted_transport_driver_id' => null,
         ]);
 
