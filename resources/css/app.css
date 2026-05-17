@@ -944,12 +944,12 @@
         width: 38px;
         height: 38px;
         border-radius: 999px;
-        background: rgb(var(--brand-strong-rgb));
+        background: #005baa;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 14px 34px rgb(var(--brand-rgb) / 0.20);
-        border: 1px solid rgb(var(--border-rgb) / 0.75);
+        box-shadow: 0 14px 34px rgb(0 91 170 / 0.24);
+        border: 1px solid rgb(0 74 139 / 0.35);
         color: #ffffff;
     }
 
@@ -962,12 +962,16 @@
     .da-tag {
         padding: 0.25rem 0.65rem;
         border-radius: 999px;
-        background: rgb(var(--brand-rgb) / 0.08);
-        border: 1px solid rgb(var(--brand-rgb) / 0.14);
+        background: rgb(0 91 170 / 0.08);
+        border: 1px solid rgb(0 91 170 / 0.16);
         font-weight: 850;
         font-size: 0.85rem;
-        color: rgb(var(--text-rgb) / 0.92);
+        color: #005baa;
         white-space: nowrap;
+    }
+
+    html[data-theme="dark"] .da-tag {
+        color: #8cc7ff;
     }
 
     .h2-tight {
