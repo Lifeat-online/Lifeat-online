@@ -16,13 +16,20 @@ use Illuminate\Support\Collection;
 
 class PlatformTranslationBatchService
 {
-    public function __construct(private readonly OpenRouterTranslationService $translator)
+    public function __construct(
+        private readonly OpenRouterTranslationService $translator,
+        private readonly PlatformInterfaceTranslationService $interfaceTranslations
+    )
     {
     }
 
     public function sections(): array
     {
         return [
+            'platform' => [
+                'label' => 'Platform Interface',
+                'type' => 'interface',
+            ],
             'articles' => [
                 'label' => 'Articles',
                 'model' => Article::class,
@@ -83,8 +90,8 @@ class PlatformTranslationBatchService
             ->map(fn (array $section, string $key): array => [
                 'key' => $key,
                 'label' => $section['label'],
-                'total' => $this->queryFor($key)->count(),
-                'missing' => $this->missingModelsForSection($key)->count(),
+                'total' => ($section['type'] ?? null) === 'interface' ? $this->interfaceTranslations->status()['total'] : $this->queryFor($key)->count(),
+                'missing' => ($section['type'] ?? null) === 'interface' ? $this->interfaceTranslations->status()['missing'] : $this->missingModelsForSection($key)->count(),
             ])
             ->values()
             ->all();
@@ -106,6 +113,16 @@ class PlatformTranslationBatchService
 
         foreach ($requested as $sectionKey) {
             if (! array_key_exists($sectionKey, $this->sections())) {
+                continue;
+            }
+
+            if (($this->sections()[$sectionKey]['type'] ?? null) === 'interface') {
+                $sectionSummary = $this->interfaceTranslations->translate($limit, $force);
+                $summary['processed'] += $sectionSummary['processed'];
+                $summary['translated'] += $sectionSummary['translated'];
+                $summary['skipped'] += $sectionSummary['skipped'];
+                $summary['failed'] += $sectionSummary['failed'];
+                $summary['sections'][] = $sectionSummary;
                 continue;
             }
 

@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureTransportDriverOnDuty;
 use App\Http\Middleware\EnsureUserHasRole;
 use App\Http\Middleware\SetLocale;
+use App\Http\Middleware\TranslateInterface;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -33,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
         $middleware->web(append: [
             SetLocale::class,
+            TranslateInterface::class,
         ]);
         $middleware->alias([
             'role' => EnsureUserHasRole::class,

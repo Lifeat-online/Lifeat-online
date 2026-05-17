@@ -25,6 +25,10 @@ return [
     'openrouter' => [
         'key' => env('OPENROUTER_API_KEY'),
         'model' => env('OPENROUTER_TRANSLATION_MODEL', 'google/gemma-4-31b-it:free'),
+        'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
+        'timeout' => env('OPENROUTER_TIMEOUT', 90),
+        'max_tokens' => env('OPENROUTER_TRANSLATION_MAX_TOKENS', 4096),
+        'structured_outputs' => env('OPENROUTER_STRUCTURED_OUTPUTS', true),
     ],
 
     'ses' => [

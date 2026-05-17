@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Setting;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -76,25 +77,11 @@ class OpenRouterTranslationService
         }
 
         try {
-            $response = Http::withToken($apiKey)
-                ->acceptJson()
-                ->asJson()
-                ->timeout(60)
-                ->post('https://openrouter.ai/api/v1/chat/completions', [
-                    'model' => $this->model(),
-                    'messages' => [
-                        [
-                            'role' => 'system',
-                            'content' => $this->systemPrompt($targetLocale),
-                        ],
-                        [
-                            'role' => 'user',
-                            'content' => json_encode($content, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                        ],
-                    ],
-                    'temperature' => 0.1,
-                    'response_format' => ['type' => 'json_object'],
-                ]);
+            $response = $this->sendTranslationRequest($apiKey, $content, $targetLocale, true);
+
+            if ($this->shouldFallbackToJsonMode($response)) {
+                $response = $this->sendTranslationRequest($apiKey, $content, $targetLocale, false);
+            }
 
             if (! $response->successful()) {
                 Log::warning('OpenRouter translation failed.', [
@@ -111,7 +98,7 @@ class OpenRouterTranslationService
                 return null;
             }
 
-            $decoded = json_decode($message, true, 512, JSON_THROW_ON_ERROR);
+            $decoded = json_decode($this->normalizeJsonResponse($message), true, 512, JSON_THROW_ON_ERROR);
 
             if (! is_array($decoded)) {
                 return null;
@@ -168,10 +155,114 @@ class OpenRouterTranslationService
         return (string) (config('services.openrouter.key') ?: Setting::getValue('translation.openrouter_api_key', ''));
     }
 
+    private function sendTranslationRequest(string $apiKey, array $content, string $targetLocale, bool $structured): Response
+    {
+        return Http::withToken($apiKey)
+            ->withHeaders($this->headers())
+            ->acceptJson()
+            ->asJson()
+            ->timeout((int) config('services.openrouter.timeout', 90))
+            ->post($this->endpoint(), $this->payload($content, $targetLocale, $structured));
+    }
+
+    private function endpoint(): string
+    {
+        return rtrim((string) config('services.openrouter.base_url', 'https://openrouter.ai/api/v1'), '/').'/chat/completions';
+    }
+
+    private function headers(): array
+    {
+        return [
+            'HTTP-Referer' => (string) config('app.url'),
+            'X-OpenRouter-Title' => (string) config('app.name', 'Life Platform'),
+        ];
+    }
+
+    private function payload(array $content, string $targetLocale, bool $structured): array
+    {
+        $payload = [
+            'model' => $this->model(),
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => $this->systemPrompt($targetLocale),
+                ],
+                [
+                    'role' => 'user',
+                    'content' => json_encode([
+                        'target_locale' => $targetLocale,
+                        'source' => $content,
+                    ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ],
+            ],
+            'temperature' => 0.1,
+            'max_completion_tokens' => (int) config('services.openrouter.max_tokens', 4096),
+        ];
+
+        if ($structured && filter_var(config('services.openrouter.structured_outputs', true), FILTER_VALIDATE_BOOL)) {
+            $payload['structured_outputs'] = true;
+            $payload['response_format'] = [
+                'type' => 'json_schema',
+                'json_schema' => [
+                    'name' => 'platform_translation',
+                    'strict' => true,
+                    'schema' => $this->jsonSchemaFor($content),
+                ],
+            ];
+
+            return $payload;
+        }
+
+        $payload['response_format'] = ['type' => 'json_object'];
+
+        return $payload;
+    }
+
+    private function jsonSchemaFor(array $content): array
+    {
+        $properties = collect($content)
+            ->mapWithKeys(fn ($value, string $key): array => [
+                $key => [
+                    'type' => 'string',
+                    'description' => "Translated value for {$key}",
+                ],
+            ])
+            ->all();
+
+        return [
+            'type' => 'object',
+            'properties' => $properties,
+            'required' => array_keys($content),
+            'additionalProperties' => false,
+        ];
+    }
+
+    private function shouldFallbackToJsonMode(Response $response): bool
+    {
+        if ($response->successful() || ! in_array($response->status(), [400, 422], true)) {
+            return false;
+        }
+
+        return str_contains($response->body(), 'response_format')
+            || str_contains($response->body(), 'structured')
+            || str_contains($response->body(), 'schema');
+    }
+
+    private function normalizeJsonResponse(string $message): string
+    {
+        $message = trim($message);
+
+        if (preg_match('/```(?:json)?\s*(.*?)\s*```/is', $message, $matches)) {
+            return trim($matches[1]);
+        }
+
+        return $message;
+    }
+
     private function systemPrompt(string $targetLocale): string
     {
         $language = config("localization.supported.{$targetLocale}.name", $targetLocale);
 
-        return "Translate the provided JSON values into {$language}. Keep keys exactly the same. Preserve names, places, URLs, email addresses, phone numbers, HTML tags, markdown, and paragraph breaks. Return only one valid JSON object.";
+        return "You are the Life Platform translation engine. Translate only the values in the provided source object into {$language}. Keep keys exactly the same. Preserve names, places, URLs, email addresses, phone numbers, HTML tags, markdown, placeholders, currency values, and paragraph breaks. Return only one valid JSON object whose top-level keys exactly match the source keys.";
     }
 }

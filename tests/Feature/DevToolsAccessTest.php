@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\Setting;
 use App\Models\Article;
+use App\Models\InterfaceTranslation;
 use App\Models\User;
 use App\Services\OpenRouterTranslationService;
 use App\Services\VapidKeySetupService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -200,5 +202,92 @@ class DevToolsAccessTest extends TestCase
             ->assertOk()
             ->assertJsonPath('processed', 1)
             ->assertJsonPath('translated', 1);
+    }
+
+    public function test_openrouter_translation_uses_structured_outputs_and_app_headers(): void
+    {
+        config([
+            'app.name' => 'Life Platform',
+            'app.url' => 'https://lifeat.test',
+            'services.openrouter.key' => 'sk-or-test',
+        ]);
+
+        Http::fake(function ($request) {
+            $payload = $request->data();
+
+            $this->assertSame('https://openrouter.ai/api/v1/chat/completions', (string) $request->url());
+            $this->assertTrue($request->hasHeader('Authorization', 'Bearer sk-or-test'));
+            $this->assertTrue($request->hasHeader('HTTP-Referer', 'https://lifeat.test'));
+            $this->assertTrue($request->hasHeader('X-OpenRouter-Title', 'Life Platform'));
+            $this->assertSame('json_schema', $payload['response_format']['type']);
+            $this->assertSame('platform_translation', $payload['response_format']['json_schema']['name']);
+            $this->assertTrue($payload['structured_outputs']);
+            $this->assertSame(['title'], $payload['response_format']['json_schema']['schema']['required']);
+
+            return Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode(['title' => 'Gemeenskapsnuus']),
+                        ],
+                    ],
+                ],
+            ]);
+        });
+
+        $translated = app(OpenRouterTranslationService::class)->translateContent([
+            'title' => 'Community News',
+        ], 'af');
+
+        $this->assertSame(['title' => 'Gemeenskapsnuus'], $translated);
+    }
+
+    public function test_openrouter_translation_falls_back_to_json_mode_when_schema_is_rejected(): void
+    {
+        config([
+            'services.openrouter.key' => 'sk-or-test',
+        ]);
+
+        Http::fakeSequence()
+            ->push(['error' => ['message' => 'response_format json_schema is not supported']], 400)
+            ->push([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => '```json'.PHP_EOL.json_encode(['title' => 'Gemeenskapsnuus']).PHP_EOL.'```',
+                        ],
+                    ],
+                ],
+            ]);
+
+        $translated = app(OpenRouterTranslationService::class)->translateContent([
+            'title' => 'Community News',
+        ], 'af');
+
+        $this->assertSame(['title' => 'Gemeenskapsnuus'], $translated);
+
+        $requests = Http::recorded();
+        $this->assertSame('json_schema', $requests[0][0]->data()['response_format']['type']);
+        $this->assertSame('json_object', $requests[1][0]->data()['response_format']['type']);
+    }
+
+    public function test_interface_translations_are_applied_to_rendered_platform_html(): void
+    {
+        InterfaceTranslation::create([
+            'locale' => 'af',
+            'source_hash' => hash('sha256', 'Login'),
+            'source_text' => 'Login',
+            'translated_text' => 'Teken in',
+            'provider' => 'test',
+            'model' => 'test',
+            'translated_at' => now(),
+        ]);
+
+        $response = $this
+            ->withSession(['locale' => 'af'])
+            ->get(route('home'));
+
+        $response->assertOk();
+        $response->assertSee('Teken in');
     }
 }
