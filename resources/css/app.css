@@ -575,6 +575,7 @@
     .card {
         position: relative;
         overflow: hidden;
+        text-align: center;
         background:
             linear-gradient(180deg, rgb(255 255 255 / 0.50), transparent 22%),
             rgb(var(--surface-rgb) / 0.97);
@@ -587,6 +588,63 @@
     .card > * {
         position: relative;
         z-index: 1;
+    }
+
+    .card img,
+    .card picture,
+    .card svg {
+        margin-inline: auto;
+    }
+
+    .card .button,
+    .card .button-link,
+    .choice-card .button,
+    .choice-card .button-link,
+    .app-card .button,
+    .app-card .button-link {
+        margin-inline: auto;
+    }
+
+    .lp :where(
+        [class~="cardx"],
+        [class$="-card"],
+        [class*="-card "],
+        [class$="-panel"],
+        [class*="-panel "],
+        [class$="-tile"],
+        [class*="-tile "],
+        [class$="-mini"],
+        [class*="-mini "]
+    ) {
+        text-align: center;
+    }
+
+    .lp :where(
+        [class~="cardx"],
+        [class$="-card"],
+        [class*="-card "],
+        [class$="-panel"],
+        [class*="-panel "],
+        [class$="-tile"],
+        [class*="-tile "],
+        [class$="-mini"],
+        [class*="-mini "]
+    ) :where(img, picture, svg) {
+        margin-inline: auto;
+    }
+
+    .lp :where(
+        [class~="cardx"],
+        [class$="-card"],
+        [class*="-card "],
+        [class$="-panel"],
+        [class*="-panel "],
+        [class$="-tile"],
+        [class*="-tile "],
+        [class$="-mini"],
+        [class*="-mini "]
+    ) :where(.button, .button-link, button, a[class*="button"]) {
+        margin-inline: auto;
     }
 
     .card::after {
@@ -1185,6 +1243,8 @@
         gap: 0.25rem;
         min-height: 7rem;
         align-content: center;
+        justify-items: center;
+        text-align: center;
         border: 1px solid rgb(var(--border-rgb) / 0.9);
         border-radius: 8px;
         background: rgb(var(--surface-rgb) / 0.86);
@@ -1213,6 +1273,8 @@
         display: grid;
         gap: 1rem;
         align-content: start;
+        justify-items: center;
+        text-align: center;
         border: 1px solid rgb(var(--border-rgb) / 0.92);
         border-radius: 8px;
         background: rgb(var(--surface-rgb) / 0.98);
@@ -1308,6 +1370,19 @@
         background: rgb(var(--surface-rgb) / 0.98);
         padding: 1.5rem;
         box-shadow: var(--shadow-soft);
+        text-align: center;
+    }
+
+    .app-card img,
+    .app-card picture,
+    .app-card svg,
+    .app-stat img,
+    .app-stat picture,
+    .app-stat svg,
+    .choice-card img,
+    .choice-card picture,
+    .choice-card svg {
+        margin-inline: auto;
     }
 
     .app-stat-grid {
@@ -1322,6 +1397,7 @@
         background: rgb(var(--surface-rgb) / 0.98);
         padding: 1.25rem;
         box-shadow: var(--shadow-soft);
+        text-align: center;
     }
 
     .app-form-grid {
@@ -1362,6 +1438,63 @@
     .backend-shell .overflow-hidden.rounded-lg,
     .backend-shell .rounded-md.bg-white {
         border-radius: 10px !important;
+    }
+
+    .backend-shell .rounded-lg.bg-white,
+    .backend-shell .rounded-xl.border,
+    .backend-shell .rounded-md.bg-white,
+    .backend-shell .app-card,
+    .backend-shell .app-stat {
+        text-align: center;
+    }
+
+    .backend-shell .rounded-lg.bg-white img,
+    .backend-shell .rounded-lg.bg-white picture,
+    .backend-shell .rounded-lg.bg-white svg,
+    .backend-shell .rounded-xl.border img,
+    .backend-shell .rounded-xl.border picture,
+    .backend-shell .rounded-xl.border svg,
+    .backend-shell .rounded-md.bg-white img,
+    .backend-shell .rounded-md.bg-white picture,
+    .backend-shell .rounded-md.bg-white svg {
+        margin-inline: auto;
+    }
+
+    .backend-shell .rounded-lg.bg-white a[class*="bg-"],
+    .backend-shell .rounded-lg.bg-white button[class*="bg-"],
+    .backend-shell .rounded-xl.border a[class*="bg-"],
+    .backend-shell .rounded-xl.border button[class*="bg-"],
+    .backend-shell .rounded-md.bg-white a[class*="bg-"],
+    .backend-shell .rounded-md.bg-white button[class*="bg-"] {
+        margin-inline: auto;
+    }
+
+    .backend-shell :where(
+        [class~="cardx"],
+        [class$="-card"],
+        [class*="-card "],
+        [class$="-panel"],
+        [class*="-panel "],
+        [class$="-tile"],
+        [class*="-tile "],
+        [class$="-mini"],
+        [class*="-mini "]
+    ) {
+        text-align: center;
+    }
+
+    .backend-shell :where(
+        [class~="cardx"],
+        [class$="-card"],
+        [class*="-card "],
+        [class$="-panel"],
+        [class*="-panel "],
+        [class$="-tile"],
+        [class*="-tile "],
+        [class$="-mini"],
+        [class*="-mini "]
+    ) :where(img, picture, svg, a[class*="bg-"], button[class*="bg-"]) {
+        margin-inline: auto;
     }
 
     .backend-shell .border,
