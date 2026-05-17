@@ -5,18 +5,39 @@
 @push('styles')
     <style>
         .directory-hero {
+            position: relative;
             display: grid;
             gap: 1.5rem;
             grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.8fr);
-            margin-bottom: 2rem;
+            margin: 1rem 0 2.25rem;
+            padding: clamp(1.1rem, 2vw, 1.6rem);
+            border: 2px solid rgb(var(--border-rgb) / 0.92);
+            border-radius: 18px;
+            background:
+                linear-gradient(135deg, rgb(var(--surface-rgb) / 0.92), rgb(var(--elevated-rgb) / 0.90)),
+                linear-gradient(90deg, rgb(var(--brand-rgb) / 0.08), rgb(var(--accent-rgb) / 0.08));
+            box-shadow: 0 1px 0 rgb(255 255 255 / 0.78) inset, 0 24px 58px rgb(77 47 24 / 0.14);
+        }
+        .directory-hero::before {
+            content: "";
+            position: absolute;
+            inset: 0.5rem;
+            border: 1px solid rgb(var(--border-rgb) / 0.48);
+            border-radius: 13px;
+            pointer-events: none;
+        }
+        .directory-hero > * {
+            position: relative;
+            z-index: 1;
         }
         .directory-panel {
             padding: 1.8rem;
-            border-radius: 24px;
+            border-radius: 14px;
             background:
-                radial-gradient(circle at top right, rgba(147, 197, 253, 0.22), transparent 30%),
-                linear-gradient(135deg, rgba(29, 78, 216, 0.10), rgba(255, 255, 255, 0.9));
-            border: 1px solid var(--border);
+                radial-gradient(circle at top right, rgb(var(--accent-rgb) / 0.16), transparent 34%),
+                linear-gradient(135deg, rgb(var(--brand-rgb) / 0.12), rgb(var(--surface-rgb) / 0.96));
+            border: 2px solid rgb(var(--border-rgb) / 0.88);
+            box-shadow: 0 14px 36px rgb(77 47 24 / 0.10);
         }
         html[data-theme="dark"] .directory-panel {
             background:
@@ -41,8 +62,8 @@
             align-items: center;
             border-radius: 999px;
             padding: 0.45rem 0.85rem;
-            background: var(--surface);
-            border: 1px solid var(--border);
+            background: rgb(var(--surface-rgb) / 0.96);
+            border: 1px solid rgb(var(--border-rgb) / 0.92);
             color: var(--text);
             text-decoration: none;
             font-size: 0.92rem;
@@ -53,10 +74,14 @@
             grid-template-columns: repeat(2, 1fr);
         }
         .stat-card {
-            border-radius: 20px;
-            padding: 1rem;
-            border: 1px solid var(--border);
-            background: var(--surface);
+            min-height: 10.5rem;
+            border-radius: 14px;
+            padding: 1.2rem;
+            border: 2px solid rgb(var(--border-rgb) / 0.9);
+            background:
+                linear-gradient(180deg, rgb(255 255 255 / 0.48), transparent 42%),
+                rgb(var(--surface-rgb) / 0.96);
+            box-shadow: 0 14px 32px rgb(77 47 24 / 0.10);
         }
         .stat-card strong {
             display: block;
@@ -77,6 +102,10 @@
         .directory-results {
             display: grid;
             gap: 1rem;
+            padding: 1rem;
+            border: 1px solid rgb(var(--border-rgb) / 0.74);
+            border-radius: 14px;
+            background: rgb(var(--elevated-rgb) / 0.60);
         }
         .directory-results-header {
             display: flex;
@@ -84,6 +113,10 @@
             gap: 1rem;
             align-items: center;
             flex-wrap: wrap;
+            padding: 1rem;
+            border: 1px solid rgb(var(--border-rgb) / 0.82);
+            border-radius: 12px;
+            background: rgb(var(--surface-rgb) / 0.94);
         }
         .listing-grid {
             display: grid;
@@ -153,8 +186,8 @@
             gap: 1rem;
             padding: 0.8rem 0.9rem;
             border-radius: 16px;
-            border: 1px solid var(--border);
-            background: var(--surface);
+            border: 1px solid rgb(var(--border-rgb) / 0.92);
+            background: rgb(var(--surface-rgb) / 0.96);
             color: var(--text);
             text-decoration: none;
         }
@@ -164,8 +197,8 @@
             place-items: center;
             text-align: center;
             border-radius: 18px;
-            border: 1px dashed var(--border);
-            background: rgba(29, 78, 216, 0.04);
+            border: 2px dashed rgb(var(--border-rgb) / 0.88);
+            background: rgb(var(--brand-rgb) / 0.06);
             color: var(--muted);
         }
         @media (max-width: 980px) {
