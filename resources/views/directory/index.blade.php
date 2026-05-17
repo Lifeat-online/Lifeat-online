@@ -31,6 +31,10 @@
             z-index: 1;
         }
         .directory-panel {
+            display: grid;
+            gap: 1.15rem;
+            grid-template-columns: minmax(0, 1fr) minmax(190px, 0.34fr);
+            align-items: center;
             padding: 1.8rem;
             border-radius: 14px;
             background:
@@ -38,6 +42,15 @@
                 linear-gradient(135deg, rgb(var(--brand-rgb) / 0.12), rgb(var(--surface-rgb) / 0.96));
             border: 2px solid rgb(var(--border-rgb) / 0.88);
             box-shadow: 0 14px 36px rgb(77 47 24 / 0.10);
+        }
+        .directory-panel-copy {
+            min-width: 0;
+        }
+        .directory-visual {
+            display: block;
+            width: min(100%, 250px);
+            justify-self: center;
+            filter: drop-shadow(0 18px 24px rgb(77 47 24 / 0.18));
         }
         html[data-theme="dark"] .directory-panel {
             background:
@@ -82,6 +95,11 @@
                 linear-gradient(180deg, rgb(255 255 255 / 0.48), transparent 42%),
                 rgb(var(--surface-rgb) / 0.96);
             box-shadow: 0 14px 32px rgb(77 47 24 / 0.10);
+        }
+        .stat-card span {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
         }
         .stat-card strong {
             display: block;
@@ -203,8 +221,12 @@
         }
         @media (max-width: 980px) {
             .directory-hero,
-            .directory-layout {
+            .directory-layout,
+            .directory-panel {
                 grid-template-columns: 1fr;
+            }
+            .directory-visual {
+                width: min(82vw, 260px);
             }
             .directory-search-form {
                 grid-template-columns: 1fr;
@@ -224,43 +246,44 @@
 @section('content')
     <section class="directory-hero">
         <div class="directory-panel">
-            <span class="eyebrow">Business directory</span>
-            <h1 style="font-size:clamp(2rem, 3.5vw, 3rem); line-height:1.08; margin:0.5rem 0 0.9rem;">Discover trusted Eastern Freestate businesses, ranked for visibility and built to convert local attention.</h1>
-            <p class="section-subtitle" style="max-width:48rem;">
-                Browse local businesses, filter by category or location, and discover the services you need across the Eastern Freestate. Featured listings appear first.
-            </p>
+            <div class="directory-panel-copy">
+                <span class="eyebrow">Business directory</span>
+                <h1 style="font-size:clamp(2rem, 3.5vw, 3rem); line-height:1.08; margin:0.5rem 0 0.9rem;">Discover trusted Eastern Freestate businesses, ranked for visibility and built to convert local attention.</h1>
+                <p class="section-subtitle" style="max-width:48rem;">
+                    Browse local businesses, filter by category or location, and discover the services you need across the Eastern Freestate. Featured listings appear first.
+                </p>
 
-            <form method="get" action="{{ route('directory.index') }}" class="directory-search-form">
-                <div>
-                    <label for="q">Search businesses</label>
-                    <input id="q" name="q" value="{{ $filters['q'] }}" placeholder="Business name, service, or keyword">
-                </div>
-                <div>
-                    <label for="location">Location</label>
-                    <input id="location" name="location" value="{{ $filters['location'] }}" placeholder="Bethlehem, Clarens, Fouriesburg...">
-                </div>
-                <div>
-                    <label for="category">Category</label>
-                    <select id="category" name="category">
-                        <option value="">All categories</option>
-                        @foreach ($categories as $category)
-                            <option value="{{ $category->slug }}" @selected($filters['category'] === $category->slug)>{{ $category->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <button class="button" type="submit">Search Directory</button>
-                    <button type="button" class="chip-link" id="btn-near-me" style="margin-top:0.5rem; width:100%; justify-content:center;">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:1.2rem; height:1.2rem; margin-right:0.4rem;">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
-                        </svg>
-                        Near me
-                    </button>
-                </div>
-                <input type="hidden" name="user_lat" id="user_lat" value="{{ request('user_lat') }}">
-                <input type="hidden" name="user_lng" id="user_lng" value="{{ request('user_lng') }}">
-            </form>
+                <form method="get" action="{{ route('directory.index') }}" class="directory-search-form">
+                    <div>
+                        <label for="q">Search businesses</label>
+                        <input id="q" name="q" value="{{ $filters['q'] }}" placeholder="Business name, service, or keyword">
+                    </div>
+                    <div>
+                        <label for="location">Location</label>
+                        <input id="location" name="location" value="{{ $filters['location'] }}" placeholder="Bethlehem, Clarens, Fouriesburg...">
+                    </div>
+                    <div>
+                        <label for="category">Category</label>
+                        <select id="category" name="category">
+                            <option value="">All categories</option>
+                            @foreach ($categories as $category)
+                                <option value="{{ $category->slug }}" @selected($filters['category'] === $category->slug)>{{ $category->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <button class="button" type="submit">Search Directory</button>
+                        <button type="button" class="chip-link" id="btn-near-me" style="margin-top:0.5rem; width:100%; justify-content:center;">
+                            <x-icon name="map-pin" class="w-5 h-5" />
+                            Near me
+                        </button>
+                    </div>
+                    <input type="hidden" name="user_lat" id="user_lat" value="{{ request('user_lat') }}">
+                    <input type="hidden" name="user_lng" id="user_lng" value="{{ request('user_lng') }}">
+                </form>
+            </div>
+
+            <img class="directory-visual" src="{{ asset('illustrations/directory-burst.svg') }}" alt="Colourful local business discovery illustration" width="420" height="360" loading="eager" decoding="async">
 
             @push('scripts')
             <script>
@@ -299,19 +322,19 @@
         <div class="stats-strip">
             <div class="stat-card">
                 <strong>{{ $directoryStats['visible_listings'] }}</strong>
-                <span>Visible businesses</span>
+                <span><x-icon name="building" class="w-4 h-4" /> Visible businesses</span>
             </div>
             <div class="stat-card">
                 <strong>{{ $directoryStats['featured_listings'] }}</strong>
-                <span>Featured placements</span>
+                <span><x-icon name="sparkles" class="w-4 h-4" /> Featured placements</span>
             </div>
             <div class="stat-card">
                 <strong>{{ $directoryStats['categories'] }}</strong>
-                <span>Business categories</span>
+                <span><x-icon name="tag" class="w-4 h-4" /> Business categories</span>
             </div>
             <div class="stat-card">
                 <strong>{{ $directoryStats['results'] }}</strong>
-                <span>Results for current filters</span>
+                <span><x-icon name="search" class="w-4 h-4" /> Results for current filters</span>
             </div>
         </div>
     </section>

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 360" role="img" aria-labelledby="title desc">
+  <title id="title">Directory discovery illustration</title>
+  <desc id="desc">A colourful local discovery card with map pins, shop windows, and campaign sparks.</desc>
+  <defs>
+    <linearGradient id="card" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#fff7e8"/>
+      <stop offset="1" stop-color="#ffd6a5"/>
+    </linearGradient>
+    <linearGradient id="pink" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#ff4d6d"/>
+      <stop offset="1" stop-color="#fb5607"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#4361ee"/>
+      <stop offset="1" stop-color="#2ec4b6"/>
+    </linearGradient>
+  </defs>
+  <rect x="40" y="35" width="330" height="270" rx="34" fill="url(#card)" stroke="#bd9e77" stroke-width="4"/>
+  <rect x="72" y="76" width="138" height="92" rx="22" fill="url(#pink)"/>
+  <rect x="94" y="119" width="94" height="49" fill="#fff7e8"/>
+  <path d="M82 76 h32 l8 43 H70Z" fill="#ffb703"/>
+  <path d="M114 76 h32 l8 43 H102Z" fill="#2ec4b6"/>
+  <path d="M146 76 h32 l8 43 H134Z" fill="#4361ee"/>
+  <rect x="230" y="74" width="96" height="96" rx="26" fill="url(#blue)"/>
+  <path d="M278 144 s-34 -31 -34 -57 a34 34 0 0 1 68 0 c0 26 -34 57 -34 57Z" fill="#fff7e8"/>
+  <circle cx="278" cy="91" r="13" fill="#ff4d6d"/>
+  <rect x="84" y="198" width="245" height="22" rx="11" fill="#1d3557" opacity="0.9"/>
+  <rect x="84" y="236" width="172" height="18" rx="9" fill="#1d3557" opacity="0.45"/>
+  <rect x="84" y="266" width="214" height="18" rx="9" fill="#1d3557" opacity="0.28"/>
+  <path d="M46 322 C120 278 164 342 226 300 C290 257 333 301 394 270" fill="none" stroke="#2ec4b6" stroke-width="8" stroke-linecap="round"/>
+  <path d="M35 130 l17 6 l6 17 l6 -17 l17 -6 l-17 -6 l-6 -17 l-6 17Z" fill="#ffb703"/>
+  <path d="M338 32 l14 5 l5 14 l5 -14 l14 -5 l-14 -5 l-5 -14 l-5 14Z" fill="#ff4d6d"/>
+</svg>

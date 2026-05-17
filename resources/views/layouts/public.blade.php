@@ -32,17 +32,17 @@
     <a class="lp-skip-link" href="#main">Skip to content</a>
     @php
         $navLinks = [
-            ['label' => 'Home', 'url' => route('home'), 'active' => request()->routeIs('home')],
-            ['label' => 'Directory', 'url' => route('directory.index'), 'active' => request()->routeIs('directory.*')],
-            ['label' => 'Vouchers', 'url' => route('vouchers.index'), 'active' => request()->routeIs('vouchers.*')],
-            ['label' => 'Events', 'url' => route('events.index'), 'active' => request()->routeIs('events.*')],
-            ['label' => 'Articles', 'url' => route('articles.index'), 'active' => request()->routeIs('articles.*')],
-            ['label' => 'Classifieds', 'url' => route('classifieds.index'), 'active' => request()->routeIs('classifieds.*')],
-            ['label' => 'Advertise', 'url' => route('advertise.index'), 'active' => request()->routeIs('advertise.*')],
-            ['label' => 'Taxi / Delivery', 'url' => route('transport.index'), 'active' => request()->routeIs('transport.*')],
-            ['label' => 'Search', 'url' => route('search.index'), 'active' => request()->routeIs('search.*')],
-            ['label' => 'Faults', 'url' => route('faults.index'), 'active' => request()->routeIs('faults.*')],
-            ['label' => 'About', 'url' => route('about.index'), 'active' => request()->routeIs('about.*')],
+            ['label' => 'Home', 'icon' => 'sparkles', 'url' => route('home'), 'active' => request()->routeIs('home')],
+            ['label' => 'Directory', 'icon' => 'building', 'url' => route('directory.index'), 'active' => request()->routeIs('directory.*')],
+            ['label' => 'Vouchers', 'icon' => 'ticket', 'url' => route('vouchers.index'), 'active' => request()->routeIs('vouchers.*')],
+            ['label' => 'Events', 'icon' => 'calendar', 'url' => route('events.index'), 'active' => request()->routeIs('events.*')],
+            ['label' => 'Articles', 'icon' => 'newspaper', 'url' => route('articles.index'), 'active' => request()->routeIs('articles.*')],
+            ['label' => 'Classifieds', 'icon' => 'tag', 'url' => route('classifieds.index'), 'active' => request()->routeIs('classifieds.*')],
+            ['label' => 'Advertise', 'icon' => 'megaphone', 'url' => route('advertise.index'), 'active' => request()->routeIs('advertise.*')],
+            ['label' => 'Taxi / Delivery', 'icon' => 'taxi', 'url' => route('transport.index'), 'active' => request()->routeIs('transport.*')],
+            ['label' => 'Search', 'icon' => 'search', 'url' => route('search.index'), 'active' => request()->routeIs('search.*')],
+            ['label' => 'Faults', 'icon' => 'map-pin', 'url' => route('faults.index'), 'active' => request()->routeIs('faults.*')],
+            ['label' => 'About', 'icon' => 'heart', 'url' => route('about.index'), 'active' => request()->routeIs('about.*')],
         ];
 
         $routeName = optional(request()->route())->getName();
@@ -177,6 +177,9 @@
                 >
             </a>
             <p class="page-copy">A fast, clean local front door for editorial content, trusted businesses, upcoming events, and advertising opportunities across the Eastern Freestate.</p>
+            <div class="lp-visual-strip" aria-hidden="true">
+                <img src="{{ asset('illustrations/community-mosaic.svg') }}" alt="" width="1200" height="260" loading="eager" decoding="async">
+            </div>
             <nav class="lp-nav" aria-label="Primary navigation" data-nav-root>
                 <button type="button" class="lp-nav-toggle" data-nav-toggle aria-controls="lp-nav-drawer" aria-expanded="false" aria-label="Open menu">
                     <x-icon name="menu" class="w-6 h-6" />
@@ -186,7 +189,10 @@
                     <ul class="lp-nav-list">
                         @foreach ($navLinks as $link)
                             <li class="lp-nav-item">
-                                <a href="{{ $link['url'] }}" class="lp-nav-link {{ $link['active'] ? 'active' : '' }}" data-nav-link>{{ $link['label'] }}</a>
+                                <a href="{{ $link['url'] }}" class="lp-nav-link {{ $link['active'] ? 'active' : '' }}" data-nav-link>
+                                    <span class="lp-nav-icon"><x-icon name="{{ $link['icon'] }}" class="w-4 h-4" /></span>
+                                    <span>{{ $link['label'] }}</span>
+                                </a>
                             </li>
                         @endforeach
                     </ul>
@@ -246,7 +252,13 @@
                     <ul class="lp-nav-mobile-list">
                         @foreach ($navLinks as $link)
                             <li>
-                                <a href="{{ $link['url'] }}" class="lp-nav-mobile-link {{ $link['active'] ? 'active' : '' }}" data-nav-link>{{ $link['label'] }}</a>
+                                <a href="{{ $link['url'] }}" class="lp-nav-mobile-link {{ $link['active'] ? 'active' : '' }}" data-nav-link>
+                                    <span class="lp-nav-mobile-label">
+                                        <span class="lp-nav-icon"><x-icon name="{{ $link['icon'] }}" class="w-4 h-4" /></span>
+                                        <span>{{ $link['label'] }}</span>
+                                    </span>
+                                    <x-icon name="arrow-right" class="w-4 h-4" />
+                                </a>
                             </li>
                         @endforeach
                     </ul>

@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 260" role="img" aria-labelledby="title desc">
+  <title id="title">Colourful community mosaic</title>
+  <desc id="desc">Abstract blocks, routes, stars, and storefront shapes representing a lively local platform.</desc>
+  <defs>
+    <linearGradient id="sunset" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#ff4d6d"/>
+      <stop offset="0.5" stop-color="#ffb703"/>
+      <stop offset="1" stop-color="#2ec4b6"/>
+    </linearGradient>
+    <linearGradient id="night" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#1d3557"/>
+      <stop offset="1" stop-color="#6d3bff"/>
+    </linearGradient>
+    <filter id="soft" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#4d2f18" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="260" rx="34" fill="#fff7e8"/>
+  <path d="M0 196 C145 128 218 225 350 155 C492 80 602 180 744 102 C884 25 1020 112 1200 45 L1200 260 L0 260 Z" fill="#ffe0a6"/>
+  <path d="M0 206 C162 155 250 238 384 176 C530 108 636 202 786 130 C945 54 1042 135 1200 77" fill="none" stroke="#fb5607" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+  <path d="M58 70 h116 a24 24 0 0 1 24 24 v82 H34 V94 a24 24 0 0 1 24 -24Z" fill="#ff4d6d" filter="url(#soft)"/>
+  <path d="M80 112 h96 v64 H80Z" fill="#fff7e8" opacity="0.95"/>
+  <path d="M80 70 h32 l10 42 H68Z" fill="#ffb703"/>
+  <path d="M112 70 h32 l10 42 H100Z" fill="#2ec4b6"/>
+  <path d="M144 70 h32 l10 42 H132Z" fill="#4361ee"/>
+  <rect x="252" y="58" width="132" height="132" rx="28" fill="#2ec4b6" filter="url(#soft)"/>
+  <path d="M286 142 l31 -55 l32 55Z" fill="#fff7e8"/>
+  <circle cx="316" cy="118" r="13" fill="#ff4d6d"/>
+  <rect x="448" y="40" width="178" height="156" rx="34" fill="url(#night)" filter="url(#soft)"/>
+  <path d="M496 135 c34 -56 78 -56 112 0" fill="none" stroke="#ffb703" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="536" cy="92" r="18" fill="#2ec4b6"/>
+  <path d="M704 62 h126 a28 28 0 0 1 28 28 v91 H676 V90 a28 28 0 0 1 28 -28Z" fill="#ffb703" filter="url(#soft)"/>
+  <path d="M712 106 h110 v75 H712Z" fill="#fff7e8" opacity="0.95"/>
+  <path d="M678 105 h178" stroke="#fb5607" stroke-width="10" stroke-linecap="round"/>
+  <rect x="918" y="52" width="206" height="140" rx="34" fill="#4361ee" filter="url(#soft)"/>
+  <path d="M970 139 h102" stroke="#fff7e8" stroke-width="13" stroke-linecap="round"/>
+  <path d="M970 103 h72" stroke="#2ec4b6" stroke-width="13" stroke-linecap="round"/>
+  <circle cx="1082" cy="103" r="18" fill="#ffb703"/>
+  <g fill="#1d3557" opacity="0.9">
+    <path d="M236 42 l8 17 l18 3 l-13 13 l3 18 l-16 -8 l-16 8 l3 -18 l-13 -13 l18 -3Z"/>
+    <path d="M880 34 l7 14 l16 2 l-12 11 l3 16 l-14 -7 l-14 7 l3 -16 l-12 -11 l16 -2Z"/>
+    <path d="M1128 210 l6 12 l13 2 l-10 9 l3 13 l-12 -6 l-12 6 l3 -13 l-10 -9 l13 -2Z"/>
+  </g>
+  <g fill="none" stroke="#1d3557" stroke-width="3" opacity="0.28">
+    <path d="M214 215 h120"/>
+    <path d="M410 224 h198"/>
+    <path d="M730 218 h130"/>
+    <path d="M930 224 h182"/>
+  </g>
+</svg>
