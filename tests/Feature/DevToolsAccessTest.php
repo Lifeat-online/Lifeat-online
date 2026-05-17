@@ -259,9 +259,10 @@ class DevToolsAccessTest extends TestCase
                 'section' => 'articles',
                 'limit' => 5,
             ])
-            ->assertUnprocessable()
+            ->assertOk()
             ->assertJsonPath('processed', 1)
             ->assertJsonPath('failed', 1)
+            ->assertJsonPath('ok', false)
             ->assertJsonPath('errors.0', 'OpenRouter returned 429: Rate limit exceeded.')
             ->assertJsonFragment([
                 'message' => 'Processed 1 translation targets: 0 translated, 0 current, 1 failed. First issue: OpenRouter returned 429: Rate limit exceeded.',
@@ -312,9 +313,10 @@ class DevToolsAccessTest extends TestCase
                 'section' => 'articles',
                 'limit' => 5,
             ])
-            ->assertUnprocessable()
+            ->assertOk()
             ->assertJsonPath('processed', 1)
             ->assertJsonPath('failed', 1)
+            ->assertJsonPath('ok', false)
             ->assertJsonPath('halted', true)
             ->assertJsonPath('sections.0.halted', true)
             ->assertJsonFragment([

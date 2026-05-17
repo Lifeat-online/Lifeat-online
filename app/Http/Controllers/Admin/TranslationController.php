@@ -123,7 +123,7 @@ class TranslationController extends Controller
             ...$result,
             'message' => $message,
             'status' => $batch->status(),
-        ], $result['ok'] ? 200 : 422);
+        ]);
     }
 
     private function ensureDevOwner(Request $request): void
