@@ -244,7 +244,8 @@
                             </div>
                             <div class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-gray-600">
                                 <p><strong>Model:</strong> {{ $devTranslationStatus['model'] }}</p>
-                                <p><strong>Provider:</strong> {{ $devTranslationStatus['configured'] ? 'Configured' : 'Missing OPENROUTER_API_KEY' }}</p>
+                                <p><strong>Provider:</strong> {{ $devTranslationStatus['configured'] ? 'Configured' : 'Missing key' }}</p>
+                                <p><strong>Source:</strong> <span data-openrouter-source>{{ $devTranslationStatus['source'] }}</span></p>
                             </div>
                         </div>
                         <div class="mt-5 grid gap-4 md:grid-cols-3">
@@ -261,6 +262,32 @@
                                 <p class="mt-2 text-2xl font-semibold text-gray-900">{{ $devTranslationStatus['published_articles_missing']->count() }}</p>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="rounded-lg bg-white p-6 shadow-sm" data-openrouter-key-form data-endpoint="{{ route('dev.translations.key.store') }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">OpenRouter Key</h3>
+                                <p class="mt-1 text-sm text-gray-500">Save the translation API key here when you do not want to edit server environment variables directly.</p>
+                            </div>
+                            <div class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-gray-600">
+                                <p><strong>Status:</strong> <span data-openrouter-status>{{ $devTranslationStatus['configured'] ? 'Configured' : 'Missing key' }}</span></p>
+                                <p><strong>Saved key:</strong> <span data-openrouter-masked>{{ $devTranslationStatus['masked_key'] ?: 'Not saved' }}</span></p>
+                            </div>
+                        </div>
+                        <div class="mt-5 grid gap-4 lg:grid-cols-[1fr,0.8fr,auto] lg:items-end">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">API key</label>
+                                <input class="w-full rounded-md border-gray-300" type="password" autocomplete="off" data-openrouter-key placeholder="sk-or-...">
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Model</label>
+                                <input class="w-full rounded-md border-gray-300" data-openrouter-model value="{{ $devTranslationStatus['model'] }}">
+                            </div>
+                            <button type="button" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-openrouter-submit>Save key</button>
+                        </div>
+                        <p class="mt-3 text-sm text-gray-500" data-openrouter-message>Environment variables still take priority when `OPENROUTER_API_KEY` is set.</p>
                     </div>
 
                     <div class="grid gap-6 xl:grid-cols-[1fr,1fr]">
@@ -729,6 +756,49 @@
                         }
                     } catch (error) {
                         setText(message, error instanceof Error ? error.message : 'Unable to enable VAPID keys.');
+                    } finally {
+                        button.disabled = false;
+                    }
+                });
+            }
+
+            const openRouterKeyForm = document.querySelector('[data-openrouter-key-form]');
+            if (openRouterKeyForm) {
+                const endpoint = openRouterKeyForm.getAttribute('data-endpoint');
+                const token = openRouterKeyForm.querySelector('input[name="_token"]')?.value;
+                const keyInput = openRouterKeyForm.querySelector('[data-openrouter-key]');
+                const modelInput = openRouterKeyForm.querySelector('[data-openrouter-model]');
+                const button = openRouterKeyForm.querySelector('[data-openrouter-submit]');
+                const message = openRouterKeyForm.querySelector('[data-openrouter-message]');
+                const status = openRouterKeyForm.querySelector('[data-openrouter-status]');
+                const masked = openRouterKeyForm.querySelector('[data-openrouter-masked]');
+                const source = document.querySelector('[data-openrouter-source]');
+
+                button?.addEventListener('click', async () => {
+                    button.disabled = true;
+                    if (message) message.textContent = 'Saving key...';
+                    try {
+                        const response = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': token || '',
+                            },
+                            body: JSON.stringify({
+                                api_key: keyInput?.value || '',
+                                model: modelInput?.value || '',
+                            }),
+                        });
+                        const payload = await response.json().catch(() => ({}));
+                        if (message) message.textContent = payload.message || `Request finished with status ${response.status}.`;
+                        if (status) status.textContent = payload.configured ? 'Configured' : 'Missing key';
+                        if (masked) masked.textContent = payload.masked_key || 'Not saved';
+                        if (source) source.textContent = payload.source || 'Settings';
+                        if (keyInput && response.ok) keyInput.value = '';
+                        if (modelInput && payload.model) modelInput.value = payload.model;
+                    } catch (error) {
+                        if (message) message.textContent = error instanceof Error ? error.message : 'Unable to save key.';
                     } finally {
                         button.disabled = false;
                     }

@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Setting;
 use App\Models\User;
+use App\Services\OpenRouterTranslationService;
 use App\Services\VapidKeySetupService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
@@ -120,6 +122,47 @@ class DevToolsAccessTest extends TestCase
 
         $this->actingAs($admin)
             ->postJson(route('dev.webpush.vapid.enable'))
+            ->assertForbidden();
+    }
+
+    public function test_dev_owner_can_save_openrouter_translation_key(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson(route('dev.translations.key.store'), [
+                'api_key' => 'sk-or-test-translation-key',
+                'model' => 'google/gemma-4-31b-it:free',
+            ])
+            ->assertOk()
+            ->assertJsonPath('configured', true)
+            ->assertJsonPath('source', 'Settings')
+            ->assertJsonPath('model', 'google/gemma-4-31b-it:free');
+
+        $this->assertDatabaseHas('settings', [
+            'key' => 'translation.openrouter_api_key',
+            'type' => 'secret',
+            'group' => 'translations',
+        ]);
+
+        $this->assertSame('sk-or-test-translation-key', Setting::getValue('translation.openrouter_api_key'));
+        $this->assertTrue(app(OpenRouterTranslationService::class)->configured());
+    }
+
+    public function test_non_owner_cannot_save_openrouter_translation_key(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'other-admin@example.com',
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson(route('dev.translations.key.store'), [
+                'api_key' => 'sk-or-test-translation-key',
+            ])
             ->assertForbidden();
     }
 }

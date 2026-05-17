@@ -19,6 +19,7 @@ use App\Models\Role;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Models\WriterApplication;
+use App\Services\OpenRouterTranslationService;
 use App\Services\VapidKeySetupService;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -28,7 +29,7 @@ use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
-    public function __invoke(VapidKeySetupService $vapidKeys): View
+    public function __invoke(VapidKeySetupService $vapidKeys, OpenRouterTranslationService $translations): View
     {
         $user = Auth::user();
         $supportThreshold = Carbon::now()->addDays(7);
@@ -94,11 +95,11 @@ class DashboardController extends Controller
             'latestEvents' => Event::latest()->limit(5)->get(),
             'latestArticles' => Article::latest()->limit(5)->get(),
             'latestWriterApplications' => WriterApplication::latest('submitted_at')->limit(5)->get(),
-            ...($canAccessDevDashboard ? $this->buildDevDashboardData($vapidKeys) : $this->emptyDevDashboardData()),
+            ...($canAccessDevDashboard ? $this->buildDevDashboardData($vapidKeys, $translations) : $this->emptyDevDashboardData()),
         ]);
     }
 
-    private function buildDevDashboardData(VapidKeySetupService $vapidKeys): array
+    private function buildDevDashboardData(VapidKeySetupService $vapidKeys, OpenRouterTranslationService $translations): array
     {
         $roles = Role::query()
             ->withCount(['users', 'permissions'])
@@ -169,7 +170,7 @@ class DashboardController extends Controller
                 ],
             ],
             'devWebPushStatus' => $vapidKeys->status(),
-            'devTranslationStatus' => $this->translationStatus(),
+            'devTranslationStatus' => $this->translationStatus($translations),
             'devRoleCards' => $roles,
             'devPermissionCards' => $permissions->sortByDesc('roles_count')->take(12)->values(),
             'devPrimaryRoleBreakdown' => $primaryRoleBreakdown,
@@ -231,6 +232,8 @@ class DashboardController extends Controller
                 'published_articles_missing' => collect(),
                 'model' => (string) config('services.openrouter.model', 'google/gemma-4-31b-it:free'),
                 'configured' => false,
+                'source' => 'Missing',
+                'masked_key' => '',
             ],
             'devRoleCards' => collect(),
             'devPermissionCards' => collect(),
@@ -239,7 +242,7 @@ class DashboardController extends Controller
         ];
     }
 
-    private function translationStatus(): array
+    private function translationStatus(OpenRouterTranslationService $translations): array
     {
         $supportedLocales = collect(config('localization.supported'))->keys()->values();
 
@@ -271,8 +274,10 @@ class DashboardController extends Controller
                 ->whereIn('locale', $supportedLocales->all())
                 ->count(),
             'published_articles_missing' => $publishedArticlesMissing,
-            'model' => (string) config('services.openrouter.model', 'google/gemma-4-31b-it:free'),
-            'configured' => (string) config('services.openrouter.key') !== '',
+            'model' => $translations->model(),
+            'configured' => $translations->configured(),
+            'source' => $translations->apiKeySource(),
+            'masked_key' => $translations->maskedApiKey(),
         ];
     }
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Article;
+use App\Models\Setting;
 use App\Services\OpenRouterTranslationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,6 +12,47 @@ use Illuminate\Validation\Rule;
 
 class TranslationController extends Controller
 {
+    public function saveKey(Request $request, OpenRouterTranslationService $translator): JsonResponse
+    {
+        $this->ensureDevOwner($request);
+
+        $validated = $request->validate([
+            'api_key' => ['required', 'string', 'min:10', 'max:500'],
+            'model' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        Setting::updateOrCreate(
+            ['key' => 'translation.openrouter_api_key'],
+            [
+                'value' => trim($validated['api_key']),
+                'type' => 'secret',
+                'group' => 'translations',
+                'updated_by_user_id' => $request->user()->id,
+            ]
+        );
+
+        if (filled($validated['model'] ?? null)) {
+            Setting::updateOrCreate(
+                ['key' => 'translation.openrouter_model'],
+                [
+                    'value' => trim($validated['model']),
+                    'type' => 'string',
+                    'group' => 'translations',
+                    'updated_by_user_id' => $request->user()->id,
+                ]
+            );
+        }
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'OpenRouter key saved.',
+            'configured' => $translator->configured(),
+            'source' => $translator->apiKeySource(),
+            'masked_key' => $translator->maskedApiKey(),
+            'model' => $translator->model(),
+        ]);
+    }
+
     public function preview(Request $request, OpenRouterTranslationService $translator): JsonResponse
     {
         $this->ensureDevOwner($request);

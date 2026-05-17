@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Setting;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -60,7 +61,7 @@ class OpenRouterTranslationService
 
     public function translateContent(array $content, string $targetLocale = 'af'): ?array
     {
-        $apiKey = (string) config('services.openrouter.key');
+        $apiKey = $this->apiKey();
 
         if ($apiKey === '') {
             return null;
@@ -130,7 +131,41 @@ class OpenRouterTranslationService
 
     public function model(): string
     {
-        return (string) config('services.openrouter.model', 'google/gemma-4-31b-it:free');
+        return (string) (Setting::getValue('translation.openrouter_model') ?: config('services.openrouter.model', 'google/gemma-4-31b-it:free'));
+    }
+
+    public function configured(): bool
+    {
+        return $this->apiKey() !== '';
+    }
+
+    public function apiKeySource(): string
+    {
+        if ((string) config('services.openrouter.key') !== '') {
+            return 'Environment';
+        }
+
+        if ((string) Setting::getValue('translation.openrouter_api_key', '') !== '') {
+            return 'Settings';
+        }
+
+        return 'Missing';
+    }
+
+    public function maskedApiKey(): string
+    {
+        $apiKey = $this->apiKey();
+
+        if ($apiKey === '') {
+            return '';
+        }
+
+        return str_repeat('*', max(strlen($apiKey) - 4, 8)).substr($apiKey, -4);
+    }
+
+    private function apiKey(): string
+    {
+        return (string) (config('services.openrouter.key') ?: Setting::getValue('translation.openrouter_api_key', ''));
     }
 
     private function systemPrompt(string $targetLocale): string
