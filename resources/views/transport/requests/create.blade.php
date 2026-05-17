@@ -12,6 +12,11 @@
         .transport-form-label { display: grid; gap: 0.4rem; font-size: 0.9rem; font-weight: 700; color: var(--text); }
         .transport-form-field { width: 100%; border: 1px solid rgb(var(--border-rgb) / 1); border-radius: 12px; background: rgb(var(--surface-rgb) / 1); color: var(--text); padding: 0.78rem 0.9rem; box-shadow: none; }
         .transport-form-field:focus { outline: 2px solid rgb(var(--brand-rgb) / 0.35); border-color: rgb(var(--brand-rgb) / 0.9); }
+        .transport-location-control { display: grid; gap: 0.5rem; }
+        .transport-location-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.5rem; align-items: center; }
+        .transport-location-button { border: 1px solid rgb(var(--brand-rgb) / 0.35); border-radius: 12px; background: rgb(var(--brand-rgb) / 0.1); color: var(--text); font-weight: 800; padding: 0.78rem 0.95rem; white-space: nowrap; cursor: pointer; }
+        .transport-location-button:disabled { cursor: wait; opacity: 0.68; }
+        .transport-location-status { min-height: 1.2rem; color: var(--muted); font-size: 0.84rem; font-weight: 600; }
         .transport-alert { margin: 0.75rem 0 1.2rem; border-radius: 12px; padding: 0.85rem 1rem; font-size: 0.94rem; }
         .transport-alert.available { background: rgb(22 163 74 / 0.12); color: rgb(22 101 52); }
         .transport-alert.pending { background: rgb(245 158 11 / 0.14); color: rgb(146 64 14); }
@@ -20,6 +25,7 @@
         @media (max-width: 760px) {
             .transport-form-grid.two,
             .transport-form-grid.four { grid-template-columns: 1fr; }
+            .transport-location-row { grid-template-columns: 1fr; }
         }
     </style>
 @endpush
@@ -71,13 +77,20 @@
                 </div>
 
                 <div class="transport-form-grid two">
-                    <label class="transport-form-label">Pickup address
-                        <input name="pickup_address" value="{{ old('pickup_address') }}" required class="transport-form-field">
-                    </label>
+                    <div class="transport-form-label transport-location-control">
+                        <span>Pickup address</span>
+                        <div class="transport-location-row">
+                            <input name="pickup_address" id="pickup_address" value="{{ old('pickup_address') }}" required class="transport-form-field" autocomplete="street-address">
+                            <button type="button" class="transport-location-button" id="pickup-location-button">My Location</button>
+                        </div>
+                        <span class="transport-location-status" id="pickup-location-status" aria-live="polite"></span>
+                    </div>
                     <label class="transport-form-label">Dropoff address
                         <input name="dropoff_address" value="{{ old('dropoff_address') }}" required class="transport-form-field">
                     </label>
                 </div>
+                <input type="hidden" name="pickup_latitude" id="pickup_latitude" value="{{ old('pickup_latitude') }}">
+                <input type="hidden" name="pickup_longitude" id="pickup_longitude" value="{{ old('pickup_longitude') }}">
 
                 <div class="transport-form-grid four">
                     <label class="transport-form-label">Distance km
@@ -108,3 +121,81 @@
         </div>
     </section>
 @endsection
+
+@push('scripts')
+    <script>
+        (() => {
+            const button = document.getElementById('pickup-location-button');
+            const addressInput = document.getElementById('pickup_address');
+            const latitudeInput = document.getElementById('pickup_latitude');
+            const longitudeInput = document.getElementById('pickup_longitude');
+            const status = document.getElementById('pickup-location-status');
+
+            if (!button || !addressInput || !latitudeInput || !longitudeInput) return;
+
+            const setStatus = (message) => {
+                if (status) status.textContent = message;
+            };
+
+            const setLoading = (loading) => {
+                button.disabled = loading;
+                button.textContent = loading ? 'Finding...' : 'My Location';
+            };
+
+            const fallbackAddress = (lat, lng) => `${lat.toFixed(7)}, ${lng.toFixed(7)}`;
+
+            const reverseGeocode = async (lat, lng) => {
+                const url = new URL('https://nominatim.openstreetmap.org/reverse');
+                url.searchParams.set('format', 'jsonv2');
+                url.searchParams.set('lat', String(lat));
+                url.searchParams.set('lon', String(lng));
+                url.searchParams.set('addressdetails', '1');
+
+                const response = await fetch(url.toString(), {
+                    headers: { Accept: 'application/json' },
+                });
+
+                if (!response.ok) return null;
+
+                const data = await response.json();
+                return data?.display_name || null;
+            };
+
+            button.addEventListener('click', () => {
+                if (!navigator.geolocation) {
+                    setStatus('GPS location is not supported by this browser.');
+                    return;
+                }
+
+                setLoading(true);
+                setStatus('Requesting GPS permission...');
+
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+
+                        latitudeInput.value = String(lat);
+                        longitudeInput.value = String(lng);
+                        setStatus('GPS found. Looking up address...');
+
+                        try {
+                            addressInput.value = await reverseGeocode(lat, lng) || fallbackAddress(lat, lng);
+                            setStatus('Pickup address filled from your current location.');
+                        } catch (_) {
+                            addressInput.value = fallbackAddress(lat, lng);
+                            setStatus('GPS found. Address lookup failed, so coordinates were used.');
+                        } finally {
+                            setLoading(false);
+                        }
+                    },
+                    () => {
+                        setLoading(false);
+                        setStatus('Unable to get your location. Please allow GPS access or enter the address manually.');
+                    },
+                    { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+                );
+            });
+        })();
+    </script>
+@endpush

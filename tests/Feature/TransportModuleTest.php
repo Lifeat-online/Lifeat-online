@@ -205,6 +205,8 @@ class TransportModuleTest extends TestCase
                 'payment_method' => 'cash',
                 'request_timing' => 'immediate',
                 'pickup_address' => '10 Church Street',
+                'pickup_latitude' => '-33.9249',
+                'pickup_longitude' => '18.4241',
                 'dropoff_address' => '22 Market Road',
                 'distance_km' => '4',
                 'parcel_weight_kg' => '2',
@@ -217,6 +219,8 @@ class TransportModuleTest extends TestCase
         $offer = TransportRequestOffer::firstOrFail();
 
         $this->assertSame(34.0, (float) $transportRequest->quoted_amount);
+        $this->assertSame(-33.9249, (float) $transportRequest->pickup_latitude);
+        $this->assertSame(18.4241, (float) $transportRequest->pickup_longitude);
         $this->assertSame(3.4, (float) $offer->platform_fee);
         $this->assertSame($session->id, $offer->transport_duty_session_id);
 
@@ -256,7 +260,10 @@ class TransportModuleTest extends TestCase
         $this->actingAs($client)
             ->get(route('transport.requests.create'))
             ->assertOk()
-            ->assertSee('No drivers are online right now');
+            ->assertSee('No drivers are online right now')
+            ->assertSee('My Location')
+            ->assertSee('name="pickup_latitude"', false)
+            ->assertSee('name="pickup_longitude"', false);
 
         $this->actingAs($client)
             ->post(route('transport.requests.store'), [
