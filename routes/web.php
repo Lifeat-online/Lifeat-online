@@ -109,6 +109,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 Route::middleware(['auth', 'role:admin'])->prefix('dev')->name('dev.')->group(function () {
     Route::post('/tests/run', [AdminDevUpdateController::class, 'runTests'])->middleware('throttle:2,1')->name('tests.run');
+    Route::post('/webpush/vapid/enable', [AdminDevUpdateController::class, 'enableVapidKeys'])->middleware('throttle:3,1')->name('webpush.vapid.enable');
     Route::get('/transport', [TransportAdminSetupController::class, 'index'])->name('transport.setup');
     Route::post('/transport/managers', [TransportAdminSetupController::class, 'storeManager'])->name('transport.managers.store');
     Route::put('/transport/settings', [TransportAdminSetupController::class, 'updateSettings'])->name('transport.settings.update');

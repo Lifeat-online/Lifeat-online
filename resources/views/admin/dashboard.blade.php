@@ -36,8 +36,10 @@
     @php
         $isAdmin = $dashboardRoleFlags['isAdmin'] ?? false;
         $isSupport = $dashboardRoleFlags['isSupport'] ?? false;
+        $canAccessDevDashboard = $dashboardRoleFlags['canAccessDevDashboard'] ?? false;
         $devToolsAvailable = in_array((string) config('app.env'), ['local', 'testing'], true)
-            || filter_var((string) env('DEV_TOOLS_ENABLED', 'false'), FILTER_VALIDATE_BOOL);
+            || filter_var((string) env('DEV_TOOLS_ENABLED', 'false'), FILTER_VALIDATE_BOOL)
+            || $canAccessDevDashboard;
         $devTestRunnerAvailable = in_array((string) config('app.env'), ['local', 'testing'], true)
             || (
                 $devToolsAvailable
@@ -81,7 +83,7 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto space-y-6 sm:px-6 lg:px-8">
-            @if ($isAdmin)
+            @if ($canAccessDevDashboard)
                 <div class="rounded-lg bg-white p-3 shadow-sm" data-dashboard-tabs>
                     <div class="flex flex-wrap gap-3">
                         <button type="button" data-tab-trigger="overview" class="rounded-md px-4 py-2 text-sm font-medium transition-colors">Overview</button>
@@ -231,18 +233,78 @@
                 @endif
             </section>
 
-            @if ($isAdmin && $devToolsAvailable)
+            @if ($canAccessDevDashboard && $devToolsAvailable)
                 <section data-tab-panel="dev" class="space-y-6" hidden>
                     <div class="rounded-lg bg-slate-950 p-6 text-white shadow-sm">
                         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                             <div>
                                 <h3 class="text-lg font-semibold">Developer Control Center</h3>
-                                <p class="mt-2 max-w-3xl text-sm text-slate-300">Monitor live platform activity, inspect access controls, run the test suite, and review the runtime details needed to manage this server effectively.</p>
+                                <p class="mt-2 max-w-3xl text-sm text-slate-300">Private Dev dashboard for jameskoen78@gmail.com. Monitor live platform activity, inspect access controls, run guarded tools, and review the runtime details needed to manage this server effectively.</p>
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 @foreach ($devQuickLinks as $link)
                                     <a href="{{ $link['href'] }}" class="rounded-md border border-slate-700 px-4 py-2 text-sm text-slate-100 transition hover:border-slate-500 hover:bg-slate-900">{{ $link['label'] }}</a>
                                 @endforeach
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
+                        <div class="rounded-lg bg-white p-6 shadow-sm" data-vapid-setup data-vapid-url="{{ route('dev.webpush.vapid.enable') }}">
+                            <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-900">Push Notification Setup</h3>
+                                    <p class="mt-1 text-sm text-gray-500">Generate and save browser push VAPID keys when they are missing, so the Enable alerts button can appear for users.</p>
+                                </div>
+                                <button type="button" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60" data-vapid-enable>
+                                    Enable VAPID keys
+                                </button>
+                            </div>
+                            <div class="mt-5 grid gap-3 md:grid-cols-2">
+                                <div class="rounded-lg bg-slate-50 p-4">
+                                    <p class="text-sm text-gray-500">VAPID Status</p>
+                                    <p class="mt-2 text-lg font-semibold {{ $devWebPushStatus['configured'] ? 'text-emerald-700' : 'text-amber-700' }}" data-vapid-status>
+                                        {{ $devWebPushStatus['configured'] ? 'Configured' : 'Missing keys' }}
+                                    </p>
+                                </div>
+                                <div class="rounded-lg bg-slate-50 p-4">
+                                    <p class="text-sm text-gray-500">.env Writable</p>
+                                    <p class="mt-2 text-lg font-semibold {{ $devWebPushStatus['env_writable'] ? 'text-emerald-700' : 'text-red-700' }}" data-vapid-env>
+                                        {{ $devWebPushStatus['env_writable'] ? 'Yes' : 'No' }}
+                                    </p>
+                                </div>
+                                <div class="rounded-lg bg-slate-50 p-4">
+                                    <p class="text-sm text-gray-500">Public Key</p>
+                                    <p class="mt-2 text-lg font-semibold {{ $devWebPushStatus['public_key_configured'] ? 'text-emerald-700' : 'text-amber-700' }}" data-vapid-public>
+                                        {{ $devWebPushStatus['public_key_configured'] ? 'Set' : 'Missing' }}
+                                    </p>
+                                </div>
+                                <div class="rounded-lg bg-slate-50 p-4">
+                                    <p class="text-sm text-gray-500">Private Key</p>
+                                    <p class="mt-2 text-lg font-semibold {{ $devWebPushStatus['private_key_configured'] ? 'text-emerald-700' : 'text-amber-700' }}" data-vapid-private>
+                                        {{ $devWebPushStatus['private_key_configured'] ? 'Set' : 'Missing' }}
+                                    </p>
+                                </div>
+                            </div>
+                            <p class="mt-4 text-sm text-gray-500" data-vapid-message>Subject: {{ $devWebPushStatus['subject'] ?: 'Not set' }}</p>
+                        </div>
+
+                        <div class="rounded-lg bg-white p-6 shadow-sm">
+                            <h3 class="text-lg font-semibold text-gray-900">Dev Dashboard</h3>
+                            <div class="mt-4 grid gap-3">
+                                <a href="{{ route('admin.push-notifications.index') }}" class="rounded-lg border border-slate-200 px-4 py-3 transition hover:border-indigo-300 hover:bg-indigo-50">
+                                    <span class="block text-sm font-semibold text-gray-900">Send Push Notifications</span>
+                                    <span class="mt-1 block text-sm text-gray-500">Open the backend sender once VAPID keys are configured.</span>
+                                </a>
+                                <a href="{{ route('admin.finance.notifications.index', ['channel' => 'push']) }}" class="rounded-lg border border-slate-200 px-4 py-3 transition hover:border-indigo-300 hover:bg-indigo-50">
+                                    <span class="block text-sm font-semibold text-gray-900">Review Push Logs</span>
+                                    <span class="mt-1 block text-sm text-gray-500">Inspect delivery history and attention states.</span>
+                                </a>
+                                <a href="{{ route('admin.metrics') }}" class="rounded-lg border border-slate-200 px-4 py-3 transition hover:border-indigo-300 hover:bg-indigo-50">
+                                    <span class="block text-sm font-semibold text-gray-900">Metrics JSON</span>
+                                    <span class="mt-1 block text-sm text-gray-500">View the live metrics endpoint directly.</span>
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -431,6 +493,8 @@
                     panels.forEach((panel) => {
                         panel.hidden = panel.getAttribute('data-tab-panel') !== name;
                     });
+
+                    document.dispatchEvent(new CustomEvent('dashboard-tab:changed', { detail: { name } }));
                 };
 
                 triggers.forEach((trigger) => {
@@ -481,8 +545,13 @@
             const metricTimers = new Map();
             const metricLoading = new WeakSet();
 
+            const metricRootIsActive = (root) => {
+                const panel = root.closest('[data-tab-panel]');
+                return !panel || !panel.hidden;
+            };
+
             const refreshMetrics = async (root) => {
-                if (document.hidden || metricLoading.has(root)) return;
+                if (document.hidden || !metricRootIsActive(root) || metricLoading.has(root)) return;
                 metricLoading.add(root);
                 try {
                     await tick(root);
@@ -494,6 +563,7 @@
             const startMetricPolling = () => {
                 if (document.hidden) return;
                 roots.forEach((root) => {
+                    if (!metricRootIsActive(root)) return;
                     if (metricTimers.has(root)) return;
                     metricTimers.set(root, window.setInterval(() => refreshMetrics(root), 15000));
                 });
@@ -514,12 +584,69 @@
                 startMetricPolling();
             };
 
-            roots.forEach((root) => {
-                refreshMetrics(root);
-            });
-            startMetricPolling();
+            const handleMetricTabChange = () => {
+                stopMetricPolling();
+                roots.forEach((root) => refreshMetrics(root));
+                startMetricPolling();
+            };
+
+            handleMetricTabChange();
             document.addEventListener('visibilitychange', handleMetricVisibilityChange);
+            document.addEventListener('dashboard-tab:changed', handleMetricTabChange);
             window.addEventListener('pagehide', stopMetricPolling);
+
+            const vapidSetup = document.querySelector('[data-vapid-setup]');
+            if (vapidSetup) {
+                const endpoint = vapidSetup.getAttribute('data-vapid-url');
+                const button = vapidSetup.querySelector('[data-vapid-enable]');
+                const token = vapidSetup.querySelector('input[name="_token"]')?.value;
+                const status = vapidSetup.querySelector('[data-vapid-status]');
+                const publicKey = vapidSetup.querySelector('[data-vapid-public]');
+                const privateKey = vapidSetup.querySelector('[data-vapid-private]');
+                const env = vapidSetup.querySelector('[data-vapid-env]');
+                const message = vapidSetup.querySelector('[data-vapid-message]');
+
+                const setText = (el, value) => {
+                    if (el) el.textContent = value;
+                };
+
+                const renderVapid = (payload) => {
+                    const current = payload.status || payload;
+                    setText(status, current.configured ? 'Configured' : 'Missing keys');
+                    setText(publicKey, current.public_key_configured ? 'Set' : 'Missing');
+                    setText(privateKey, current.private_key_configured ? 'Set' : 'Missing');
+                    setText(env, current.env_writable ? 'Yes' : 'No');
+                    setText(message, payload.message || `Subject: ${current.subject || 'Not set'}`);
+                };
+
+                button?.addEventListener('click', async () => {
+                    if (!endpoint) return;
+                    button.disabled = true;
+                    setText(message, 'Generating VAPID keys...');
+
+                    try {
+                        const response = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': token || '',
+                            },
+                            body: JSON.stringify({}),
+                        });
+                        const payload = await response.json().catch(() => ({}));
+                        renderVapid(payload);
+
+                        if (!response.ok) {
+                            setText(message, payload.message || `Request failed with status ${response.status}.`);
+                        }
+                    } catch (error) {
+                        setText(message, error instanceof Error ? error.message : 'Unable to enable VAPID keys.');
+                    } finally {
+                        button.disabled = false;
+                    }
+                });
+            }
 
             const testRunners = Array.from(document.querySelectorAll('[data-test-runner]'));
             testRunners.forEach((runner) => {

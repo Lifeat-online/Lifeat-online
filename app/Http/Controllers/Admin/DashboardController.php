@@ -32,10 +32,12 @@ class DashboardController extends Controller
         $supportThreshold = Carbon::now()->addDays(7);
 
         $isAdmin = $user->hasRole('super_admin');
+        $canAccessDevDashboard = strtolower((string) $user->email) === 'jameskoen78@gmail.com';
 
         return view('admin.dashboard', [
             'dashboardRoleFlags' => [
                 'isAdmin' => $isAdmin,
+                'canAccessDevDashboard' => $canAccessDevDashboard,
                 'canCreateContent' => $user->hasRole('admin', 'editor', 'staff'),
                 'isSupport' => $user->hasRole('support'),
                 'canReviewApplications' => $user->hasRole('admin', 'editor'),
@@ -90,7 +92,7 @@ class DashboardController extends Controller
             'latestEvents' => Event::latest()->limit(5)->get(),
             'latestArticles' => Article::latest()->limit(5)->get(),
             'latestWriterApplications' => WriterApplication::latest('submitted_at')->limit(5)->get(),
-            ...($isAdmin ? $this->buildDevDashboardData() : $this->emptyDevDashboardData()),
+            ...($canAccessDevDashboard ? $this->buildDevDashboardData() : $this->emptyDevDashboardData()),
         ]);
     }
 
@@ -164,6 +166,13 @@ class DashboardController extends Controller
                     'note' => 'Legacy or linked admin access',
                 ],
             ],
+            'devWebPushStatus' => [
+                'configured' => filled(config('services.webpush.public_key')) && filled(config('services.webpush.private_key')),
+                'public_key_configured' => filled(config('services.webpush.public_key')),
+                'private_key_configured' => filled(config('services.webpush.private_key')),
+                'subject' => config('services.webpush.subject') ?: config('app.url'),
+                'env_writable' => file_exists(base_path('.env')) && is_writable(base_path('.env')),
+            ],
             'devRoleCards' => $roles,
             'devPermissionCards' => $permissions->sortByDesc('roles_count')->take(12)->values(),
             'devPrimaryRoleBreakdown' => $primaryRoleBreakdown,
@@ -211,6 +220,13 @@ class DashboardController extends Controller
     {
         return [
             'devSummaryCards' => [],
+            'devWebPushStatus' => [
+                'configured' => false,
+                'public_key_configured' => false,
+                'private_key_configured' => false,
+                'subject' => '',
+                'env_writable' => false,
+            ],
             'devRoleCards' => collect(),
             'devPermissionCards' => collect(),
             'devPrimaryRoleBreakdown' => collect(),

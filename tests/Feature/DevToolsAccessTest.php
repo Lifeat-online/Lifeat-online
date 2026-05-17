@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\VapidKeySetupService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class DevToolsAccessTest extends TestCase
@@ -20,7 +22,10 @@ class DevToolsAccessTest extends TestCase
 
     public function test_super_admin_can_use_dev_test_runner_in_testing_environment(): void
     {
-        $admin = User::factory()->create(['role' => 'super_admin']);
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
 
         $this->actingAs($admin)
             ->postJson(route('dev.tests.run'), ['suite' => 'Bogus'])
@@ -32,19 +37,25 @@ class DevToolsAccessTest extends TestCase
         config(['app.env' => 'production']);
         putenv('DEV_TOOLS_ENABLED=false');
 
-        $admin = User::factory()->create(['role' => 'super_admin']);
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
 
         $this->actingAs($admin)
             ->postJson(route('dev.tests.run'), ['suite' => 'Unit'])
             ->assertForbidden();
     }
 
-    public function test_dev_tab_is_hidden_when_dev_tools_are_disabled(): void
+    public function test_dev_tab_is_hidden_from_non_owner_even_when_dev_tools_are_enabled(): void
     {
         config(['app.env' => 'production']);
-        putenv('DEV_TOOLS_ENABLED=false');
+        putenv('DEV_TOOLS_ENABLED=true');
 
-        $admin = User::factory()->create(['role' => 'super_admin']);
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'other-admin@example.com',
+        ]);
 
         $response = $this->actingAs($admin)->get(route('admin.dashboard'));
 
@@ -59,7 +70,10 @@ class DevToolsAccessTest extends TestCase
         putenv('DEV_TOOLS_ENABLED=true');
         putenv('DEV_TEST_RUNNER_ENABLED=false');
 
-        $admin = User::factory()->create(['role' => 'super_admin']);
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
 
         $response = $this->actingAs($admin)->get(route('admin.dashboard'));
 
@@ -67,5 +81,45 @@ class DevToolsAccessTest extends TestCase
         $response->assertSee('Developer Control Center');
         $response->assertDontSee('Testing Area');
         $response->assertDontSee(route('dev.tests.run'));
+    }
+
+    public function test_dev_owner_can_enable_vapid_keys_from_dev_endpoint(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
+
+        $this->mock(VapidKeySetupService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('enable')
+                ->once()
+                ->andReturn([
+                    'configured' => true,
+                    'public_key_configured' => true,
+                    'private_key_configured' => true,
+                    'subject' => 'https://example.test',
+                    'env_writable' => true,
+                    'changed' => true,
+                    'message' => 'VAPID keys were generated and saved to .env.',
+                ]);
+        });
+
+        $this->actingAs($admin)
+            ->postJson(route('dev.webpush.vapid.enable'))
+            ->assertOk()
+            ->assertJsonPath('configured', true)
+            ->assertJsonPath('changed', true);
+    }
+
+    public function test_non_owner_cannot_enable_vapid_keys(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'other-admin@example.com',
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson(route('dev.webpush.vapid.enable'))
+            ->assertForbidden();
     }
 }

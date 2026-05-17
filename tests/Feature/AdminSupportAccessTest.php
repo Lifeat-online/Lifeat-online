@@ -185,11 +185,12 @@ class AdminSupportAccessTest extends TestCase
         $response->assertDontSee('Review Applications');
     }
 
-    public function test_admin_user_sees_dev_tab_sections_on_dashboard(): void
+    public function test_dev_owner_sees_dev_tab_sections_on_dashboard(): void
     {
         $admin = User::factory()->create([
             'role' => 'super_admin',
             'name' => 'Admin Dev User',
+            'email' => 'jameskoen78@gmail.com',
         ]);
 
         $response = $this->actingAs($admin)->get(route('admin.dashboard'));
@@ -198,10 +199,30 @@ class AdminSupportAccessTest extends TestCase
         $response->assertSee('Management Area');
         $response->assertSee('Dev');
         $response->assertSee('Developer Control Center');
+        $response->assertSee('Push Notification Setup');
+        $response->assertSee(route('dev.webpush.vapid.enable'), false);
         $response->assertSee('Live Metrics');
         $response->assertSee('Testing Area');
         $response->assertSee('Roles And Permissions');
         $response->assertSee('Server Statistics');
+    }
+
+    public function test_non_owner_admin_does_not_see_dev_tab_sections_on_dashboard(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'name' => 'Admin Regular User',
+            'email' => 'other-admin@example.com',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('admin.dashboard'));
+
+        $response->assertOk();
+        $response->assertSee('Management Area');
+        $response->assertDontSee('Dev');
+        $response->assertDontSee('Developer Control Center');
+        $response->assertDontSee('Push Notification Setup');
+        $response->assertDontSee(route('dev.webpush.vapid.enable'), false);
     }
 
     public function test_support_user_cannot_use_write_finance_actions(): void

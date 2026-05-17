@@ -4,14 +4,16 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\DevTestRunnerService;
+use App\Services\VapidKeySetupService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use RuntimeException;
 
 class DevUpdateController extends Controller
 {
     public function runTests(Request $request, DevTestRunnerService $runner): JsonResponse
     {
-        $this->ensureAdmin($request);
+        $this->ensureDevOwner($request);
         $this->ensureDevToolsAvailable();
 
         if (! $this->testRunnerEnabled()) {
@@ -31,9 +33,29 @@ class DevUpdateController extends Controller
         return response()->json($result, ($result['ok'] ?? false) ? 200 : 400);
     }
 
-    private function ensureAdmin(Request $request): void
+    public function enableVapidKeys(Request $request, VapidKeySetupService $vapidKeys): JsonResponse
     {
-        if (! $request->user()?->hasRole('super_admin')) {
+        $this->ensureDevOwner($request);
+
+        try {
+            $result = $vapidKeys->enable();
+        } catch (RuntimeException $exception) {
+            return response()->json([
+                'ok' => false,
+                'message' => $exception->getMessage(),
+                'status' => $vapidKeys->status(),
+            ], 422);
+        }
+
+        return response()->json([
+            'ok' => true,
+            ...$result,
+        ]);
+    }
+
+    private function ensureDevOwner(Request $request): void
+    {
+        if (strtolower((string) $request->user()?->email) !== 'jameskoen78@gmail.com') {
             abort(403);
         }
     }
