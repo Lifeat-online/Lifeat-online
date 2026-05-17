@@ -128,7 +128,7 @@ class DashboardController extends Controller
 
         $primaryRoleBreakdown = User::query()
             ->selectRaw('COALESCE(role, ?) as role_label, COUNT(*) as aggregate', ['unassigned'])
-            ->groupBy('role_label')
+            ->groupBy('role')
             ->orderByDesc('aggregate')
             ->get()
             ->map(fn ($row): array => [
