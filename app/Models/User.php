@@ -101,6 +101,11 @@ class User extends Authenticatable
         return $this->hasMany(Subscription::class);
     }
 
+    public function browserPushSubscriptions(): HasMany
+    {
+        return $this->hasMany(BrowserPushSubscription::class);
+    }
+
     public function councillorProfile(): HasOne
     {
         return $this->hasOne(Councillor::class);

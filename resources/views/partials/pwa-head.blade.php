@@ -5,6 +5,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#f3251e" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#111827" media="(prefers-color-scheme: dark)">
+@if (config('services.webpush.public_key'))
+<meta name="webpush-vapid-public-key" content="{{ config('services.webpush.public_key') }}">
+@endif
 <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
 <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('pwa/apple-touch-icon.png') }}">
 <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('pwa/favicon-32x32.png') }}">

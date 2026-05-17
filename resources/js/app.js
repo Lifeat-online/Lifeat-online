@@ -277,6 +277,102 @@ const initServiceWorker = () => {
     });
 };
 
+const urlBase64ToUint8Array = (base64String) => {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+};
+
+const initPushNotifications = () => {
+    const buttons = Array.from(document.querySelectorAll('[data-push-toggle]')).filter((button) => button instanceof HTMLButtonElement);
+    if (!buttons.length) return;
+
+    const key = document.querySelector('meta[name="webpush-vapid-public-key"]')?.getAttribute('content');
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    const supported = key && csrf && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    if (!supported) return;
+
+    window.axios.defaults.headers.common['X-CSRF-TOKEN'] = csrf;
+
+    const setButtonState = (label, disabled = false) => {
+        buttons.forEach((button) => {
+            button.hidden = false;
+            button.textContent = label;
+            button.disabled = disabled;
+            button.setAttribute('aria-live', 'polite');
+        });
+    };
+
+    const contentEncoding = () => {
+        if (window.PushManager.supportedContentEncodings?.includes('aes128gcm')) return 'aes128gcm';
+        return 'aesgcm';
+    };
+
+    const storeSubscription = async (subscription) => {
+        const payload = subscription.toJSON();
+        await window.axios.post('/api/push-subscriptions', {
+            endpoint: payload.endpoint,
+            keys: payload.keys,
+            content_encoding: contentEncoding(),
+        });
+    };
+
+    const deleteSubscription = async (subscription) => {
+        await window.axios.delete('/api/push-subscriptions', {
+            data: { endpoint: subscription.endpoint },
+        });
+    };
+
+    const refreshState = async () => {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (Notification.permission === 'denied') {
+            setButtonState('Alerts blocked', true);
+            return;
+        }
+        setButtonState(subscription ? 'Alerts on' : 'Enable alerts');
+    };
+
+    buttons.forEach((button) => {
+        button.addEventListener('click', async () => {
+            try {
+                setButtonState('Saving...', true);
+                const registration = await navigator.serviceWorker.ready;
+                const existing = await registration.pushManager.getSubscription();
+
+                if (existing) {
+                    await deleteSubscription(existing);
+                    await existing.unsubscribe();
+                    setButtonState('Enable alerts');
+                    return;
+                }
+
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    setButtonState(permission === 'denied' ? 'Alerts blocked' : 'Enable alerts', permission === 'denied');
+                    return;
+                }
+
+                const subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(key),
+                });
+
+                await storeSubscription(subscription);
+                setButtonState('Alerts on');
+            } catch (error) {
+                console.error('Push notification setup failed:', error);
+                setButtonState('Enable alerts');
+            }
+        });
+    });
+
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.ready.then(refreshState).catch(() => {});
+    });
+};
+
 const initSupabase = () => {
     const url = import.meta.env.VITE_SUPABASE_URL;
     const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -338,6 +434,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initSmoothScroll();
     initSectionHighlighting();
     initServiceWorker();
+    initPushNotifications();
     initSupabase();
     initTransportRealtime();
 });

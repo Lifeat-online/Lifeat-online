@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'life-pwa-v1';
+const CACHE_VERSION = 'life-pwa-v2';
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -145,4 +145,51 @@ self.addEventListener('fetch', (event) => {
       })
     );
   }
+});
+
+const defaultNotificationUrl = '/';
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let payload = {};
+  try {
+    payload = event.data.json();
+  } catch (_) {
+    payload = {
+      title: 'Life@ update',
+      body: event.data.text(),
+    };
+  }
+
+  const title = payload.title || 'Life@ update';
+  const options = {
+    body: payload.body || 'Open Life@ for the latest local update.',
+    icon: payload.icon || '/pwa/icon-192.png',
+    badge: payload.badge || '/pwa/favicon-32x32.png',
+    tag: payload.tag || 'life-update',
+    data: {
+      url: payload.url || defaultNotificationUrl,
+      ...(payload.data || {}),
+    },
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const targetUrl = new URL(event.notification.data?.url || defaultNotificationUrl, self.location.origin).href;
+
+  event.waitUntil(
+    clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        const existingClient = clientList.find((client) => client.url === targetUrl && 'focus' in client);
+        if (existingClient) return existingClient.focus();
+        if (clients.openWindow) return clients.openWindow(targetUrl);
+        return null;
+      })
+  );
 });

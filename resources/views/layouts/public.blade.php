@@ -206,6 +206,7 @@
                             <a href="{{ route('login') }}" class="button-link">Login</a>
                             <a href="{{ route('register') }}" class="button-link">Register</a>
                         @endauth
+                        <button type="button" class="button-link push-toggle" data-push-toggle hidden>Enable alerts</button>
                     </div>
                 </div>
 
@@ -257,6 +258,7 @@
                             <a href="{{ route('login') }}" class="button-link w-full">Login</a>
                             <a href="{{ route('register') }}" class="button-link w-full">Register</a>
                         @endauth
+                        <button type="button" class="button-link w-full push-toggle" data-push-toggle hidden>Enable alerts</button>
                     </div>
                 </div>
             </nav>

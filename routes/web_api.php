@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\ListingController as AdminListingController;
 use App\Http\Controllers\Admin\MarketingIntegrationController as AdminMarketingIntegrationController;
 use App\Http\Controllers\Admin\MetricsController as AdminMetricsController;
 use App\Http\Controllers\Admin\VoucherController as AdminVoucherController;
+use App\Http\Controllers\Api\BrowserPushSubscriptionController;
 use App\Http\Controllers\Api\ClientAdvertisingApiController;
 use App\Http\Controllers\Api\StaffAdvertisingApiController;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +26,11 @@ use Illuminate\Support\Facades\Route;
 | API described in the production-readiness roadmap.
 |
 */
+
+Route::prefix('api')->name('api.')->middleware('throttle:30,1')->group(function () {
+    Route::post('/push-subscriptions', [BrowserPushSubscriptionController::class, 'store'])->name('push-subscriptions.store');
+    Route::delete('/push-subscriptions', [BrowserPushSubscriptionController::class, 'destroy'])->name('push-subscriptions.destroy');
+});
 
 Route::middleware('auth')->prefix('api')->name('api.')->group(function () {
     Route::prefix('client/advertising')->name('client.advertising.')->group(function () {

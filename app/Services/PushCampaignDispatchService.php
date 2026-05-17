@@ -8,8 +8,10 @@ use RuntimeException;
 
 class PushCampaignDispatchService
 {
-    public function __construct(private readonly NotificationLogService $notificationLogService)
-    {
+    public function __construct(
+        private readonly NotificationLogService $notificationLogService,
+        private readonly WebPushDeliveryService $webPushDeliveryService,
+    ) {
     }
 
     public function dispatch(PushCampaign $campaign): NotificationLog
@@ -19,6 +21,7 @@ class PushCampaignDispatchService
         $this->ensureDispatchable($campaign);
 
         $dispatchedAt = now();
+        $delivery = $this->webPushDeliveryService->sendCampaign($campaign);
 
         $notification = $this->notificationLogService->log(
             'push_campaign_sent',
@@ -41,6 +44,7 @@ class PushCampaignDispatchService
                 'scheduled_for' => optional($campaign->schedule_at)->toIso8601String(),
                 'dispatched_at' => $dispatchedAt->toIso8601String(),
                 'package_name' => $campaign->activeSubscription?->package?->name,
+                'web_push' => $delivery,
             ]
         );
 

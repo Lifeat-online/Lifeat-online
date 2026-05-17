@@ -25,12 +25,20 @@ use Laravel\Reverb\Servers\Reverb\Contracts\PubSubProvider;
 use Laravel\Reverb\Servers\Reverb\Factory as ReverbServerFactory;
 use Laravel\Telescope\Contracts\EntriesRepository;
 use Laravel\Telescope\Telescope;
+use Minishlink\WebPush\VAPID;
 use React\EventLoop\Loop;
 use Symfony\Component\Console\Command\Command;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Artisan::command('webpush:keys', function () {
+    $keys = VAPID::createVapidKeys();
+
+    $this->line('WEBPUSH_VAPID_PUBLIC_KEY='.$keys['publicKey']);
+    $this->line('WEBPUSH_VAPID_PRIVATE_KEY='.$keys['privateKey']);
+})->purpose('Generate VAPID keys for browser push notifications');
 
 Artisan::command('reverb:start-railway
     {--host= : The IP address the server should bind to}
