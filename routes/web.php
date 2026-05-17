@@ -61,6 +61,8 @@ use App\Http\Controllers\Transport\Manager\DriverController as TransportManagerD
 use App\Http\Controllers\Transport\Manager\VehicleController as TransportManagerVehicleController;
 use App\Http\Controllers\Transport\Admin\SetupController as TransportAdminSetupController;
 use App\Http\Controllers\Transport\RequestController as TransportRequestController;
+use App\Http\Controllers\Transport\RequestCancellationController as TransportRequestCancellationController;
+use App\Http\Controllers\Transport\RequestTrackingController as TransportRequestTrackingController;
 use App\Http\Controllers\AccountAdvertisingDashboardController;
 use App\Http\Controllers\StaffAdvertisingDashboardController;
 use App\Http\Controllers\CivicFaultMapController;
@@ -119,6 +121,10 @@ Route::middleware(['auth'])->prefix('transport')->name('transport.')->group(func
     Route::get('/requests/create', [TransportRequestController::class, 'create'])->name('requests.create');
     Route::post('/requests', [TransportRequestController::class, 'store'])->name('requests.store');
     Route::get('/requests/{transportRequest}', [TransportRequestController::class, 'show'])->name('requests.show');
+    Route::post('/requests/{transportRequest}/cancel', [TransportRequestCancellationController::class, 'store'])->name('requests.cancel');
+    Route::get('/requests/{transportRequest}/tracking', [TransportRequestTrackingController::class, 'show'])->name('requests.tracking');
+    Route::post('/requests/{transportRequest}/passenger-location', [TransportRequestTrackingController::class, 'updatePassenger'])->name('requests.passenger-location');
+    Route::post('/requests/{transportRequest}/driver-location', [TransportRequestTrackingController::class, 'updateDriver'])->middleware('transport.on_duty')->name('requests.driver-location');
 
     Route::middleware('role:transport_manager,admin')->prefix('manager')->name('manager.')->group(function () {
         Route::get('/', TransportManagerDashboardController::class)->name('dashboard');

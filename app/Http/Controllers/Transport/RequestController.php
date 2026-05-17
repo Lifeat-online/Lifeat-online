@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Transport;
 
 use App\Events\TransportRequestStatusChanged;
 use App\Http\Controllers\Controller;
+use App\Models\Setting;
 use App\Models\TransportRequest;
 use App\Services\TransportDispatchService;
 use App\Models\TransportDutySession;
+use App\Models\TransportDriver;
+use App\Models\TransportVehicle;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,10 +19,21 @@ class RequestController extends Controller
 {
     public function create(): View
     {
+        $activeSessions = TransportDutySession::query()
+            ->with(['driver', 'vehicle'])
+            ->whereNull('ended_at')
+            ->where('status', TransportDutySession::STATUS_AVAILABLE)
+            ->whereHas('driver', fn ($query) => $query->where('status', TransportDriver::STATUS_APPROVED))
+            ->whereHas('vehicle', fn ($query) => $query->where('status', TransportVehicle::STATUS_APPROVED))
+            ->get();
+
         return view('transport.requests.create', [
-            'activeDriverCount' => TransportDutySession::whereNull('ended_at')
-                ->where('status', 'available')
-                ->count(),
+            'activeDriverCount' => $activeSessions->count(),
+            'platformFeePercent' => (float) Setting::getValue('transport.platform_fee_percent', 10),
+            'pricingVehicles' => $activeSessions
+                ->map(fn (TransportDutySession $session) => $this->pricingVehiclePayload($session))
+                ->filter()
+                ->values(),
         ]);
     }
 
@@ -113,6 +127,7 @@ class RequestController extends Controller
 
         $transportRequest->load([
             'acceptedDriver.user',
+            'acceptedDriver.activeDutySession',
             'acceptedVehicle',
             'offers.driver.user',
             'offers.vehicle',
@@ -153,5 +168,36 @@ class RequestController extends Controller
         }
 
         return 'Request created and sent to available drivers.';
+    }
+
+    private function pricingVehiclePayload(TransportDutySession $session): ?array
+    {
+        $vehicle = $session->vehicle;
+        $driver = $session->driver;
+
+        if (! $vehicle || ! $driver) {
+            return null;
+        }
+
+        return [
+            'id' => $vehicle->id,
+            'name' => $vehicle->name,
+            'vehicle_type' => $vehicle->vehicle_type,
+            'driver_id' => $driver->id,
+            'can_transport_people' => $driver->can_transport_people,
+            'can_transport_parcels' => $driver->can_transport_parcels,
+            'can_carry_people' => $vehicle->can_carry_people,
+            'can_carry_parcels' => $vehicle->can_carry_parcels,
+            'max_passengers' => (int) $vehicle->max_passengers,
+            'max_weight_kg' => $vehicle->max_weight_kg !== null ? (float) $vehicle->max_weight_kg : null,
+            'pricing_mode' => $vehicle->pricing_mode,
+            'base_fee' => (float) $vehicle->base_fee,
+            'per_km_fee' => (float) $vehicle->per_km_fee,
+            'per_person_fee' => (float) $vehicle->per_person_fee,
+            'minimum_fee' => (float) $vehicle->minimum_fee,
+            'accepts_cash' => $vehicle->accepts_cash,
+            'has_card_machine' => $vehicle->has_card_machine,
+            'accepts_payfast' => $vehicle->accepts_payfast,
+        ];
     }
 }

@@ -187,6 +187,7 @@ class TransportModuleTest extends TestCase
             'base_fee' => 10,
             'per_km_fee' => 6,
             'minimum_fee' => 25,
+            'cancellation_fee' => 12,
             'accepts_cash' => true,
             'accepts_payfast' => true,
             'approved_at' => now(),
@@ -257,6 +258,49 @@ class TransportModuleTest extends TestCase
             'id' => $session->id,
             'status' => TransportDutySession::STATUS_BUSY,
         ]);
+
+        $this->actingAs($client)
+            ->post(route('transport.requests.passenger-location', $transportRequest), [
+                'latitude' => -33.9248,
+                'longitude' => 18.4240,
+            ])
+            ->assertOk();
+
+        $this->actingAs($driverUser)
+            ->post(route('transport.requests.driver-location', $transportRequest), [
+                'latitude' => -33.9250,
+                'longitude' => 18.4242,
+            ])
+            ->assertOk();
+
+        $this->actingAs($client)
+            ->get(route('transport.requests.tracking', $transportRequest))
+            ->assertOk()
+            ->assertJsonPath('driver.distance_to_pickup_km', 0)
+            ->assertJsonPath('passenger.location.lat', -33.9248);
+
+        $this->actingAs($client)
+            ->get(route('transport.requests.show', $transportRequest))
+            ->assertOk()
+            ->assertSee('Cancel request')
+            ->assertSee('Live route')
+            ->assertSee('Cancelling now may apply')
+            ->assertSee(route('transport.requests.cancel', $transportRequest), false);
+
+        $this->actingAs($client)
+            ->post(route('transport.requests.cancel', $transportRequest))
+            ->assertRedirect(route('transport.requests.show', $transportRequest));
+
+        $this->assertDatabaseHas('transport_requests', [
+            'id' => $transportRequest->id,
+            'status' => TransportRequest::STATUS_CANCELLED,
+            'cancellation_fee' => 12,
+        ]);
+
+        $this->assertDatabaseHas('transport_duty_sessions', [
+            'id' => $session->id,
+            'status' => TransportDutySession::STATUS_AVAILABLE,
+        ]);
     }
 
     public function test_client_can_save_scheduled_request_when_no_drivers_are_online(): void
@@ -270,6 +314,14 @@ class TransportModuleTest extends TestCase
             ->assertSee('No drivers are online right now')
             ->assertSee('My Location')
             ->assertSee('data-address-autocomplete', false)
+            ->assertSee("url.searchParams.set('countrycodes', 'za')", false)
+            ->assertSee('sortByDistance', false)
+            ->assertSee('id="distance_km"', false)
+            ->assertSee('updateTripDistance', false)
+            ->assertSee('transport-review-modal', false)
+            ->assertSee('router.project-osrm.org', false)
+            ->assertSee('matchingVehicles', false)
+            ->assertSee('Accept and send to drivers')
             ->assertSee('data-service-field="ride"', false)
             ->assertSee('data-service-field="parcel heavy_goods"', false)
             ->assertSee('name="pickup_latitude"', false)
@@ -309,6 +361,17 @@ class TransportModuleTest extends TestCase
         $this->actingAs($client)
             ->get(route('transport.requests.show', $request))
             ->assertOk()
-            ->assertSee('This request is scheduled');
+            ->assertSee('This request is scheduled')
+            ->assertSee('Cancel request');
+
+        $this->actingAs($client)
+            ->post(route('transport.requests.cancel', $request))
+            ->assertRedirect(route('transport.requests.show', $request));
+
+        $this->assertDatabaseHas('transport_requests', [
+            'id' => $request->id,
+            'status' => TransportRequest::STATUS_CANCELLED,
+            'cancellation_fee' => 0,
+        ]);
     }
 }

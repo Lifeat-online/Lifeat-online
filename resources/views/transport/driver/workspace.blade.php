@@ -1,4 +1,11 @@
 <x-app-layout>
+    @push('styles')
+        <style>
+            @import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+            .driver-tracking-map { height: min(52vh, 460px); border-radius: 0.75rem; border: 1px solid #e5e7eb; overflow: hidden; background: #f8fafc; }
+        </style>
+    @endpush
+
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">Live Driver Workspace</h2>
     </x-slot>
@@ -57,6 +64,37 @@
                 </div>
             </section>
 
+            @if ($activeRequests->isNotEmpty())
+                <section class="rounded-lg bg-white p-6 shadow-sm">
+                    <h3 class="text-lg font-semibold text-gray-900">Active route</h3>
+                    <div class="mt-5 grid gap-5">
+                        @foreach ($activeRequests as $activeRequest)
+                            <article class="rounded-md border border-gray-200 p-4" data-driver-tracking
+                                data-tracking-url="{{ route('transport.requests.tracking', $activeRequest) }}"
+                                data-location-url="{{ route('transport.requests.driver-location', $activeRequest) }}"
+                                data-pickup-lat="{{ (float) $activeRequest->pickup_latitude }}"
+                                data-pickup-lng="{{ (float) $activeRequest->pickup_longitude }}"
+                                data-dropoff-lat="{{ (float) $activeRequest->dropoff_latitude }}"
+                                data-dropoff-lng="{{ (float) $activeRequest->dropoff_longitude }}">
+                                <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                    <div>
+                                        <p class="text-sm uppercase tracking-wide text-gray-500">{{ ucfirst(str_replace('_', ' ', $activeRequest->status)) }}</p>
+                                        <h4 class="mt-1 font-semibold text-gray-900">{{ $activeRequest->pickup_address }}</h4>
+                                        <p class="mt-1 text-sm text-gray-600">Passenger: {{ $activeRequest->user->name }} · Dropoff: {{ $activeRequest->dropoff_address }}</p>
+                                        <p class="mt-1 text-sm text-gray-600" data-driver-tracking-status>Waiting for live passenger location...</p>
+                                    </div>
+                                    <div class="text-sm text-gray-600 md:text-right">
+                                        <p>Quote: ZAR {{ number_format((float) $activeRequest->quoted_amount, 2) }}</p>
+                                        <p>You earn: ZAR {{ number_format((float) $activeRequest->driver_amount, 2) }}</p>
+                                    </div>
+                                </div>
+                                <div id="driver-tracking-map-{{ $activeRequest->id }}" class="driver-tracking-map mt-4" aria-label="Driver route tracking map"></div>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+
             <section class="rounded-lg border border-red-200 bg-red-50 p-6">
                 <h3 class="text-lg font-semibold text-red-950">Safety</h3>
                 <p class="mt-2 text-sm text-red-900">The panic workflow will be connected to live safety events in the safety phase. Your configured emergency contact is already stored on the driver profile.</p>
@@ -64,4 +102,98 @@
             </section>
         </div>
     </div>
+
+    @push('scripts')
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+        <script>
+            (() => {
+                const roots = document.querySelectorAll('[data-driver-tracking]');
+                if (!roots.length || !window.L) return;
+
+                const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+                roots.forEach((root) => {
+                    const mapEl = root.querySelector('.driver-tracking-map');
+                    const status = root.querySelector('[data-driver-tracking-status]');
+                    if (!mapEl) return;
+
+                    const pickup = { lat: Number(root.dataset.pickupLat), lng: Number(root.dataset.pickupLng) };
+                    const dropoff = { lat: Number(root.dataset.dropoffLat), lng: Number(root.dataset.dropoffLng) };
+                    const map = L.map(mapEl);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        attribution: '&copy; OpenStreetMap contributors',
+                    }).addTo(map);
+
+                    const bounds = [[pickup.lat, pickup.lng]];
+                    L.marker([pickup.lat, pickup.lng]).addTo(map).bindPopup('Pickup point');
+                    if (Number.isFinite(dropoff.lat) && Number.isFinite(dropoff.lng)) {
+                        L.marker([dropoff.lat, dropoff.lng]).addTo(map).bindPopup('Dropoff');
+                        L.polyline([[pickup.lat, pickup.lng], [dropoff.lat, dropoff.lng]], { color: '#2563eb', weight: 4, dashArray: '8 8' }).addTo(map);
+                        bounds.push([dropoff.lat, dropoff.lng]);
+                    }
+                    map.fitBounds(bounds, { padding: [24, 24] });
+
+                    let driverMarker = null;
+                    let passengerMarker = null;
+
+                    const postLocation = (position) => {
+                        fetch(root.dataset.locationUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': csrf,
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude,
+                            }),
+                        }).catch(() => {});
+                    };
+
+                    if (navigator.geolocation) {
+                        navigator.geolocation.watchPosition(postLocation, () => {}, {
+                            enableHighAccuracy: true,
+                            maximumAge: 15000,
+                            timeout: 12000,
+                        });
+                    }
+
+                    const refreshTracking = async () => {
+                        try {
+                            const response = await fetch(root.dataset.trackingUrl, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+                            if (!response.ok) return;
+                            const data = await response.json();
+                            const driverLocation = data.driver?.location;
+                            const passengerLocation = data.passenger?.location;
+
+                            if (driverLocation) {
+                                const latLng = [driverLocation.lat, driverLocation.lng];
+                                driverMarker = driverMarker || L.marker(latLng).addTo(map).bindPopup('You');
+                                driverMarker.setLatLng(latLng);
+                            }
+
+                            if (passengerLocation) {
+                                const latLng = [passengerLocation.lat, passengerLocation.lng];
+                                passengerMarker = passengerMarker || L.marker(latLng).addTo(map).bindPopup('Passenger live location');
+                                passengerMarker.setLatLng(latLng);
+                            }
+
+                            if (status) {
+                                status.textContent = data.driver?.distance_to_passenger_km !== null
+                                    ? `Passenger is ${data.driver.distance_to_passenger_km} km away. Pickup point is ${data.driver.distance_to_pickup_km ?? '-'} km away.`
+                                    : 'Waiting for live passenger location...';
+                            }
+                        } catch (_) {
+                        }
+                    };
+
+                    refreshTracking();
+                    setInterval(refreshTracking, 10000);
+                });
+            })();
+        </script>
+    @endpush
 </x-app-layout>
