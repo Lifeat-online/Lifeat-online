@@ -35,6 +35,14 @@
                             <label class="mb-1 block text-sm font-medium">Slug</label>
                             <input class="w-full rounded-md border-gray-300" name="slug" value="{{ old('slug', $article->slug) }}">
                         </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">Original Language</label>
+                            <select class="w-full rounded-md border-gray-300" name="source_locale">
+                                @foreach (config('localization.supported') as $locale => $details)
+                                    <option value="{{ $locale }}" @selected(old('source_locale', $article->source_locale ?: app()->getLocale()) === $locale)>{{ $details['name'] }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                     </div>
 
                     <div>

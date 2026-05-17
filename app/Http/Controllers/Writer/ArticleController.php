@@ -44,6 +44,7 @@ class ArticleController extends Controller
     {
         $data = $this->validated($request);
         $data['user_id'] = $request->user()->id;
+        $data['source_locale'] = $data['source_locale'] ?? app()->getLocale();
         $data['status'] = $request->boolean('submit_for_review') ? 'pending_review' : 'draft';
         $data['submitted_at'] = $data['status'] === 'pending_review' ? now() : null;
         $data['published_at'] = null;
@@ -99,6 +100,7 @@ class ArticleController extends Controller
             'slug' => ['required', 'string', 'max:255', Rule::unique('articles', 'slug')->ignore($article?->id)],
             'excerpt' => ['nullable', 'string'],
             'body' => ['nullable', 'string'],
+            'source_locale' => ['nullable', Rule::in(array_keys((array) config('localization.supported')))],
             'category_ids' => ['nullable', 'array'],
             'category_ids.*' => ['integer', 'exists:categories,id'],
             'tag_ids' => ['nullable', 'array'],

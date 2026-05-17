@@ -45,11 +45,11 @@ class ArticleController extends Controller
     {
         abort_if($article->status !== 'published', 404);
 
-        $article->load(['author', 'categories', 'tags', 'locations']);
+        $article->load(['author', 'categories', 'tags', 'locations', 'contentTranslations']);
 
         $categoryIds = $article->categories->modelKeys();
 
-        $relatedArticles = Article::with(['author', 'categories', 'tags', 'locations'])
+        $relatedArticles = Article::with(['author', 'categories', 'tags', 'locations', 'contentTranslations'])
             ->published()
             ->whereKeyNot($article->getKey())
             ->when(! empty($categoryIds), function ($query) use ($categoryIds) {
@@ -83,7 +83,7 @@ class ArticleController extends Controller
         $tagSlug = $forcedTag?->slug ?? trim((string) $request->string('tag'));
         $locationSlug = $forcedLocation?->slug ?? trim((string) $request->string('location'));
 
-        $articles = Article::with(['author', 'categories', 'tags', 'locations'])
+        $articles = Article::with(['author', 'categories', 'tags', 'locations', 'contentTranslations'])
             ->published()
             ->when($forcedAuthor, function ($query) use ($forcedAuthor) {
                 $query->where('user_id', $forcedAuthor->id);

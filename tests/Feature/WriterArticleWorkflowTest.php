@@ -6,7 +6,9 @@ use App\Models\Article;
 use App\Models\Category;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\OpenRouterTranslationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class WriterArticleWorkflowTest extends TestCase
@@ -76,6 +78,74 @@ class WriterArticleWorkflowTest extends TestCase
         $this->assertNotNull($article->wordLedger);
         $this->assertSame($article->wordCount(), $article->wordLedger->word_count);
         $this->assertEquals('1.50', $article->wordLedger->rate_per_word);
+    }
+
+    public function test_publishing_english_article_requests_afrikaans_translation(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+        ]);
+
+        $article = Article::create([
+            'user_id' => User::factory()->create(['role' => 'writer'])->id,
+            'title' => 'Community Update',
+            'slug' => 'community-update',
+            'excerpt' => 'Short excerpt',
+            'body' => 'This article body is ready for a bilingual publishing workflow.',
+            'source_locale' => 'en',
+            'status' => 'pending_review',
+        ]);
+
+        $this->mock(OpenRouterTranslationService::class, function (MockInterface $mock) use ($article): void {
+            $mock->shouldReceive('translateModel')
+                ->once()
+                ->withArgs(fn (Article $target, string $locale): bool => $target->is($article) && $locale === 'af')
+                ->andReturn(['ok' => true, 'message' => 'Translation saved.']);
+        });
+
+        $this->actingAs($admin)->put(route('admin.articles.update', $article), [
+            'title' => $article->title,
+            'slug' => $article->slug,
+            'excerpt' => $article->excerpt,
+            'body' => $article->body,
+            'source_locale' => 'en',
+            'status' => 'published',
+            'category_ids' => [],
+        ])->assertRedirect(route('admin.articles.edit', $article));
+    }
+
+    public function test_publishing_afrikaans_article_requests_english_translation(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+        ]);
+
+        $article = Article::create([
+            'user_id' => User::factory()->create(['role' => 'writer'])->id,
+            'title' => 'Gemeenskapsnuus',
+            'slug' => 'gemeenskapsnuus',
+            'excerpt' => 'Kort uittreksel',
+            'body' => 'Hierdie Afrikaanse artikel moet ook in Engels beskikbaar wees.',
+            'source_locale' => 'af',
+            'status' => 'pending_review',
+        ]);
+
+        $this->mock(OpenRouterTranslationService::class, function (MockInterface $mock) use ($article): void {
+            $mock->shouldReceive('translateModel')
+                ->once()
+                ->withArgs(fn (Article $target, string $locale): bool => $target->is($article) && $locale === 'en')
+                ->andReturn(['ok' => true, 'message' => 'Translation saved.']);
+        });
+
+        $this->actingAs($admin)->put(route('admin.articles.update', $article), [
+            'title' => $article->title,
+            'slug' => $article->slug,
+            'excerpt' => $article->excerpt,
+            'body' => $article->body,
+            'source_locale' => 'af',
+            'status' => 'published',
+            'category_ids' => [],
+        ])->assertRedirect(route('admin.articles.edit', $article));
     }
 
     public function test_revision_request_note_is_saved_for_article(): void

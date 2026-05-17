@@ -10,10 +10,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
+use App\Models\Concerns\HasContentTranslations;
 
 class Article extends Model
 {
-    use HasFactory;
+    use HasFactory, HasContentTranslations;
+
+    protected array $translatable = [
+        'title',
+        'excerpt',
+        'body',
+    ];
 
     protected $fillable = [
         'user_id',
@@ -23,6 +30,7 @@ class Article extends Model
         'excerpt',
         'body',
         'featured_image',
+        'source_locale',
         'status',
         'submitted_at',
         'published_at',
@@ -74,6 +82,21 @@ class Article extends Model
     public function revisionNotes(): HasMany
     {
         return $this->hasMany(ArticleRevisionNote::class)->latest();
+    }
+
+    public function localizedTitle(?string $locale = null): string
+    {
+        return (string) $this->localizedValue('title', $locale);
+    }
+
+    public function localizedExcerpt(?string $locale = null): ?string
+    {
+        return $this->localizedValue('excerpt', $locale);
+    }
+
+    public function localizedBody(?string $locale = null): ?string
+    {
+        return $this->localizedValue('body', $locale);
     }
 
     public function scopePublished(Builder $query): Builder

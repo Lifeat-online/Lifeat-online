@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdCampaign;
+use App\Models\ContentTranslation;
 use App\Models\PayoutRequest;
 use App\Models\Article;
 use App\Models\Event;
@@ -168,6 +169,7 @@ class DashboardController extends Controller
                 ],
             ],
             'devWebPushStatus' => $vapidKeys->status(),
+            'devTranslationStatus' => $this->translationStatus(),
             'devRoleCards' => $roles,
             'devPermissionCards' => $permissions->sortByDesc('roles_count')->take(12)->values(),
             'devPrimaryRoleBreakdown' => $primaryRoleBreakdown,
@@ -222,10 +224,55 @@ class DashboardController extends Controller
                 'subject' => '',
                 'storage_ready' => false,
             ],
+            'devTranslationStatus' => [
+                'supported_locales' => collect(config('localization.supported'))->keys()->all(),
+                'target_locales' => [],
+                'article_translations' => 0,
+                'published_articles_missing' => collect(),
+                'model' => (string) config('services.openrouter.model', 'google/gemma-4-31b-it:free'),
+                'configured' => false,
+            ],
             'devRoleCards' => collect(),
             'devPermissionCards' => collect(),
             'devPrimaryRoleBreakdown' => collect(),
             'devServerStatSections' => [],
+        ];
+    }
+
+    private function translationStatus(): array
+    {
+        $supportedLocales = collect(config('localization.supported'))->keys()->values();
+
+        $publishedArticlesMissing = Article::query()
+            ->published()
+            ->with('contentTranslations')
+            ->latest('published_at')
+            ->limit(25)
+            ->get()
+            ->map(function (Article $article) use ($supportedLocales): Article {
+                $translated = $article->contentTranslations->pluck('locale');
+                $article->missing_translation_locales = $supportedLocales
+                    ->reject(fn (string $locale): bool => $locale === $article->sourceLocale())
+                    ->diff($translated)
+                    ->values()
+                    ->all();
+
+                return $article;
+            })
+            ->filter(fn (Article $article): bool => $article->missing_translation_locales !== [])
+            ->take(8)
+            ->values();
+
+        return [
+            'supported_locales' => $supportedLocales->all(),
+            'target_locales' => $supportedLocales->all(),
+            'article_translations' => ContentTranslation::query()
+                ->where('translatable_type', Article::class)
+                ->whereIn('locale', $supportedLocales->all())
+                ->count(),
+            'published_articles_missing' => $publishedArticlesMissing,
+            'model' => (string) config('services.openrouter.model', 'google/gemma-4-31b-it:free'),
+            'configured' => (string) config('services.openrouter.key') !== '',
         ];
     }
 

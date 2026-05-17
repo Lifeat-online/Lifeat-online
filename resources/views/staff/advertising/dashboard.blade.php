@@ -49,7 +49,7 @@
                         <select id="business_id" class="selectx">
                             <option value="">Select…</option>
                             @foreach ($businesses as $business)
-                                <option value="{{ $business->id }}">{{ $business->title }}</option>
+                                <option value="{{ $business->getRouteKey() }}">{{ $business->title }}</option>
                             @endforeach
                         </select>
                         <div style="margin-top:0.65rem;">
@@ -215,7 +215,7 @@
     <script>
         (() => {
             const csrf = @json(csrf_token());
-            const workspaceUrls = @json($businesses->mapWithKeys(fn ($b) => [(string) $b->id => route('account.listings.show', $b)])->all());
+            const workspaceUrls = @json($businesses->mapWithKeys(fn ($b) => [(string) $b->getRouteKey() => route('account.listings.show', $b)])->all());
             const select = document.getElementById('business_id');
             const openWorkspace = document.getElementById('open-workspace');
             const voucherWorkspace = document.getElementById('voucher-workspace');

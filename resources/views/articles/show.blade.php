@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', $article->title.' | Articles')
+@section('title', $article->localizedTitle().' | Articles')
 
 @section('content')
     <section class="section detail-grid">
@@ -19,7 +19,7 @@
                 @if ($article->featured_image)
                     <img src="{{ \Illuminate\Support\Facades\Storage::url($article->featured_image) }}" alt="" style="width:100%; height:280px; object-fit:cover; border-radius:12px; margin:0 0 1rem;">
                 @endif
-                <h2>{{ $article->title }}</h2>
+                <h2>{{ $article->localizedTitle() }}</h2>
                 <div>
                     @foreach ($article->categories as $category)
                         <a href="{{ route('articles.categories.show', $category) }}" class="badge">{{ $category->name }}</a>
@@ -31,7 +31,7 @@
                         <a href="{{ route('articles.locations.show', $location) }}" class="badge">{{ $location->name }}</a>
                     @endforeach
                 </div>
-                <div>{!! nl2br(e($article->body ?: $article->excerpt ?: 'Article body coming soon.')) !!}</div>
+                <div>{!! nl2br(e($article->localizedBody() ?: $article->localizedExcerpt() ?: 'Article body coming soon.')) !!}</div>
             </article>
         </div>
 
@@ -46,7 +46,7 @@
             <article class="card">
                 <h3>Related Articles</h3>
                 @forelse ($relatedArticles as $relatedArticle)
-                    <p><a href="{{ route('articles.show', $relatedArticle) }}">{{ $relatedArticle->title }}</a></p>
+                    <p><a href="{{ route('articles.show', $relatedArticle) }}">{{ $relatedArticle->localizedTitle() }}</a></p>
                 @empty
                     <p class="muted">No related articles found yet.</p>
                 @endforelse

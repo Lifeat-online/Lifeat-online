@@ -22,6 +22,7 @@ use App\Http\Controllers\Admin\WriterPaymentController as AdminWriterPaymentCont
 use App\Http\Controllers\Admin\CouncillorController as AdminCouncillorController;
 use App\Http\Controllers\Admin\CivicFaultReportController as AdminCivicFaultReportController;
 use App\Http\Controllers\Admin\DevUpdateController as AdminDevUpdateController;
+use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Writer\EarningsController as WriterEarningsController;
 use App\Http\Controllers\Writer\ArticleController as WriterArticleController;
 use App\Http\Controllers\AboutController;
@@ -72,9 +73,11 @@ use App\Http\Controllers\Councillor\CivicFaultReportController as CouncillorCivi
 use App\Http\Controllers\Api\ClientAdvertisingApiController;
 use App\Http\Controllers\Api\StaffAdvertisingApiController;
 use App\Http\Controllers\Auth\AdminBootstrapController;
+use App\Http\Controllers\LocaleController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
+Route::post('/locale/{locale}', LocaleController::class)->name('locale.switch');
 Route::post('/__bootstrap/admin', [AdminBootstrapController::class, 'store'])->middleware(['throttle:6,1'])->name('bootstrap.admin');
 Route::get('/directory', [DirectoryController::class, 'index'])->name('directory.index');
 Route::get('/directory/{listing:slug}', [DirectoryController::class, 'show'])->name('directory.show');
@@ -112,6 +115,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware(['auth', 'role:admin'])->prefix('dev')->name('dev.')->group(function () {
     Route::post('/tests/run', [AdminDevUpdateController::class, 'runTests'])->middleware('throttle:2,1')->name('tests.run');
     Route::post('/webpush/vapid/enable', [AdminDevUpdateController::class, 'enableVapidKeys'])->middleware('throttle:3,1')->name('webpush.vapid.enable');
+    Route::post('/translations/preview', [AdminTranslationController::class, 'preview'])->middleware('throttle:12,1')->name('translations.preview');
+    Route::post('/translations/articles/{article:slug}', [AdminTranslationController::class, 'translateArticle'])->middleware('throttle:12,1')->name('translations.articles.translate');
     Route::get('/transport', [TransportAdminSetupController::class, 'index'])->name('transport.setup');
     Route::post('/transport/managers', [TransportAdminSetupController::class, 'storeManager'])->name('transport.managers.store');
     Route::put('/transport/settings', [TransportAdminSetupController::class, 'updateSettings'])->name('transport.settings.update');

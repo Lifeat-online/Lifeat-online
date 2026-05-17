@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="{{ app()->getLocale() }}" data-theme="light">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -198,6 +198,7 @@
                         @endforeach
                     </ul>
                     <div class="lp-nav-tools">
+                        @include('partials.language-switcher')
                         <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle dark and light mode" title="Toggle dark and light mode">
                             <svg data-theme-icon-sun xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2.25M12 18.75V21M4.97 4.97l1.59 1.59M17.44 17.44l1.59 1.59M3 12h2.25M18.75 12H21M4.97 19.03l1.59-1.59M17.44 6.56l1.59-1.59M15.75 12A3.75 3.75 0 1112 8.25 3.75 3.75 0 0115.75 12z" />
@@ -237,6 +238,7 @@
                             >
                         </div>
                         <div class="lp-drawer-actions">
+                            @include('partials.language-switcher')
                             <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle dark and light mode" title="Toggle dark and light mode">
                                 <svg data-theme-icon-sun xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2.25M12 18.75V21M4.97 4.97l1.59 1.59M17.44 17.44l1.59 1.59M3 12h2.25M18.75 12H21M4.97 19.03l1.59-1.59M17.44 6.56l1.59-1.59M15.75 12A3.75 3.75 0 1112 8.25 3.75 3.75 0 0115.75 12z" />
@@ -264,6 +266,7 @@
                         @endforeach
                     </ul>
                     <div class="lp-drawer-footer">
+                        @include('partials.language-switcher')
                         @auth
                             <a href="{{ route('dashboard') }}" class="button-link w-full">Dashboard</a>
                             <form method="post" action="{{ route('logout') }}" class="w-full">

@@ -11,6 +11,7 @@ use App\Models\LocationNode;
 use App\Models\Setting;
 use App\Models\Tag;
 use App\Services\AuditLogService;
+use App\Services\OpenRouterTranslationService;
 use App\Support\Validation\UploadRules;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\UploadedFile;
@@ -87,10 +88,11 @@ class ArticleController extends Controller
         ]);
     }
 
-    public function store(Request $request, AuditLogService $audit)
+    public function store(Request $request, AuditLogService $audit, OpenRouterTranslationService $translator)
     {
         $data = $this->validated($request);
         $data['user_id'] = $request->user()->id;
+        $data['source_locale'] = $data['source_locale'] ?? app()->getLocale();
         $data['published_at'] = $this->publishedAt($data['status'], $data['published_at'] ?? null);
         $data['submitted_at'] = $this->submittedAt($data['status'], null, $data['submitted_at'] ?? null);
         $data['editor_user_id'] = $data['status'] === 'published' ? $request->user()->id : null;
@@ -102,6 +104,7 @@ class ArticleController extends Controller
         $article->locations()->sync($request->input('location_ids', []));
         $this->syncRevisionNote($article, $request);
         $this->syncWordLedger($article, $request);
+        $this->syncPublishedTranslations($article->fresh(), $translator);
         $audit->log($request, 'article.created', $article, [], $article->fresh()->toArray());
 
         if ($request->expectsJson()) {
@@ -129,10 +132,11 @@ class ArticleController extends Controller
         ]);
     }
 
-    public function update(Request $request, Article $article, AuditLogService $audit)
+    public function update(Request $request, Article $article, AuditLogService $audit, OpenRouterTranslationService $translator)
     {
         $before = $article->toArray();
         $data = $this->validated($request, $article);
+        $data['source_locale'] = $data['source_locale'] ?? $article->sourceLocale();
         $data['published_at'] = $this->publishedAt($data['status'], $data['published_at'] ?? $article->published_at);
         $data['submitted_at'] = $this->submittedAt($data['status'], $article->submitted_at, $data['submitted_at'] ?? null);
         $data['editor_user_id'] = $data['status'] === 'published' ? $request->user()->id : $article->editor_user_id;
@@ -144,6 +148,7 @@ class ArticleController extends Controller
         $article->locations()->sync($request->input('location_ids', []));
         $this->syncRevisionNote($article, $request);
         $this->syncWordLedger($article->fresh(), $request);
+        $this->syncPublishedTranslations($article->fresh(), $translator);
         $audit->log($request, 'article.updated', $article, $before, $article->fresh()->toArray());
 
         if ($request->expectsJson()) {
@@ -167,7 +172,7 @@ class ArticleController extends Controller
         return redirect()->route('admin.articles.index')->with('status', 'Article deleted.');
     }
 
-    public function bulk(Request $request, AuditLogService $audit)
+    public function bulk(Request $request, AuditLogService $audit, OpenRouterTranslationService $translator)
     {
         $validated = $request->validate([
             'action' => ['required', Rule::in(['set_status', 'delete'])],
@@ -206,6 +211,7 @@ class ArticleController extends Controller
 
             $article->update($next);
             $this->syncWordLedger($article->fresh(), $request);
+            $this->syncPublishedTranslations($article->fresh(), $translator);
             $audit->log($request, 'article.bulk_set_status', $article, $before, $article->fresh()->toArray());
         }
 
@@ -223,6 +229,7 @@ class ArticleController extends Controller
             'slug' => ['required', 'string', 'max:255', Rule::unique('articles', 'slug')->ignore($article?->id)],
             'excerpt' => ['nullable', 'string'],
             'body' => ['nullable', 'string'],
+            'source_locale' => ['nullable', Rule::in(array_keys((array) config('localization.supported')))],
             'revision_note' => ['nullable', 'string'],
             'submitted_at' => ['nullable', 'date'],
             'featured_image_upload' => UploadRules::optionalPublicImage(),
@@ -302,6 +309,21 @@ class ArticleController extends Controller
                 'approved_at' => now(),
             ]
         );
+    }
+
+    private function syncPublishedTranslations(Article $article, OpenRouterTranslationService $translator): void
+    {
+        if ($article->status !== 'published') {
+            return;
+        }
+
+        foreach (array_keys((array) config('localization.supported')) as $locale) {
+            if ($locale === $article->sourceLocale()) {
+                continue;
+            }
+
+            $translator->translateModel($article, $locale);
+        }
     }
 
     private function syncRevisionNote(Article $article, Request $request): void

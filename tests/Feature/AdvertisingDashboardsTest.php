@@ -223,7 +223,8 @@ class AdvertisingDashboardsTest extends TestCase
         $this->actingAs($admin)
             ->get(route('staff.advertising.index'))
             ->assertOk()
-            ->assertSee('Dev Preview Business');
+            ->assertSee('Dev Preview Business')
+            ->assertSee('value="'.$listing->slug.'"', false);
 
         $this->actingAs($admin)
             ->getJson(route('api.client.advertising.summary', $listing))

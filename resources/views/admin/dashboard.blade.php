@@ -89,6 +89,7 @@
                         <button type="button" data-tab-trigger="overview" class="rounded-md px-4 py-2 text-sm font-medium transition-colors">Overview</button>
                         @if ($devToolsAvailable)
                             <button type="button" data-tab-trigger="dev" class="rounded-md px-4 py-2 text-sm font-medium transition-colors">Dev</button>
+                            <button type="button" data-tab-trigger="translations" class="rounded-md px-4 py-2 text-sm font-medium transition-colors">Translations</button>
                         @endif
                     </div>
                 </div>
@@ -234,6 +235,87 @@
             </section>
 
             @if ($canAccessDevDashboard && $devToolsAvailable)
+                <section data-tab-panel="translations" class="space-y-6" hidden>
+                    <div class="rounded-lg bg-white p-6 shadow-sm">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">Translation Control</h3>
+                                <p class="mt-1 text-sm text-gray-500">Keep articles available in every configured language. New published articles translate from their original language into the other supported language automatically.</p>
+                            </div>
+                            <div class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-gray-600">
+                                <p><strong>Model:</strong> {{ $devTranslationStatus['model'] }}</p>
+                                <p><strong>Provider:</strong> {{ $devTranslationStatus['configured'] ? 'Configured' : 'Missing OPENROUTER_API_KEY' }}</p>
+                            </div>
+                        </div>
+                        <div class="mt-5 grid gap-4 md:grid-cols-3">
+                            <div class="rounded-lg bg-slate-50 p-4">
+                                <p class="text-sm text-gray-500">Supported Languages</p>
+                                <p class="mt-2 text-2xl font-semibold text-gray-900">{{ implode(', ', $devTranslationStatus['supported_locales']) }}</p>
+                            </div>
+                            <div class="rounded-lg bg-slate-50 p-4">
+                                <p class="text-sm text-gray-500">Article Translations</p>
+                                <p class="mt-2 text-2xl font-semibold text-gray-900">{{ $devTranslationStatus['article_translations'] }}</p>
+                            </div>
+                            <div class="rounded-lg bg-slate-50 p-4">
+                                <p class="text-sm text-gray-500">Published Articles Missing Translation</p>
+                                <p class="mt-2 text-2xl font-semibold text-gray-900">{{ $devTranslationStatus['published_articles_missing']->count() }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-6 xl:grid-cols-[1fr,1fr]">
+                        <div class="rounded-lg bg-white p-6 shadow-sm" data-translation-preview data-endpoint="{{ route('dev.translations.preview') }}">
+                            <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                            <h3 class="text-lg font-semibold text-gray-900">Quick Translation Test</h3>
+                            <div class="mt-4 space-y-4">
+                                <div>
+                                    <label class="mb-1 block text-sm font-medium text-gray-700">Target language</label>
+                                    <select class="w-full rounded-md border-gray-300" data-translation-locale>
+                                        @foreach ($devTranslationStatus['target_locales'] as $locale)
+                                            <option value="{{ $locale }}">{{ config("localization.supported.{$locale}.name") }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-sm font-medium text-gray-700">Source text</label>
+                                    <textarea class="w-full rounded-md border-gray-300" rows="5" data-translation-source></textarea>
+                                </div>
+                                <button type="button" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-translation-submit>Translate</button>
+                                <p class="text-sm text-gray-500" data-translation-status>Idle</p>
+                                <textarea class="w-full rounded-md border-gray-300 bg-slate-50" rows="5" readonly data-translation-output></textarea>
+                            </div>
+                        </div>
+
+                        <div class="rounded-lg bg-white p-6 shadow-sm">
+                            <h3 class="text-lg font-semibold text-gray-900">Published Article Queue</h3>
+                            <div class="mt-4 space-y-3">
+                                @forelse ($devTranslationStatus['published_articles_missing'] as $article)
+                                    <div class="rounded-lg border border-slate-200 p-4" data-article-translation data-endpoint="{{ route('dev.translations.articles.translate', $article) }}">
+                                        <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                        <div class="flex flex-wrap items-start justify-between gap-3">
+                                            <div>
+                                                <a href="{{ route('admin.articles.edit', $article) }}" class="font-semibold text-indigo-600">{{ $article->title }}</a>
+                                                <p class="mt-1 text-sm text-gray-500">Original: {{ strtoupper($article->sourceLocale()) }} · Missing: {{ implode(', ', $article->missing_translation_locales) }} · Published {{ optional($article->published_at)->format('j M Y') }}</p>
+                                            </div>
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <select class="rounded-md border-gray-300 text-sm" data-article-translation-locale>
+                                                    @foreach ($article->missing_translation_locales as $locale)
+                                                        <option value="{{ $locale }}">{{ config("localization.supported.{$locale}.name") }}</option>
+                                                    @endforeach
+                                                </select>
+                                                <button type="button" class="rounded-md bg-slate-800 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60" data-article-translation-submit>Translate now</button>
+                                            </div>
+                                        </div>
+                                        <p class="mt-2 text-sm text-gray-500" data-article-translation-status>Waiting</p>
+                                    </div>
+                                @empty
+                                    <p class="rounded-lg bg-slate-50 p-4 text-sm text-gray-500">No published article translation gaps found.</p>
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <section data-tab-panel="dev" class="space-y-6" hidden>
                     <div class="rounded-lg bg-slate-950 p-6 text-white shadow-sm">
                         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -652,6 +734,73 @@
                     }
                 });
             }
+
+            const translationPreview = document.querySelector('[data-translation-preview]');
+            if (translationPreview) {
+                const endpoint = translationPreview.getAttribute('data-endpoint');
+                const token = translationPreview.querySelector('input[name="_token"]')?.value;
+                const locale = translationPreview.querySelector('[data-translation-locale]');
+                const source = translationPreview.querySelector('[data-translation-source]');
+                const output = translationPreview.querySelector('[data-translation-output]');
+                const status = translationPreview.querySelector('[data-translation-status]');
+                const button = translationPreview.querySelector('[data-translation-submit]');
+
+                button?.addEventListener('click', async () => {
+                    button.disabled = true;
+                    if (status) status.textContent = 'Translating...';
+                    try {
+                        const response = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': token || '',
+                            },
+                            body: JSON.stringify({
+                                text: source?.value || '',
+                                target_locale: locale?.value || 'af',
+                            }),
+                        });
+                        const payload = await response.json().catch(() => ({}));
+                        if (output) output.value = payload.translated || '';
+                        if (status) status.textContent = payload.message || `Request finished with status ${response.status}.`;
+                    } catch (error) {
+                        if (status) status.textContent = error instanceof Error ? error.message : 'Unable to translate.';
+                    } finally {
+                        button.disabled = false;
+                    }
+                });
+            }
+
+            document.querySelectorAll('[data-article-translation]').forEach((root) => {
+                const endpoint = root.getAttribute('data-endpoint');
+                const token = root.querySelector('input[name="_token"]')?.value;
+                const button = root.querySelector('[data-article-translation-submit]');
+                const status = root.querySelector('[data-article-translation-status]');
+                const locale = root.querySelector('[data-article-translation-locale]');
+
+                button?.addEventListener('click', async () => {
+                    button.disabled = true;
+                    if (status) status.textContent = 'Translating...';
+                    try {
+                        const response = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': token || '',
+                            },
+                            body: JSON.stringify({ target_locale: locale?.value || 'af', force: true }),
+                        });
+                        const payload = await response.json().catch(() => ({}));
+                        if (status) status.textContent = payload.message || `Request finished with status ${response.status}.`;
+                    } catch (error) {
+                        if (status) status.textContent = error instanceof Error ? error.message : 'Unable to translate article.';
+                    } finally {
+                        button.disabled = false;
+                    }
+                });
+            });
 
             const testRunners = Array.from(document.querySelectorAll('[data-test-runner]'));
             testRunners.forEach((runner) => {

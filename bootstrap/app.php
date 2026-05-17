@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureTransportDriverOnDuty;
 use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Middleware\SetLocale;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -30,6 +31,9 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
+        $middleware->web(append: [
+            SetLocale::class,
+        ]);
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
             'transport.on_duty' => EnsureTransportDriverOnDuty::class,

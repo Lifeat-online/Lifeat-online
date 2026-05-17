@@ -45,6 +45,14 @@
                             </select>
                         </div>
                         <div>
+                            <label class="mb-1 block text-sm font-medium">Original Language</label>
+                            <select class="w-full rounded-md border-gray-300" name="source_locale">
+                                @foreach (config('localization.supported') as $locale => $details)
+                                    <option value="{{ $locale }}" @selected(old('source_locale', $article->source_locale ?: app()->getLocale()) === $locale)>{{ $details['name'] }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
                             <label class="mb-1 block text-sm font-medium">Publish At</label>
                             <input class="w-full rounded-md border-gray-300" type="datetime-local" name="published_at" value="{{ old('published_at', optional($article->published_at)->format('Y-m-d\TH:i')) }}">
                         </div>

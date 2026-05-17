@@ -46,8 +46,8 @@
                                 </span>
                             @endif
                         </div>
-                        <h3><a href="{{ route('articles.show', $article) }}">{{ $article->title }}</a></h3>
-                        <p>{{ $article->excerpt ?: \Illuminate\Support\Str::limit(strip_tags((string) $article->body), 180) }}</p>
+                        <h3><a href="{{ route('articles.show', $article) }}">{{ $article->localizedTitle() }}</a></h3>
+                        <p>{{ $article->localizedExcerpt() ?: \Illuminate\Support\Str::limit(strip_tags((string) $article->localizedBody()), 180) }}</p>
                         <div>
                             @foreach ($article->categories as $category)
                                 <a href="{{ route('articles.categories.show', $category) }}" class="badge">{{ $category->name }}</a>
