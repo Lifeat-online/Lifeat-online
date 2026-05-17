@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class PwaAssetsTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_public_layout_includes_install_metadata(): void
     {
         $response = $this->get(route('legal.terms'));
@@ -38,6 +41,9 @@ class PwaAssetsTest extends TestCase
         $this->assertStringContainsString('/offline.html', $serviceWorker);
         $this->assertStringContainsString('const responseForCache = response.clone();', $serviceWorker);
         $this->assertStringContainsString('await cache.put(request, responseForCache);', $serviceWorker);
+        $this->assertStringContainsString('vibrationPatterns', $serviceWorker);
+        $this->assertStringContainsString('life:push-tone', $serviceWorker);
+        $this->assertStringContainsString('actionUrls', $serviceWorker);
         $this->assertStringContainsString('You are offline', $offlineShell);
     }
 }

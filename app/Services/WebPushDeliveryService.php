@@ -93,7 +93,7 @@ class WebPushDeliveryService
         return $this->sendManual($user, $payload, 'self');
     }
 
-    public function sendManual(User $sender, array $payload, string $audience = 'all'): array
+    public function sendManual(User $sender, array $payload, string $audience = 'all', array $options = []): array
     {
         if (! $this->isConfigured()) {
             return [
@@ -110,9 +110,18 @@ class WebPushDeliveryService
             'title' => $payload['title'],
             'body' => $payload['body'],
             'url' => $payload['url'],
-            'tag' => 'admin-manual-push-'.$sender->getKey().'-'.now()->timestamp,
-            'icon' => asset('pwa/icon-192.png'),
-            'badge' => asset('pwa/favicon-32x32.png'),
+            'tag' => $payload['tag'] ?? 'admin-manual-push-'.$sender->getKey().'-'.now()->timestamp,
+            'icon' => $payload['icon'] ?? asset('pwa/icon-192.png'),
+            'badge' => $payload['badge'] ?? asset('pwa/favicon-32x32.png'),
+            'image' => $payload['image'] ?? null,
+            'actions' => $payload['actions'] ?? [],
+            'requireInteraction' => (bool) ($payload['requireInteraction'] ?? false),
+            'renotify' => (bool) ($payload['renotify'] ?? false),
+            'silent' => (bool) ($payload['silent'] ?? false),
+            'playTone' => (bool) ($payload['playTone'] ?? false),
+            'tone' => $payload['tone'] ?? 'chime',
+            'vibration' => $payload['vibration'] ?? 'none',
+            'timestamp' => now()->timestamp * 1000,
             'data' => [
                 'manual' => true,
                 'audience' => $audience,
@@ -127,7 +136,9 @@ class WebPushDeliveryService
             $query->where('user_id', $sender->getKey());
         }
 
-        $query->chunkById(100, function ($subscriptions) use ($webPush, $encodedPayload, &$attempted): void {
+        $queueOptions = $this->notificationOptions($options);
+
+        $query->chunkById(100, function ($subscriptions) use ($webPush, $encodedPayload, $queueOptions, &$attempted): void {
             foreach ($subscriptions as $subscription) {
                 $attempted++;
                 $webPush->queueNotification(
@@ -137,7 +148,8 @@ class WebPushDeliveryService
                         'authToken' => $subscription->auth_token,
                         'contentEncoding' => $subscription->content_encoding,
                     ]),
-                    $encodedPayload
+                    $encodedPayload,
+                    $queueOptions
                 );
             }
         });
@@ -210,6 +222,15 @@ class WebPushDeliveryService
             'failed' => $failed,
             'expired' => $expired,
         ];
+    }
+
+    private function notificationOptions(array $options): array
+    {
+        return collect([
+            'TTL' => $options['TTL'] ?? 2419200,
+            'urgency' => $options['urgency'] ?? null,
+            'topic' => $options['topic'] ?? null,
+        ])->filter(fn ($value): bool => $value !== null && $value !== '')->all();
     }
 
     private function payloadForCampaign(PushCampaign $campaign): array

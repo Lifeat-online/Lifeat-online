@@ -150,6 +150,20 @@ self.addEventListener('fetch', (event) => {
 
 const defaultNotificationUrl = '/';
 
+const vibrationPatterns = {
+  none: [],
+  short: [120],
+  double: [90, 70, 90],
+  urgent: [180, 90, 180, 90, 240],
+};
+
+const notifyOpenClients = async (payload) => {
+  const clientList = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+  clientList.forEach((client) => {
+    client.postMessage(payload);
+  });
+};
+
 self.addEventListener('push', (event) => {
   if (!event.data) return;
 
@@ -164,24 +178,58 @@ self.addEventListener('push', (event) => {
   }
 
   const title = payload.title || 'Life@ update';
+  const actions = Array.isArray(payload.actions)
+    ? payload.actions
+        .filter((action) => action && action.action && action.title)
+        .slice(0, 2)
+        .map((action) => ({
+          action: action.action,
+          title: action.title,
+          ...(action.icon ? { icon: action.icon } : {}),
+        }))
+    : [];
+
+  const actionUrls = Array.isArray(payload.actions)
+    ? payload.actions.reduce((urls, action) => {
+        if (action?.action && action?.url) urls[action.action] = action.url;
+        return urls;
+      }, {})
+    : {};
+
   const options = {
     body: payload.body || 'Open Life@ for the latest local update.',
     icon: payload.icon || '/pwa/icon-192.png',
     badge: payload.badge || '/pwa/favicon-32x32.png',
+    ...(payload.image ? { image: payload.image } : {}),
     tag: payload.tag || 'life-update',
+    renotify: Boolean(payload.renotify) && !Boolean(payload.silent),
+    requireInteraction: Boolean(payload.requireInteraction),
+    silent: Boolean(payload.silent),
+    timestamp: Number(payload.timestamp) || Date.now(),
+    actions,
+    ...(!payload.silent && payload.vibration && vibrationPatterns[payload.vibration]?.length ? { vibrate: vibrationPatterns[payload.vibration] } : {}),
     data: {
       url: payload.url || defaultNotificationUrl,
+      actionUrls,
+      playTone: Boolean(payload.playTone) && !Boolean(payload.silent),
+      tone: payload.tone || 'chime',
       ...(payload.data || {}),
     },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(title, options),
+      options.data.playTone ? notifyOpenClients({ type: 'life:push-tone', tone: options.data.tone }) : Promise.resolve(),
+    ])
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const targetUrl = new URL(event.notification.data?.url || defaultNotificationUrl, self.location.origin).href;
+  const actionUrl = event.action ? event.notification.data?.actionUrls?.[event.action] : null;
+  const targetUrl = new URL(actionUrl || event.notification.data?.url || defaultNotificationUrl, self.location.origin).href;
 
   event.waitUntil(
     clients

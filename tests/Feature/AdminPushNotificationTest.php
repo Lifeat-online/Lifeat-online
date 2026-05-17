@@ -25,6 +25,9 @@ class AdminPushNotificationTest extends TestCase
             ->get(route('admin.push-notifications.test'))
             ->assertOk()
             ->assertSee('Push Notifications')
+            ->assertSee('Hero Image URL')
+            ->assertSee('Preview tone')
+            ->assertSee('Web Push topic')
             ->assertSee('Send Push');
     }
 
@@ -35,11 +38,15 @@ class AdminPushNotificationTest extends TestCase
         $this->mock(WebPushDeliveryService::class, function (MockInterface $mock) use ($admin): void {
             $mock->shouldReceive('sendManual')
                 ->once()
-                ->withArgs(fn (User $user, array $payload, string $audience): bool => $user->is($admin)
+                ->withArgs(fn (User $user, array $payload, string $audience, array $options): bool => $user->is($admin)
                     && $payload['title'] === 'Backend push test'
                     && $payload['body'] === 'This is a test message.'
                     && $payload['url'] === route('admin.dashboard')
-                    && $audience === 'all')
+                    && $payload['tone'] === 'chime'
+                    && $payload['vibration'] === 'double'
+                    && $audience === 'all'
+                    && $options['TTL'] === 86400
+                    && $options['urgency'] === 'normal')
                 ->andReturn([
                     'configured' => true,
                     'attempted' => 1,
@@ -55,6 +62,10 @@ class AdminPushNotificationTest extends TestCase
                 'title' => 'Backend push test',
                 'body' => 'This is a test message.',
                 'url' => route('admin.dashboard'),
+                'urgency' => 'normal',
+                'ttl' => 86400,
+                'tone' => 'chime',
+                'vibration' => 'double',
             ])
             ->assertRedirect()
             ->assertSessionHas('status', 'Push attempted for 1 subscription(s): 1 sent, 0 failed.');
@@ -65,6 +76,61 @@ class AdminPushNotificationTest extends TestCase
             'recipient' => 'all active browser subscriptions',
             'status' => 'sent',
         ]);
+    }
+
+    public function test_admin_can_send_fully_featured_push_payload(): void
+    {
+        $admin = User::factory()->create(['role' => 'super_admin']);
+
+        $this->mock(WebPushDeliveryService::class, function (MockInterface $mock) use ($admin): void {
+            $mock->shouldReceive('sendManual')
+                ->once()
+                ->withArgs(fn (User $user, array $payload, string $audience, array $options): bool => $user->is($admin)
+                    && $audience === 'self'
+                    && $payload['image'] === 'https://example.com/push.jpg'
+                    && $payload['requireInteraction'] === true
+                    && $payload['renotify'] === true
+                    && $payload['silent'] === false
+                    && $payload['playTone'] === true
+                    && $payload['tone'] === 'urgent'
+                    && $payload['vibration'] === 'urgent'
+                    && $payload['actions'][0]['title'] === 'Open'
+                    && $payload['actions'][0]['url'] === 'https://example.com/open'
+                    && $options['TTL'] === 3600
+                    && $options['urgency'] === 'high'
+                    && $options['topic'] === 'breaking-news')
+                ->andReturn([
+                    'configured' => true,
+                    'attempted' => 1,
+                    'sent' => 1,
+                    'failed' => 0,
+                    'expired' => 0,
+                ]);
+        });
+
+        $this->actingAs($admin)
+            ->post(route('admin.push-notifications.store'), [
+                'audience' => 'self',
+                'title' => 'Rich push',
+                'body' => 'This carries every supported option.',
+                'url' => route('admin.dashboard'),
+                'icon' => 'https://example.com/icon.png',
+                'badge' => 'https://example.com/badge.png',
+                'image' => 'https://example.com/push.jpg',
+                'tag' => 'breaking-news',
+                'topic' => 'breaking-news',
+                'urgency' => 'high',
+                'ttl' => 3600,
+                'require_interaction' => '1',
+                'renotify' => '1',
+                'play_tone' => '1',
+                'tone' => 'urgent',
+                'vibration' => 'urgent',
+                'action_1_title' => 'Open',
+                'action_1_url' => 'https://example.com/open',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('status', 'Push attempted for 1 subscription(s): 1 sent, 0 failed.');
     }
 
     public function test_web_push_notice_about_optional_math_extensions_does_not_break_manual_send(): void
@@ -85,7 +151,7 @@ class AdminPushNotificationTest extends TestCase
             'title' => 'Backend push test',
             'body' => 'This is a test message.',
             'url' => route('admin.dashboard'),
-        ], 'self');
+        ], 'self', ['TTL' => 60, 'urgency' => 'normal']);
 
         $this->assertSame([
             'configured' => true,

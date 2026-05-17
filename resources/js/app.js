@@ -286,7 +286,8 @@ const urlBase64ToUint8Array = (base64String) => {
 
 const initPushNotifications = () => {
     const buttons = Array.from(document.querySelectorAll('[data-push-toggle]')).filter((button) => button instanceof HTMLButtonElement);
-    if (!buttons.length) return;
+    const toneButtons = Array.from(document.querySelectorAll('[data-push-tone-preview]')).filter((button) => button instanceof HTMLButtonElement);
+    if (!buttons.length && !toneButtons.length) return;
 
     const key = document.querySelector('meta[name="webpush-vapid-public-key"]')?.getAttribute('content');
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
@@ -294,6 +295,45 @@ const initPushNotifications = () => {
     if (!supported) return;
 
     window.axios.defaults.headers.common['X-CSRF-TOKEN'] = csrf;
+
+    let audioContext = null;
+    const toneMap = {
+        chime: [880, 1174],
+        bell: [784, 988, 1318],
+        urgent: [880, 880, 880],
+        soft: [523, 659],
+    };
+
+    const ensureAudioContext = async () => {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return null;
+        audioContext ||= new AudioContextClass();
+        if (audioContext.state === 'suspended') await audioContext.resume();
+        return audioContext;
+    };
+
+    const playTone = async (tone = 'chime') => {
+        const context = await ensureAudioContext();
+        if (!context) return;
+
+        const notes = toneMap[tone] || toneMap.chime;
+        const start = context.currentTime;
+
+        notes.forEach((frequency, index) => {
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+            const noteStart = start + index * 0.16;
+
+            oscillator.type = tone === 'soft' ? 'sine' : 'triangle';
+            oscillator.frequency.setValueAtTime(frequency, noteStart);
+            gain.gain.setValueAtTime(0.0001, noteStart);
+            gain.gain.exponentialRampToValueAtTime(tone === 'urgent' ? 0.12 : 0.08, noteStart + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, noteStart + 0.14);
+            oscillator.connect(gain).connect(context.destination);
+            oscillator.start(noteStart);
+            oscillator.stop(noteStart + 0.16);
+        });
+    };
 
     const setButtonState = (label, disabled = false) => {
         buttons.forEach((button) => {
@@ -340,6 +380,7 @@ const initPushNotifications = () => {
                 setButtonState('Saving...', true);
                 const registration = await navigator.serviceWorker.ready;
                 const existing = await registration.pushManager.getSubscription();
+                await ensureAudioContext().catch(() => null);
 
                 if (existing) {
                     await deleteSubscription(existing);
@@ -366,6 +407,20 @@ const initPushNotifications = () => {
                 setButtonState('Enable alerts');
             }
         });
+    });
+
+    toneButtons.forEach((button) => {
+        button.hidden = false;
+        button.addEventListener('click', () => {
+            const select = document.querySelector('[data-push-tone-select]');
+            const tone = select instanceof HTMLSelectElement ? select.value : button.dataset.pushTonePreview;
+            playTone(tone).catch((error) => console.error('Push notification tone preview failed:', error));
+        });
+    });
+
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.type !== 'life:push-tone') return;
+        playTone(event.data.tone).catch(() => {});
     });
 
     window.addEventListener('load', () => {
