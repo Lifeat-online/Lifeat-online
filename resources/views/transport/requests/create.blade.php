@@ -1,85 +1,110 @@
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">Request Transport</h2>
-    </x-slot>
+@extends('layouts.public')
 
-    <div class="py-10">
-        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
-            <section class="rounded-lg bg-white p-6 shadow-sm">
-                <h3 class="text-lg font-semibold text-gray-900">Ride, parcel, or delivery request</h3>
-                @if ($activeDriverCount > 0)
-                    <p class="mt-2 rounded-md bg-green-50 px-4 py-3 text-sm text-green-800">{{ $activeDriverCount }} driver(s) are currently available for immediate requests.</p>
-                @else
-                    <p class="mt-2 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-900">No drivers are online right now. You can still save a scheduled ride or delivery request.</p>
-                @endif
-                <form method="post" action="{{ route('transport.requests.store') }}" class="mt-6 space-y-5">
-                    @csrf
-                    <div class="grid gap-4 md:grid-cols-2">
-                        <label class="block text-sm font-medium text-gray-700">Service type
-                            <select name="service_type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                                <option value="parcel">Parcel delivery</option>
-                                <option value="ride">Passenger ride</option>
-                                <option value="errand">Errand or collection</option>
-                                <option value="heavy_goods">Large item delivery</option>
-                            </select>
-                        </label>
-                        <label class="block text-sm font-medium text-gray-700">Payment
-                            <select name="payment_method" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                                <option value="payfast">Pay online with PayFast</option>
-                                <option value="cash">Cash to driver</option>
-                                <option value="card_machine">Driver card machine</option>
-                            </select>
-                        </label>
-                    </div>
+@section('title', 'Request Transport | Life Platform')
 
-                    <div class="grid gap-4 md:grid-cols-2">
-                        <label class="block text-sm font-medium text-gray-700">Timing
-                            <select name="request_timing" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                                <option value="immediate" @selected(old('request_timing') === 'immediate')>As soon as possible</option>
-                                <option value="scheduled" @selected(old('request_timing') === 'scheduled' || $activeDriverCount === 0)>Schedule for later</option>
-                            </select>
-                        </label>
-                        <label class="block text-sm font-medium text-gray-700">Scheduled pickup
-                            <input name="scheduled_pickup_at" type="datetime-local" value="{{ old('scheduled_pickup_at') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                        </label>
-                    </div>
+@push('styles')
+    <style>
+        .transport-form-shell { max-width: 920px; margin: 0 auto; }
+        .transport-form-card { border: 1px solid rgb(var(--border-rgb) / 0.9); border-radius: 18px; padding: 1.5rem; background: rgb(var(--surface-rgb) / 0.94); box-shadow: var(--shadow-soft); }
+        .transport-form-grid { display: grid; gap: 1rem; }
+        .transport-form-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .transport-form-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .transport-form-label { display: grid; gap: 0.4rem; font-size: 0.9rem; font-weight: 700; color: var(--text); }
+        .transport-form-field { width: 100%; border: 1px solid rgb(var(--border-rgb) / 1); border-radius: 12px; background: rgb(var(--surface-rgb) / 1); color: var(--text); padding: 0.78rem 0.9rem; box-shadow: none; }
+        .transport-form-field:focus { outline: 2px solid rgb(var(--brand-rgb) / 0.35); border-color: rgb(var(--brand-rgb) / 0.9); }
+        .transport-alert { margin: 0.75rem 0 1.2rem; border-radius: 12px; padding: 0.85rem 1rem; font-size: 0.94rem; }
+        .transport-alert.available { background: rgb(22 163 74 / 0.12); color: rgb(22 101 52); }
+        .transport-alert.pending { background: rgb(245 158 11 / 0.14); color: rgb(146 64 14); }
+        html[data-theme="dark"] .transport-alert.available { color: rgb(187 247 208); }
+        html[data-theme="dark"] .transport-alert.pending { color: rgb(253 230 138); }
+        @media (max-width: 760px) {
+            .transport-form-grid.two,
+            .transport-form-grid.four { grid-template-columns: 1fr; }
+        }
+    </style>
+@endpush
 
-                    <div class="grid gap-4 md:grid-cols-2">
-                        <label class="block text-sm font-medium text-gray-700">Pickup address
-                            <input name="pickup_address" value="{{ old('pickup_address') }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                        </label>
-                        <label class="block text-sm font-medium text-gray-700">Dropoff address
-                            <input name="dropoff_address" value="{{ old('dropoff_address') }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                        </label>
-                    </div>
+@section('content')
+    <section class="section transport-form-shell">
+        <div class="transport-form-card">
+            <span class="badge">Taxi / Delivery</span>
+            <h2 class="h2-tight">Request transport</h2>
+            <p class="muted">Book a ride, parcel delivery, errand, or larger local delivery.</p>
 
-                    <div class="grid gap-4 md:grid-cols-4">
-                        <label class="block text-sm font-medium text-gray-700">Distance km
-                            <input name="distance_km" type="number" min="0.1" max="2000" step="0.1" value="{{ old('distance_km', 5) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                        </label>
-                        <label class="block text-sm font-medium text-gray-700">People
-                            <input name="passenger_count" type="number" min="0" max="80" value="{{ old('passenger_count', 0) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                        </label>
-                        <label class="block text-sm font-medium text-gray-700">Parcel kg
-                            <input name="parcel_weight_kg" type="number" min="0" step="0.1" value="{{ old('parcel_weight_kg') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                        </label>
-                        <label class="block text-sm font-medium text-gray-700">Vehicle
-                            <select name="required_vehicle_type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                                <option value="">Any suitable</option>
-                                @foreach (['bicycle', 'scooter', 'motorcycle', 'car', 'bakkie', 'ldv', 'van', 'truck', 'trailer'] as $type)
-                                    <option value="{{ $type }}">{{ ucfirst($type) }}</option>
-                                @endforeach
-                            </select>
-                        </label>
-                    </div>
+            <h3>Ride, parcel, or delivery request</h3>
+            @if ($activeDriverCount > 0)
+                <p class="transport-alert available">{{ $activeDriverCount }} driver(s) are currently available for immediate requests.</p>
+            @else
+                <p class="transport-alert pending">No drivers are online right now. You can still save a scheduled ride or delivery request.</p>
+            @endif
 
-                    <label class="block text-sm font-medium text-gray-700">Notes
-                        <textarea name="client_notes" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">{{ old('client_notes') }}</textarea>
+            <form method="post" action="{{ route('transport.requests.store') }}" class="transport-form-grid">
+                @csrf
+                <div class="transport-form-grid two">
+                    <label class="transport-form-label">Service type
+                        <select name="service_type" class="transport-form-field">
+                            <option value="parcel">Parcel delivery</option>
+                            <option value="ride">Passenger ride</option>
+                            <option value="errand">Errand or collection</option>
+                            <option value="heavy_goods">Large item delivery</option>
+                        </select>
                     </label>
+                    <label class="transport-form-label">Payment
+                        <select name="payment_method" class="transport-form-field">
+                            <option value="payfast">Pay online with PayFast</option>
+                            <option value="cash">Cash to driver</option>
+                            <option value="card_machine">Driver card machine</option>
+                        </select>
+                    </label>
+                </div>
 
-                    <button class="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Send to available drivers</button>
-                </form>
-            </section>
+                <div class="transport-form-grid two">
+                    <label class="transport-form-label">Timing
+                        <select name="request_timing" class="transport-form-field">
+                            <option value="immediate" @selected(old('request_timing') === 'immediate')>As soon as possible</option>
+                            <option value="scheduled" @selected(old('request_timing') === 'scheduled' || $activeDriverCount === 0)>Schedule for later</option>
+                        </select>
+                    </label>
+                    <label class="transport-form-label">Scheduled pickup
+                        <input name="scheduled_pickup_at" type="datetime-local" value="{{ old('scheduled_pickup_at') }}" class="transport-form-field">
+                    </label>
+                </div>
+
+                <div class="transport-form-grid two">
+                    <label class="transport-form-label">Pickup address
+                        <input name="pickup_address" value="{{ old('pickup_address') }}" required class="transport-form-field">
+                    </label>
+                    <label class="transport-form-label">Dropoff address
+                        <input name="dropoff_address" value="{{ old('dropoff_address') }}" required class="transport-form-field">
+                    </label>
+                </div>
+
+                <div class="transport-form-grid four">
+                    <label class="transport-form-label">Distance km
+                        <input name="distance_km" type="number" min="0.1" max="2000" step="0.1" value="{{ old('distance_km', 5) }}" required class="transport-form-field">
+                    </label>
+                    <label class="transport-form-label">People
+                        <input name="passenger_count" type="number" min="0" max="80" value="{{ old('passenger_count', 0) }}" class="transport-form-field">
+                    </label>
+                    <label class="transport-form-label">Parcel kg
+                        <input name="parcel_weight_kg" type="number" min="0" step="0.1" value="{{ old('parcel_weight_kg') }}" class="transport-form-field">
+                    </label>
+                    <label class="transport-form-label">Vehicle
+                        <select name="required_vehicle_type" class="transport-form-field">
+                            <option value="">Any suitable</option>
+                            @foreach (['bicycle', 'scooter', 'motorcycle', 'car', 'bakkie', 'ldv', 'van', 'truck', 'trailer'] as $type)
+                                <option value="{{ $type }}">{{ ucfirst($type) }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                </div>
+
+                <label class="transport-form-label">Notes
+                    <textarea name="client_notes" rows="4" class="transport-form-field">{{ old('client_notes') }}</textarea>
+                </label>
+
+                <button class="button" type="submit">Send to available drivers</button>
+            </form>
         </div>
-    </div>
-</x-app-layout>
+    </section>
+@endsection

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3251e">
+  <title>Offline - Life Platform</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="/pwa/favicon-32x32.png">
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, Figtree, Arial, sans-serif;
+      background: #f8fafc;
+      color: #111827;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    main {
+      width: min(100%, 560px);
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #ffffff;
+      padding: 32px;
+      box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+    }
+
+    img {
+      width: 160px;
+      height: auto;
+      display: block;
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(1.75rem, 5vw, 2.5rem);
+      line-height: 1.05;
+    }
+
+    p {
+      margin: 0 0 24px;
+      color: #4b5563;
+      line-height: 1.6;
+    }
+
+    a, button {
+      appearance: none;
+      border: 0;
+      border-radius: 6px;
+      background: #f3251e;
+      color: #ffffff;
+      cursor: pointer;
+      display: inline-flex;
+      font: inherit;
+      font-weight: 700;
+      padding: 12px 16px;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <img src="/branding/life-logo-light.svg" alt="Life Platform">
+    <h1>You are offline</h1>
+    <p>Life@ has saved the core app shell and public pages you have visited. Reconnect to load fresh listings, forms, payments, and live transport or fault data.</p>
+    <button type="button" onclick="window.location.reload()">Try again</button>
+  </main>
+</body>
+</html>

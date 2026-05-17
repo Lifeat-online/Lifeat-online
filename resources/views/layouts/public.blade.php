@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', config('app.name', 'Life Platform'))</title>
+    @include('partials.pwa-head')
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="preload" as="image" href="{{ asset('branding/life-logo-light.svg') }}">
     <link rel="preload" as="image" href="{{ asset('branding/life-logo-dark.svg') }}">
@@ -103,6 +104,14 @@
                 break;
             case 'transport.index':
                 $pushCrumb('Taxi / Delivery', route('transport.index'));
+                break;
+            case 'transport.requests.create':
+                $pushCrumb('Taxi / Delivery', route('transport.index'));
+                $pushCrumb('Request transport', null);
+                break;
+            case 'transport.requests.show':
+                $pushCrumb('Taxi / Delivery', route('transport.index'));
+                $pushCrumb('Transport request', null);
                 break;
             case 'search.index':
                 $pushCrumb('Search', route('search.index'));
