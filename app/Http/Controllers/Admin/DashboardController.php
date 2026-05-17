@@ -20,6 +20,7 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Models\WriterApplication;
 use App\Services\OpenRouterTranslationService;
+use App\Services\GoogleMapsService;
 use App\Services\PlatformTranslationBatchService;
 use App\Services\VapidKeySetupService;
 use Carbon\Carbon;
@@ -30,7 +31,7 @@ use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
-    public function __invoke(VapidKeySetupService $vapidKeys, OpenRouterTranslationService $translations, PlatformTranslationBatchService $translationBatch): View
+    public function __invoke(VapidKeySetupService $vapidKeys, OpenRouterTranslationService $translations, PlatformTranslationBatchService $translationBatch, GoogleMapsService $maps): View
     {
         $user = Auth::user();
         $supportThreshold = Carbon::now()->addDays(7);
@@ -96,11 +97,11 @@ class DashboardController extends Controller
             'latestEvents' => Event::latest()->limit(5)->get(),
             'latestArticles' => Article::latest()->limit(5)->get(),
             'latestWriterApplications' => WriterApplication::latest('submitted_at')->limit(5)->get(),
-            ...($canAccessDevDashboard ? $this->buildDevDashboardData($vapidKeys, $translations, $translationBatch) : $this->emptyDevDashboardData()),
+            ...($canAccessDevDashboard ? $this->buildDevDashboardData($vapidKeys, $translations, $translationBatch, $maps) : $this->emptyDevDashboardData()),
         ]);
     }
 
-    private function buildDevDashboardData(VapidKeySetupService $vapidKeys, OpenRouterTranslationService $translations, PlatformTranslationBatchService $translationBatch): array
+    private function buildDevDashboardData(VapidKeySetupService $vapidKeys, OpenRouterTranslationService $translations, PlatformTranslationBatchService $translationBatch, GoogleMapsService $maps): array
     {
         $roles = Role::query()
             ->withCount(['users', 'permissions'])
@@ -172,6 +173,7 @@ class DashboardController extends Controller
             ],
             'devWebPushStatus' => $vapidKeys->status(),
             'devTranslationStatus' => $this->translationStatus($translations, $translationBatch),
+            'devMapStatus' => $this->mapStatus($maps),
             'devRoleCards' => $roles,
             'devPermissionCards' => $permissions->sortByDesc('roles_count')->take(12)->values(),
             'devPrimaryRoleBreakdown' => $primaryRoleBreakdown,
@@ -246,6 +248,11 @@ class DashboardController extends Controller
                 'openrouter_model' => (string) config('services.openrouter.model', 'google/gemma-4-31b-it:free'),
                 'sections' => [],
             ],
+            'devMapStatus' => [
+                'configured' => false,
+                'source' => 'Missing',
+                'masked_key' => '',
+            ],
             'devRoleCards' => collect(),
             'devPermissionCards' => collect(),
             'devPrimaryRoleBreakdown' => collect(),
@@ -299,6 +306,15 @@ class DashboardController extends Controller
             'openrouter_masked_key' => $translations->openRouterMaskedApiKey(),
             'openrouter_model' => $translations->openRouterModel(),
             'sections' => $translationBatch->status(),
+        ];
+    }
+
+    private function mapStatus(GoogleMapsService $maps): array
+    {
+        return [
+            'configured' => $maps->configured(),
+            'source' => $maps->apiKeySource(),
+            'masked_key' => $maps->maskedApiKey(),
         ];
     }
 

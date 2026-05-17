@@ -44,6 +44,13 @@ return [
         'timeout' => env('GOOGLE_TRANSLATE_TIMEOUT', 30),
     ],
 
+    'google_maps' => [
+        'key' => env('GOOGLE_MAPS_API_KEY'),
+        'places_endpoint' => env('GOOGLE_PLACES_ENDPOINT', 'https://places.googleapis.com/v1'),
+        'geocoding_endpoint' => env('GOOGLE_GEOCODING_ENDPOINT', 'https://maps.googleapis.com/maps/api/geocode/json'),
+        'timeout' => env('GOOGLE_MAPS_TIMEOUT', 15),
+    ],
+
     'translation' => [
         'provider' => env('TRANSLATION_PROVIDER', 'google'),
     ],

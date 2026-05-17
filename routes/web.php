@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\EventController as AdminEventController;
 use App\Http\Controllers\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\Admin\ListingController as AdminListingController;
 use App\Http\Controllers\Admin\MetricsController as AdminMetricsController;
+use App\Http\Controllers\Admin\MapIntegrationController as AdminMapIntegrationController;
 use App\Http\Controllers\Admin\PackageController as AdminPackageController;
 use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Admin\VoucherController as AdminVoucherController;
@@ -46,6 +47,7 @@ use App\Http\Controllers\DirectoryController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LegalController;
+use App\Http\Controllers\MapAddressController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\VoucherRedemptionController;
@@ -104,6 +106,12 @@ Route::post('/add-listing/start', [AddListingController::class, 'start'])->middl
 Route::view('/transport', 'transport.index')->name('transport.index');
 Route::get('/about', [AboutController::class, 'index'])->name('about.index');
 
+Route::prefix('maps')->name('maps.')->middleware('throttle:60,1')->group(function () {
+    Route::get('/places/autocomplete', [MapAddressController::class, 'autocomplete'])->name('places.autocomplete');
+    Route::get('/places/details', [MapAddressController::class, 'place'])->name('places.details');
+    Route::get('/places/reverse', [MapAddressController::class, 'reverse'])->name('places.reverse');
+});
+
 Route::get('/faults', [CivicFaultMapController::class, 'index'])->name('faults.index');
 Route::get('/faults/data/faults', [CivicFaultDataController::class, 'faults'])->name('faults.data.faults');
 Route::get('/faults/data/councillors', [CivicFaultDataController::class, 'councillors'])->name('faults.data.councillors');
@@ -119,6 +127,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('dev')->name('dev.')->group(fu
     Route::post('/translations/preview', [AdminTranslationController::class, 'preview'])->middleware('throttle:12,1')->name('translations.preview');
     Route::post('/translations/batch', [AdminTranslationController::class, 'batch'])->middleware('throttle:60,1')->name('translations.batch');
     Route::post('/translations/articles/{article:slug}', [AdminTranslationController::class, 'translateArticle'])->middleware('throttle:12,1')->name('translations.articles.translate');
+    Route::post('/maps/key', [AdminMapIntegrationController::class, 'saveKey'])->middleware('throttle:6,1')->name('maps.key.store');
     Route::get('/transport', [TransportAdminSetupController::class, 'index'])->name('transport.setup');
     Route::post('/transport/managers', [TransportAdminSetupController::class, 'storeManager'])->name('transport.managers.store');
     Route::put('/transport/settings', [TransportAdminSetupController::class, 'updateSettings'])->name('transport.settings.update');

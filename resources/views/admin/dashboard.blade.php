@@ -316,6 +316,29 @@
                         <p class="mt-3 text-sm text-gray-500" data-translation-settings-message>Environment variables still take priority over saved keys.</p>
                     </div>
 
+                    <div class="rounded-lg bg-white p-6 shadow-sm" data-map-settings-form data-endpoint="{{ route('dev.maps.key.store') }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">Google Maps Address Search</h3>
+                                <p class="mt-1 text-sm text-gray-500">Use Google Places for South African address autocomplete and GPS reverse lookup. The key stays server-side.</p>
+                            </div>
+                            <div class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-gray-600">
+                                <p><strong>Status:</strong> <span data-map-status>{{ $devMapStatus['configured'] ? 'Configured' : 'Missing key' }}</span></p>
+                                <p><strong>Source:</strong> <span data-map-source>{{ $devMapStatus['source'] }}</span></p>
+                                <p><strong>Google Maps key:</strong> <span data-map-masked>{{ $devMapStatus['masked_key'] ?: 'Not saved' }}</span></p>
+                            </div>
+                        </div>
+                        <div class="mt-5 grid gap-4 lg:grid-cols-[1fr,auto] lg:items-end">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Google Maps API key</label>
+                                <input class="w-full rounded-md border-gray-300" type="password" autocomplete="off" data-map-key placeholder="Google Maps / Places API key">
+                            </div>
+                            <button type="button" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-map-settings-submit>Save Maps key</button>
+                        </div>
+                        <p class="mt-3 text-sm text-gray-500" data-map-settings-message>Enable Places API and Geocoding API on the same Google Cloud key. GOOGLE_MAPS_API_KEY still takes priority over saved keys.</p>
+                    </div>
+
                     <div class="rounded-lg bg-white p-6 shadow-sm" data-translation-batch data-endpoint="{{ route('dev.translations.batch') }}">
                         <input type="hidden" name="_token" value="{{ csrf_token() }}">
                         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -887,6 +910,47 @@
                         if (openRouterModelInput && payload.model && payload.provider === 'openrouter') openRouterModelInput.value = payload.model;
                     } catch (error) {
                         if (message) message.textContent = error instanceof Error ? error.message : 'Unable to save key.';
+                    } finally {
+                        button.disabled = false;
+                    }
+                });
+            }
+
+            const mapSettingsForm = document.querySelector('[data-map-settings-form]');
+            if (mapSettingsForm) {
+                const endpoint = mapSettingsForm.getAttribute('data-endpoint');
+                const token = mapSettingsForm.querySelector('input[name="_token"]')?.value;
+                const keyInput = mapSettingsForm.querySelector('[data-map-key]');
+                const button = mapSettingsForm.querySelector('[data-map-settings-submit]');
+                const message = mapSettingsForm.querySelector('[data-map-settings-message]');
+                const status = mapSettingsForm.querySelector('[data-map-status]');
+                const source = mapSettingsForm.querySelector('[data-map-source]');
+                const masked = mapSettingsForm.querySelector('[data-map-masked]');
+
+                button?.addEventListener('click', async () => {
+                    button.disabled = true;
+                    if (message) message.textContent = 'Saving Maps key...';
+
+                    try {
+                        const response = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': token || '',
+                            },
+                            body: JSON.stringify({
+                                google_maps_api_key: keyInput?.value || '',
+                            }),
+                        });
+                        const payload = await response.json().catch(() => ({}));
+                        if (message) message.textContent = payload.message || `Request finished with status ${response.status}.`;
+                        if (status) status.textContent = payload.configured ? 'Configured' : 'Missing key';
+                        if (source) source.textContent = payload.source || 'Settings';
+                        if (masked) masked.textContent = payload.masked_key || 'Not saved';
+                        if (keyInput && response.ok) keyInput.value = '';
+                    } catch (error) {
+                        if (message) message.textContent = error instanceof Error ? error.message : 'Unable to save Maps key.';
                     } finally {
                         button.disabled = false;
                     }

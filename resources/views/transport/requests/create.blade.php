@@ -74,7 +74,7 @@
                 <p class="transport-alert pending">No drivers are online right now. You can still save a scheduled ride or delivery request.</p>
             @endif
 
-            <form method="post" action="{{ route('transport.requests.store') }}" id="transport-request-form" class="transport-form-grid">
+            <form method="post" action="{{ route('transport.requests.store') }}" id="transport-request-form" class="transport-form-grid" data-address-autocomplete-endpoint="{{ route('maps.places.autocomplete') }}" data-address-details-endpoint="{{ route('maps.places.details') }}" data-address-reverse-endpoint="{{ route('maps.places.reverse') }}">
                 @csrf
                 <div class="transport-form-grid two">
                     <label class="transport-form-label">Service type
@@ -236,7 +236,9 @@
             };
 
             const fallbackAddress = (lat, lng) => `${lat.toFixed(7)}, ${lng.toFixed(7)}`;
-            const southAfricaViewbox = '16.344976,-22.126612,32.830120,-34.819166';
+            const addressAutocompleteEndpoint = form.dataset.addressAutocompleteEndpoint || '';
+            const addressDetailsEndpoint = form.dataset.addressDetailsEndpoint || '';
+            const addressReverseEndpoint = form.dataset.addressReverseEndpoint || '';
 
             const debounce = (callback, wait = 350) => {
                 let timer = null;
@@ -508,32 +510,15 @@
                 reviewModal.hidden = true;
             };
 
-            const sortByDistance = (results, origin) => {
-                if (!origin) return results;
-
-                return results
-                    .map((result) => {
-                        const lat = Number(result.lat);
-                        const lng = Number(result.lon);
-                        const resultOrigin = Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
-
-                        return {
-                            ...result,
-                            distance_km: resultOrigin ? distanceKm(origin, resultOrigin) : Number.POSITIVE_INFINITY,
-                        };
-                    })
-                    .sort((a, b) => a.distance_km - b.distance_km);
-            };
-
             const searchAddresses = async (query, signal, origin = null) => {
-                const url = new URL('https://nominatim.openstreetmap.org/search');
-                url.searchParams.set('format', 'jsonv2');
+                if (!addressAutocompleteEndpoint) return [];
+
+                const url = new URL(addressAutocompleteEndpoint, window.location.origin);
                 url.searchParams.set('q', query);
-                url.searchParams.set('addressdetails', '1');
-                url.searchParams.set('countrycodes', 'za');
-                url.searchParams.set('viewbox', southAfricaViewbox);
-                url.searchParams.set('bounded', '1');
-                url.searchParams.set('limit', '8');
+                if (origin) {
+                    url.searchParams.set('lat', String(origin.lat));
+                    url.searchParams.set('lng', String(origin.lng));
+                }
 
                 const response = await fetch(url.toString(), {
                     headers: { Accept: 'application/json' },
@@ -542,13 +527,30 @@
 
                 if (!response.ok) return [];
 
-                const results = await response.json();
-                return sortByDistance(Array.isArray(results) ? results : [], origin);
+                const payload = await response.json();
+
+                return Array.isArray(payload.results) ? payload.results : [];
+            };
+
+            const fetchAddressDetails = async (placeId) => {
+                if (!addressDetailsEndpoint || !placeId) return null;
+
+                const url = new URL(addressDetailsEndpoint, window.location.origin);
+                url.searchParams.set('place_id', placeId);
+
+                const response = await fetch(url.toString(), {
+                    headers: { Accept: 'application/json' },
+                });
+
+                if (!response.ok) return null;
+
+                const payload = await response.json();
+
+                return payload?.result || null;
             };
 
             const labelForResult = (result) => {
-                const address = result?.address || {};
-                return address.name || address.road || address.suburb || address.city || address.town || address.village || result.display_name || 'Address';
+                return result?.label || result?.display_name || 'Address';
             };
 
             const initAddressAutocomplete = (input) => {
@@ -565,6 +567,27 @@
                     if (fieldStatus) fieldStatus.textContent = message;
                 };
 
+                const selectResult = async (result) => {
+                    input.value = result.display_name || result.label || input.value;
+                    closeSuggestions(suggestions);
+                    setFieldStatus('Confirming address...');
+
+                    const details = await fetchAddressDetails(result.place_id);
+
+                    if (details?.lat && details?.lon) {
+                        input.value = details.display_name || details.formatted_address || result.display_name || input.value;
+                        lat.value = details.lat;
+                        lng.value = details.lon;
+                        updateTripDistance();
+                        setFieldStatus('Address selected.');
+                        return;
+                    }
+
+                    lat.value = '';
+                    lng.value = '';
+                    setFieldStatus('Select another suggestion or type the address manually.');
+                };
+
                 const renderResults = (results) => {
                     suggestions.replaceChildren();
 
@@ -578,18 +601,10 @@
                         title.textContent = labelForResult(result);
 
                         const detail = document.createElement('span');
-                        const distance = Number.isFinite(result.distance_km) ? `${result.distance_km.toFixed(1)} km away - ` : '';
-                        detail.textContent = `${distance}${result.display_name || ''}`;
+                        detail.textContent = result.detail || result.display_name || '';
 
                         option.append(title, detail);
-                        option.addEventListener('click', () => {
-                            input.value = result.display_name || input.value;
-                            lat.value = result.lat || '';
-                            lng.value = result.lon || '';
-                            closeSuggestions(suggestions);
-                            updateTripDistance();
-                            setFieldStatus('Address selected.');
-                        });
+                        option.addEventListener('click', () => selectResult(result));
 
                         suggestions.append(option);
                     });
@@ -663,11 +678,11 @@
             });
 
             const reverseGeocode = async (lat, lng) => {
-                const url = new URL('https://nominatim.openstreetmap.org/reverse');
-                url.searchParams.set('format', 'jsonv2');
+                if (!addressReverseEndpoint) return null;
+
+                const url = new URL(addressReverseEndpoint, window.location.origin);
                 url.searchParams.set('lat', String(lat));
-                url.searchParams.set('lon', String(lng));
-                url.searchParams.set('addressdetails', '1');
+                url.searchParams.set('lng', String(lng));
 
                 const response = await fetch(url.toString(), {
                     headers: { Accept: 'application/json' },
@@ -676,7 +691,7 @@
                 if (!response.ok) return null;
 
                 const data = await response.json();
-                return data?.display_name || null;
+                return data?.address || null;
             };
 
             button.addEventListener('click', () => {
