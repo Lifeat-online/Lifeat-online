@@ -65,7 +65,7 @@
             case 'directory.show':
                 $pushCrumb('Directory', route('directory.index'));
                 $listing = request()->route('listing');
-                $pushCrumb($listing?->title ?: 'Listing', null);
+                $pushCrumb($listing?->localizedValue('title') ?: 'Listing', null);
                 break;
             case 'vouchers.index':
                 $pushCrumb('Vouchers', route('vouchers.index'));
@@ -73,7 +73,7 @@
             case 'vouchers.show':
                 $pushCrumb('Vouchers', route('vouchers.index'));
                 $voucher = request()->route('voucher');
-                $pushCrumb($voucher?->title ?: 'Voucher', null);
+                $pushCrumb($voucher?->localizedValue('title') ?: 'Voucher', null);
                 break;
             case 'events.index':
                 $pushCrumb('Events', route('events.index'));
@@ -81,7 +81,7 @@
             case 'events.show':
                 $pushCrumb('Events', route('events.index'));
                 $event = request()->route('event');
-                $pushCrumb($event?->title ?: 'Event', null);
+                $pushCrumb($event?->localizedValue('title') ?: 'Event', null);
                 break;
             case 'articles.index':
             case 'articles.categories.show':
@@ -93,7 +93,7 @@
             case 'articles.show':
                 $pushCrumb('Articles', route('articles.index'));
                 $article = request()->route('article');
-                $pushCrumb($article?->title ?: 'Article', null);
+                $pushCrumb($article && method_exists($article, 'localizedTitle') ? $article->localizedTitle() : ($article?->title ?: 'Article'), null);
                 break;
             case 'classifieds.index':
                 $pushCrumb('Classifieds', route('classifieds.index'));
@@ -101,7 +101,7 @@
             case 'classifieds.show':
                 $pushCrumb('Classifieds', route('classifieds.index'));
                 $classified = request()->route('classified');
-                $pushCrumb($classified?->title ?: 'Classified', null);
+                $pushCrumb($classified?->localizedValue('title') ?: 'Classified', null);
                 break;
             case 'advertise.index':
                 $pushCrumb('Advertise', route('advertise.index'));

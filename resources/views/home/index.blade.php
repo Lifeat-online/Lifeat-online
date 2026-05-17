@@ -448,13 +448,13 @@
             <div class="lead-grid">
                 <article class="card">
                     @if ($leadArticle->featured_image)
-                        <img class="feature-media" src="{{ \Illuminate\Support\Facades\Storage::url($leadArticle->featured_image) }}" alt="{{ $leadArticle->title }}" decoding="async" fetchpriority="high">
+                        <img class="feature-media" src="{{ \Illuminate\Support\Facades\Storage::url($leadArticle->featured_image) }}" alt="{{ $leadArticle->localizedTitle() }}" decoding="async" fetchpriority="high">
                     @else
                         <div class="media-fallback" aria-hidden="true"></div>
                     @endif
                     <span class="eyebrow">Lead story</span>
                     <h3 class="lead-title">
-                        <a href="{{ route('articles.show', $leadArticle) }}">{{ $leadArticle->title }}</a>
+                        <a href="{{ route('articles.show', $leadArticle) }}">{{ $leadArticle->localizedTitle() }}</a>
                     </h3>
                     <div class="mini-meta">
                         {{ optional($leadArticle->published_at)->format('j M Y') ?: 'Draft' }}
@@ -462,10 +462,10 @@
                             · {{ $leadArticle->author->name }}
                         @endif
                     </div>
-                    <p class="mt-08">{{ $leadArticle->excerpt ?: \Illuminate\Support\Str::limit(strip_tags((string) $leadArticle->body), 240) }}</p>
+                    <p class="mt-08">{{ $leadArticle->localizedExcerpt() ?: \Illuminate\Support\Str::limit(strip_tags((string) $leadArticle->localizedBody()), 240) }}</p>
                     <div class="mt-10">
                         @foreach ($leadArticle->categories as $category)
-                            <span class="badge">{{ $category->name }}</span>
+                            <span class="badge">{{ $category->localizedValue('name') }}</span>
                         @endforeach
                     </div>
                     <div class="mt-10">
@@ -477,14 +477,14 @@
                     @forelse ($secondaryArticles as $article)
                         <article class="story-item">
                             <span class="eyebrow">Latest</span>
-                            <h3 class="h3-tight"><a href="{{ route('articles.show', $article) }}">{{ $article->title }}</a></h3>
+                            <h3 class="h3-tight"><a href="{{ route('articles.show', $article) }}">{{ $article->localizedTitle() }}</a></h3>
                             <div class="mini-meta">
                                 {{ optional($article->published_at)->format('j M Y') ?: 'Draft' }}
                                 @if ($article->author)
                                     · {{ $article->author->name }}
                                 @endif
                             </div>
-                            <p class="h3-tight">{{ $article->excerpt ?: \Illuminate\Support\Str::limit(strip_tags((string) $article->body), 120) }}</p>
+                            <p class="h3-tight">{{ $article->localizedExcerpt() ?: \Illuminate\Support\Str::limit(strip_tags((string) $article->localizedBody()), 120) }}</p>
                         </article>
                     @empty
                         <div class="empty-state">More editorial stories will appear here as articles are published.</div>
@@ -515,7 +515,7 @@
             @forelse ($featuredCategories as $category)
                 <a href="{{ route('search.index', ['category' => $category->slug]) }}" class="category-card">
                     <span class="eyebrow">Category</span>
-                    <h3 class="h3-cat">{{ $category->name }}</h3>
+                    <h3 class="h3-cat">{{ $category->localizedValue('name') }}</h3>
                     <p class="muted h3-tight">{{ $category->visible_listings_count }} visible businesses</p>
                 </a>
             @empty
@@ -536,18 +536,18 @@
             @if ($loop->first)<div class="grid grid-2">@endif
             <article class="card listing-card-home">
                 @if ($listing->featured_image)
-                    <img class="feature-media media-220" src="{{ \Illuminate\Support\Facades\Storage::url($listing->featured_image) }}" alt="{{ $listing->title }}" loading="lazy" decoding="async">
+                    <img class="feature-media media-220" src="{{ \Illuminate\Support\Facades\Storage::url($listing->featured_image) }}" alt="{{ $listing->localizedValue('title') }}" loading="lazy" decoding="async">
                 @endif
                 @if ($listing->logo_path)
-                    <img class="listing-logo" src="{{ \Illuminate\Support\Facades\Storage::url($listing->logo_path) }}" alt="{{ $listing->title }} logo" loading="lazy" decoding="async">
+                    <img class="listing-logo" src="{{ \Illuminate\Support\Facades\Storage::url($listing->logo_path) }}" alt="{{ $listing->localizedValue('title') }} logo" loading="lazy" decoding="async">
                 @endif
                 <span class="eyebrow">{{ $listing->is_featured ? 'Featured business' : 'Local business' }}</span>
-                <h3 class="h3-card"><a href="{{ route('directory.show', $listing) }}">{{ $listing->title }}</a></h3>
-                <div class="mini-meta">{{ $listing->city ?: 'Location pending' }}{{ $listing->region ? ', '.$listing->region : '' }}</div>
-                <p>{{ $listing->excerpt ?: \Illuminate\Support\Str::limit(strip_tags((string) $listing->description), 150) }}</p>
+                <h3 class="h3-card"><a href="{{ route('directory.show', $listing) }}">{{ $listing->localizedValue('title') }}</a></h3>
+                <div class="mini-meta">{{ $listing->localizedValue('city') ?: 'Location pending' }}{{ $listing->localizedValue('region') ? ', '.$listing->localizedValue('region') : '' }}</div>
+                <p>{{ $listing->localizedValue('excerpt') ?: \Illuminate\Support\Str::limit(strip_tags((string) $listing->localizedValue('description')), 150) }}</p>
                 <div>
                     @foreach ($listing->categories->take(3) as $category)
-                        <span class="badge">{{ $category->name }}</span>
+                        <span class="badge">{{ $category->localizedValue('name') }}</span>
                     @endforeach
                 </div>
             </article>
@@ -625,17 +625,17 @@
             @if ($loop->first)<div class="grid grid-2">@endif
             <article class="card event-card-home">
                 @if ($event->featured_image)
-                    <img class="feature-media media-220" src="{{ \Illuminate\Support\Facades\Storage::url($event->featured_image) }}" alt="{{ $event->title }}" loading="lazy" decoding="async">
+                    <img class="feature-media media-220" src="{{ \Illuminate\Support\Facades\Storage::url($event->featured_image) }}" alt="{{ $event->localizedValue('title') }}" loading="lazy" decoding="async">
                 @endif
                 <span class="eyebrow">Upcoming event</span>
-                <h3 class="h3-card"><a href="{{ route('events.show', $event) }}">{{ $event->title }}</a></h3>
+                <h3 class="h3-card"><a href="{{ route('events.show', $event) }}">{{ $event->localizedValue('title') }}</a></h3>
                 <div class="mini-meta">
                     {{ optional($event->start_at)->format('D, j M Y g:i A') ?: 'Date pending' }}
                     @if ($event->listing)
-                        · {{ $event->listing->title }}
+                        · {{ $event->listing->localizedValue('title') }}
                     @endif
                 </div>
-                <p>{{ $event->excerpt ?: \Illuminate\Support\Str::limit(strip_tags((string) $event->description), 150) }}</p>
+                <p>{{ $event->localizedValue('excerpt') ?: \Illuminate\Support\Str::limit(strip_tags((string) $event->localizedValue('description')), 150) }}</p>
             </article>
             @if ($loop->last)</div>@endif
         @empty

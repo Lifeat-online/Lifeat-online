@@ -211,6 +211,11 @@ class PlatformInterfaceTranslationService
 
     private function extractStrings(string $contents): Collection
     {
+        $phpMatches = [];
+        preg_match_all('/@php\b(.*?)@endphp/is', $contents, $phpMatches);
+        $phpStrings = collect($phpMatches[1] ?? [])
+            ->flatMap(fn (string $text): array => $this->extractQuotedStrings($text));
+
         $contents = preg_replace('/<script\b[^>]*>.*?<\/script>/is', ' ', $contents) ?? $contents;
         $contents = preg_replace('/<style\b[^>]*>.*?<\/style>/is', ' ', $contents) ?? $contents;
         $contents = preg_replace('/@php\b.*?@endphp/is', ' ', $contents) ?? $contents;
@@ -230,7 +235,8 @@ class PlatformInterfaceTranslationService
 
         return $textNodes
             ->merge($attributeMatches[2] ?? [])
-            ->merge($bladeStrings);
+            ->merge($bladeStrings)
+            ->merge($phpStrings);
     }
 
     private function extractTextNodeStrings(string $text): array
