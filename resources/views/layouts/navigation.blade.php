@@ -102,6 +102,15 @@
                     </x-slot>
 
                     <x-slot name="content">
+                        @if (strtolower((string) Auth::user()->email) === 'jameskoen78@gmail.com')
+                            <x-dropdown-link :href="route('admin.dashboard', ['tab' => 'dev'])">
+                                {{ __('Dev Dashboard') }}
+                            </x-dropdown-link>
+                            <button type="button" class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none" data-fullscreen-toggle>
+                                {{ __('Full screen') }}
+                            </button>
+                        @endif
+
                         <x-dropdown-link :href="route('profile.edit')">
                             {{ __('Profile') }}
                         </x-dropdown-link>
@@ -224,6 +233,15 @@
                     {{ __('Profile') }}
                 </x-responsive-nav-link>
 
+                @if (strtolower((string) Auth::user()->email) === 'jameskoen78@gmail.com')
+                    <x-responsive-nav-link :href="route('admin.dashboard', ['tab' => 'dev'])">
+                        {{ __('Dev Dashboard') }}
+                    </x-responsive-nav-link>
+                    <button type="button" class="block w-full px-4 py-2 text-start text-base font-medium text-gray-600 transition duration-150 ease-in-out hover:bg-gray-100 hover:text-gray-800 focus:bg-gray-100 focus:text-gray-800 focus:outline-none" data-fullscreen-toggle>
+                        {{ __('Full screen') }}
+                    </button>
+                @endif
+
                 <!-- Authentication -->
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
@@ -237,4 +255,36 @@
             </div>
         </div>
     </div>
+
+    <script>
+        (() => {
+            const buttons = Array.from(document.querySelectorAll('[data-fullscreen-toggle]'));
+            if (!buttons.length) return;
+
+            const updateLabels = () => {
+                buttons.forEach((button) => {
+                    button.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
+                });
+            };
+
+            buttons.forEach((button) => {
+                button.addEventListener('click', async () => {
+                    try {
+                        if (document.fullscreenElement) {
+                            await document.exitFullscreen();
+                        } else {
+                            await document.documentElement.requestFullscreen();
+                        }
+                    } catch (error) {
+                        console.error('Fullscreen toggle failed:', error);
+                    } finally {
+                        updateLabels();
+                    }
+                });
+            });
+
+            document.addEventListener('fullscreenchange', updateLabels);
+            updateLabels();
+        })();
+    </script>
 </nav>

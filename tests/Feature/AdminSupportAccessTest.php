@@ -198,6 +198,8 @@ class AdminSupportAccessTest extends TestCase
         $response->assertOk();
         $response->assertSee('Management Area');
         $response->assertSee('Dev');
+        $response->assertSee('Dev Dashboard');
+        $response->assertSee('Full screen');
         $response->assertSee('Developer Control Center');
         $response->assertSee('Push Notification Setup');
         $response->assertSee(route('dev.webpush.vapid.enable'), false);
@@ -220,6 +222,7 @@ class AdminSupportAccessTest extends TestCase
         $response->assertOk();
         $response->assertSee('Management Area');
         $response->assertDontSee('Dev');
+        $response->assertDontSee('Dev Dashboard');
         $response->assertDontSee('Developer Control Center');
         $response->assertDontSee('Push Notification Setup');
         $response->assertDontSee(route('dev.webpush.vapid.enable'), false);

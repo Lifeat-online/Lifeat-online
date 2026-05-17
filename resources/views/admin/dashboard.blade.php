@@ -501,7 +501,12 @@
                     trigger.addEventListener('click', () => setActiveTab(trigger.getAttribute('data-tab-trigger')));
                 });
 
-                setActiveTab('overview');
+                const requestedTab = new URLSearchParams(window.location.search).get('tab');
+                const initialTab = triggers.some((trigger) => trigger.getAttribute('data-tab-trigger') === requestedTab)
+                    ? requestedTab
+                    : 'overview';
+
+                setActiveTab(initialTab);
             }
 
             const roots = Array.from(document.querySelectorAll('[data-metrics-root]'));
