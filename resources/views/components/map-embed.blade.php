@@ -62,6 +62,12 @@
     .life-marker-featured .life-marker-pin {
         background: #1d4ed8;
     }
+    .life-marker-status-available .life-marker-pin {
+        background: #16a34a;
+    }
+    .life-marker-status-busy .life-marker-pin {
+        background: #f97316;
+    }
     .life-marker-pin {
         width: 14px;
         height: 14px;
@@ -164,23 +170,40 @@
             maxClusterRadius: 50
         });
 
+        function escapeHtml(value) {
+            return String(value || '').replace(/[&<>"']/g, function (char) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                }[char];
+            });
+        }
+
         markers.forEach(function (m) {
             if (!m.lat || !m.lng) return;
 
+            var markerClass = m.marker_class ? String(m.marker_class).replace(/[^a-zA-Z0-9_-]/g, '') : '';
+
             // Custom circle div-icon
             var icon = L.divIcon({
-                className: m.featured ? 'life-marker-featured' : '',
+                className: [m.featured ? 'life-marker-featured' : '', markerClass].filter(Boolean).join(' '),
                 html: '<div class="life-marker-pin"></div>',
                 iconSize: [14, 14],
                 iconAnchor: [7, 7],
                 popupAnchor: [0, -10],
             });
 
-            var popupHtml = '<strong>' + m.title + '</strong>';
-            if (m.date)  popupHtml += '<br><small>' + m.date + '</small>';
-            if (m.city)  popupHtml += '<br><small>' + m.city + '</small>';
+            var popupHtml = '<strong>' + escapeHtml(m.title) + '</strong>';
+            if (m.status_label) popupHtml += '<br><small>Status: ' + escapeHtml(m.status_label) + '</small>';
+            if (m.vehicle) popupHtml += '<br><small>Vehicle: ' + escapeHtml(m.vehicle) + '</small>';
+            if (m.seen) popupHtml += '<br><small>Last seen: ' + escapeHtml(m.seen) + '</small>';
+            if (m.date)  popupHtml += '<br><small>' + escapeHtml(m.date) + '</small>';
+            if (m.city)  popupHtml += '<br><small>' + escapeHtml(m.city) + '</small>';
             if (m.distance) popupHtml += '<br><small style="color:#059669;">' + parseFloat(m.distance).toFixed(1) + ' km away</small>';
-            if (m.url)   popupHtml += '<br><a href="' + m.url + '" style="color:#1d4ed8;">View &rarr;</a>';
+            if (m.url)   popupHtml += '<br><a href="' + escapeHtml(m.url) + '" style="color:#1d4ed8;">View &rarr;</a>';
 
             var pin = L.marker([m.lat, m.lng], { icon: icon });
             pin.bindPopup(popupHtml);

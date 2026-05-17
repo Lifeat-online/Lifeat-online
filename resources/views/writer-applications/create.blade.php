@@ -94,6 +94,12 @@
             gap: 1rem;
             grid-template-columns: repeat(3, minmax(0, 1fr));
         }
+        .payout-note {
+            padding: 1rem;
+            border-radius: 18px;
+            border: 1px solid rgba(255, 111, 88, 0.3);
+            background: rgba(255, 111, 88, 0.08);
+        }
         .summary-strip {
             display: grid;
             gap: 1rem;
@@ -156,7 +162,7 @@
                 </div>
                 <div class="checklist-item">
                     <strong>Verification documents</strong>
-                    <p class="helper">Upload your ID, banking proof, and proof of residence as PDF or image files.</p>
+                    <p class="helper">Upload your ID and proof of residence as PDF or image files. Banking details are requested later only when a payout is needed.</p>
                 </div>
             </div>
         </div>
@@ -253,36 +259,19 @@
         </section>
 
         <section class="card form-card">
-            <h2>Banking And Verification</h2>
-            <p class="helper">These details support compliance checks and future payout preparation if your application is approved.</p>
-
-            <div class="info-grid">
-                <div class="field">
-                    <label for="bank_name">Bank name</label>
-                    <input id="bank_name" name="bank_name" value="{{ old('bank_name') }}" required>
-                </div>
-                <div class="field">
-                    <label for="account_holder_name">Account holder name</label>
-                    <input id="account_holder_name" name="account_holder_name" value="{{ old('account_holder_name') }}" required>
-                </div>
-                <div class="field">
-                    <label for="account_number">Account number</label>
-                    <input id="account_number" name="account_number" value="{{ old('account_number') }}" required>
-                </div>
-                <div class="field">
-                    <label for="branch_code">Branch code</label>
-                    <input id="branch_code" name="branch_code" value="{{ old('branch_code') }}" required>
-                </div>
+            <h2>Verification Now, Payout Details Later</h2>
+            <p class="helper">
+                Banking details are not required for this application. We only ask for bank account details after an article has been approved or a business has signed up, and a payout is requested.
+            </p>
+            <div class="payout-note" style="margin-top:1rem;">
+                <strong>No banking information is needed at signup.</strong>
+                <p class="helper">For now, submit only the verification documents needed to review your application. Payout banking details are collected securely inside the payout request workflow when money is due.</p>
             </div>
 
-            <div class="upload-grid" style="margin-top:1rem;">
+            <div class="upload-grid" style="margin-top:1rem; grid-template-columns: repeat(2, minmax(0, 1fr));">
                 <div class="field">
                     <label for="id_document_upload">ID document</label>
                     <input id="id_document_upload" type="file" name="id_document_upload" accept=".pdf,.jpg,.jpeg,.png" required>
-                </div>
-                <div class="field">
-                    <label for="banking_document_upload">Banking confirmation</label>
-                    <input id="banking_document_upload" type="file" name="banking_document_upload" accept=".pdf,.jpg,.jpeg,.png" required>
                 </div>
                 <div class="field">
                     <label for="proof_of_residence_upload">Proof of residence</label>
@@ -293,7 +282,7 @@
 
         <section class="card form-card">
             <h2>Submit Application</h2>
-            <p class="helper">By submitting, you confirm that the information is accurate and that the uploaded documents belong to you.</p>
+            <p class="helper">By submitting, you confirm that the information is accurate and that the uploaded documents belong to you. Banking details will only be requested later if a payout is due.</p>
             <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
                 <button type="submit" class="button">Submit staff application</button>
                 <a href="{{ route('home') }}" class="button" style="background:transparent; color:var(--primary); border:1px solid var(--border);">Back to home</a>

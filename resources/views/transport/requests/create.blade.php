@@ -515,6 +515,7 @@
 
                 const url = new URL(addressAutocompleteEndpoint, window.location.origin);
                 url.searchParams.set('q', query);
+                url.searchParams.set('countrycodes', 'za');
                 if (origin) {
                     url.searchParams.set('lat', String(origin.lat));
                     url.searchParams.set('lng', String(origin.lng));
@@ -551,6 +552,10 @@
 
             const labelForResult = (result) => {
                 return result?.label || result?.display_name || 'Address';
+            };
+
+            const sortByDistance = (results) => {
+                return [...results].sort((a, b) => Number(a.distance_meters ?? Infinity) - Number(b.distance_meters ?? Infinity));
             };
 
             const initAddressAutocomplete = (input) => {
@@ -633,7 +638,7 @@
                             ? coordinatesFor('pickup') || currentLocation
                             : currentLocation || coordinatesFor('pickup');
                         const results = await searchAddresses(query, controller.signal, origin);
-                        renderResults(results);
+                        renderResults(sortByDistance(results));
                     } catch (error) {
                         if (error.name !== 'AbortError') {
                             closeSuggestions(suggestions);

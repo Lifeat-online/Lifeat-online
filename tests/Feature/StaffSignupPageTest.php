@@ -19,12 +19,14 @@ class StaffSignupPageTest extends TestCase
         $response->assertOk();
         $response->assertSee('Writer and staff application');
         $response->assertSee('Sample Content');
-        $response->assertSee('Banking And Verification');
+        $response->assertSee('Verification Now, Payout Details Later');
+        $response->assertSee('No banking information is needed at signup.');
+        $response->assertSee('Banking details are not required for this application.');
         $response->assertSee('Use this if businesses may contact you on WhatsApp after your staff application is approved.');
         $response->assertSee('Submit staff application');
     }
 
-    public function test_visitor_can_submit_a_staff_signup_application(): void
+    public function test_visitor_can_submit_a_staff_signup_application_without_banking_details(): void
     {
         Storage::fake('public');
         Storage::fake('local');
@@ -41,13 +43,8 @@ class StaffSignupPageTest extends TestCase
             'sample_article_body' => str_repeat('This article sample explores how local traders use the Saturday market to build repeat customers and create opportunities in the region. ', 4),
             'sample_advert_title' => 'Visit Blue Crane Bakery this weekend',
             'sample_advert_body' => str_repeat('Fresh bread, family specials, and a warm local welcome make this bakery worth the stop. ', 2),
-            'bank_name' => 'Capitec',
-            'account_holder_name' => 'Lebo Mokoena',
-            'account_number' => '1234567890',
-            'branch_code' => '470010',
             'profile_photo_upload' => UploadedFile::fake()->image('profile.jpg'),
             'id_document_upload' => UploadedFile::fake()->create('id.pdf', 120, 'application/pdf'),
-            'banking_document_upload' => UploadedFile::fake()->create('banking.pdf', 120, 'application/pdf'),
             'proof_of_residence_upload' => UploadedFile::fake()->create('residence.pdf', 120, 'application/pdf'),
         ]);
 
@@ -58,17 +55,20 @@ class StaffSignupPageTest extends TestCase
             'username' => 'lebo_writer',
             'status' => 'pending',
             'available_on_whatsapp' => true,
+            'bank_name' => null,
+            'account_holder_name' => null,
+            'account_number' => null,
+            'branch_code' => null,
         ]);
 
         $application = WriterApplication::query()->firstOrFail();
 
         Storage::disk('public')->assertExists($application->profile_photo_path);
         Storage::disk('local')->assertExists($application->id_document_path);
-        Storage::disk('local')->assertExists($application->banking_document_path);
         Storage::disk('local')->assertExists($application->proof_of_residence_path);
         Storage::disk('public')->assertMissing($application->id_document_path);
-        Storage::disk('public')->assertMissing($application->banking_document_path);
         Storage::disk('public')->assertMissing($application->proof_of_residence_path);
+        $this->assertNull($application->banking_document_path);
 
         $this->followRedirects($response)
             ->assertSee('Application received')

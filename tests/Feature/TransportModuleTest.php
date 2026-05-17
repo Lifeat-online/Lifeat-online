@@ -28,6 +28,80 @@ class TransportModuleTest extends TestCase
             ->assertSee(route('transport.requests.create'), false);
     }
 
+    public function test_transport_page_shows_online_driver_map_and_statuses(): void
+    {
+        $availableUser = User::factory()->create(['name' => 'Available Driver', 'role' => 'transport_driver']);
+        $availableDriver = TransportDriver::create([
+            'user_id' => $availableUser->id,
+            'status' => TransportDriver::STATUS_APPROVED,
+            'can_transport_people' => true,
+            'approved_at' => now(),
+        ]);
+        $availableVehicle = TransportVehicle::create([
+            'transport_driver_id' => $availableDriver->id,
+            'name' => 'Blue sedan',
+            'vehicle_type' => 'car',
+            'status' => TransportVehicle::STATUS_APPROVED,
+            'can_carry_people' => true,
+            'pricing_mode' => 'per_km',
+            'base_fee' => 20,
+            'per_km_fee' => 8,
+            'minimum_fee' => 35,
+            'approved_at' => now(),
+        ]);
+        TransportDutySession::create([
+            'transport_driver_id' => $availableDriver->id,
+            'transport_vehicle_id' => $availableVehicle->id,
+            'status' => TransportDutySession::STATUS_AVAILABLE,
+            'started_at' => now(),
+            'last_latitude' => -28.2319,
+            'last_longitude' => 28.3093,
+            'last_seen_at' => now(),
+        ]);
+
+        $busyUser = User::factory()->create(['name' => 'Busy Driver', 'role' => 'transport_driver']);
+        $busyDriver = TransportDriver::create([
+            'user_id' => $busyUser->id,
+            'status' => TransportDriver::STATUS_APPROVED,
+            'can_transport_parcels' => true,
+            'approved_at' => now(),
+        ]);
+        $busyVehicle = TransportVehicle::create([
+            'transport_driver_id' => $busyDriver->id,
+            'name' => 'Parcel bakkie',
+            'vehicle_type' => 'bakkie',
+            'status' => TransportVehicle::STATUS_APPROVED,
+            'can_carry_parcels' => true,
+            'pricing_mode' => 'per_km',
+            'base_fee' => 30,
+            'per_km_fee' => 10,
+            'minimum_fee' => 50,
+            'approved_at' => now(),
+        ]);
+        TransportDutySession::create([
+            'transport_driver_id' => $busyDriver->id,
+            'transport_vehicle_id' => $busyVehicle->id,
+            'status' => TransportDutySession::STATUS_BUSY,
+            'started_at' => now(),
+            'last_latitude' => -28.2400,
+            'last_longitude' => 28.3200,
+            'last_seen_at' => now(),
+        ]);
+
+        $this->get(route('transport.index'))
+            ->assertOk()
+            ->assertSee('Live driver availability')
+            ->assertSee('transport-driver-map', false)
+            ->assertSee('Available Driver')
+            ->assertSee('Blue sedan')
+            ->assertSee('Available')
+            ->assertSee('Busy Driver')
+            ->assertSee('Parcel bakkie')
+            ->assertSee('Occupied')
+            ->assertSee('life-marker-status-available', false)
+            ->assertSee('life-marker-status-busy', false);
+    }
+
     public function test_admin_can_setup_transport_managers_and_platform_rules(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

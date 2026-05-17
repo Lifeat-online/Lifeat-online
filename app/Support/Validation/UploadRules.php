@@ -27,4 +27,12 @@ class UploadRules
     {
         return ['required', 'file', 'mimes:pdf,jpg,jpeg,png', "max:{$maxKilobytes}"];
     }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function optionalPrivateDocument(int $maxKilobytes = 5120): array
+    {
+        return ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', "max:{$maxKilobytes}"];
+    }
 }

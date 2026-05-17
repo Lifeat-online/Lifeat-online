@@ -39,12 +39,14 @@ class WriterApplicationController extends Controller
             'sample_advert_title' => $data['sample_advert_title'],
             'sample_advert_body' => $data['sample_advert_body'],
             'id_document_path' => $this->storePrivateUpload($data['id_document_upload'], 'writer-applications/id-documents'),
-            'banking_document_path' => $this->storePrivateUpload($data['banking_document_upload'], 'writer-applications/banking-documents'),
+            'banking_document_path' => isset($data['banking_document_upload'])
+                ? $this->storePrivateUpload($data['banking_document_upload'], 'writer-applications/banking-documents')
+                : null,
             'proof_of_residence_path' => $this->storePrivateUpload($data['proof_of_residence_upload'], 'writer-applications/proof-of-residence'),
-            'bank_name' => $data['bank_name'],
-            'account_holder_name' => $data['account_holder_name'],
-            'account_number' => $data['account_number'],
-            'branch_code' => $data['branch_code'],
+            'bank_name' => $data['bank_name'] ?? null,
+            'account_holder_name' => $data['account_holder_name'] ?? null,
+            'account_number' => $data['account_number'] ?? null,
+            'branch_code' => $data['branch_code'] ?? null,
             'status' => 'pending',
             'submitted_at' => now(),
         ]);
@@ -91,13 +93,13 @@ class WriterApplicationController extends Controller
             'sample_article_body' => ['required', 'string', 'min:300', 'max:12000'],
             'sample_advert_title' => ['required', 'string', 'max:255'],
             'sample_advert_body' => ['required', 'string', 'min:120', 'max:4000'],
-            'bank_name' => ['required', 'string', 'max:255'],
-            'account_holder_name' => ['required', 'string', 'max:255'],
-            'account_number' => ['required', 'string', 'max:60'],
-            'branch_code' => ['required', 'string', 'max:30'],
+            'bank_name' => ['nullable', 'string', 'max:255'],
+            'account_holder_name' => ['nullable', 'string', 'max:255'],
+            'account_number' => ['nullable', 'string', 'max:60'],
+            'branch_code' => ['nullable', 'string', 'max:30'],
             'profile_photo_upload' => UploadRules::requiredPublicImage(4096),
             'id_document_upload' => UploadRules::requiredPrivateDocument(),
-            'banking_document_upload' => UploadRules::requiredPrivateDocument(),
+            'banking_document_upload' => UploadRules::optionalPrivateDocument(),
             'proof_of_residence_upload' => UploadRules::requiredPrivateDocument(),
         ]);
     }

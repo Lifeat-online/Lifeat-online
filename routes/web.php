@@ -59,6 +59,7 @@ use App\Http\Controllers\WriterApplicationController;
 use App\Http\Controllers\Transport\DriverOfferController as TransportDriverOfferController;
 use App\Http\Controllers\Transport\DriverDutyController as TransportDriverDutyController;
 use App\Http\Controllers\Transport\DriverWorkspaceController as TransportDriverWorkspaceController;
+use App\Http\Controllers\Transport\PageController as TransportPageController;
 use App\Http\Controllers\Transport\Manager\DashboardController as TransportManagerDashboardController;
 use App\Http\Controllers\Transport\Manager\DriverController as TransportManagerDriverController;
 use App\Http\Controllers\Transport\Manager\VehicleController as TransportManagerVehicleController;
@@ -103,7 +104,7 @@ Route::get('/advertise', [AdvertiseController::class, 'index'])->name('advertise
 Route::post('/advertise/start', [AdvertiseController::class, 'start'])->middleware('auth')->name('advertise.start');
 Route::get('/add-listing', [AddListingController::class, 'index'])->name('add-listing.index');
 Route::post('/add-listing/start', [AddListingController::class, 'start'])->middleware('auth')->name('add-listing.start');
-Route::view('/transport', 'transport.index')->name('transport.index');
+Route::get('/transport', TransportPageController::class)->name('transport.index');
 Route::get('/about', [AboutController::class, 'index'])->name('about.index');
 
 Route::prefix('maps')->name('maps.')->middleware('throttle:60,1')->group(function () {

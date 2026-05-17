@@ -26,10 +26,10 @@ return new class extends Migration
             $table->string('id_document_path')->nullable();
             $table->string('banking_document_path')->nullable();
             $table->string('proof_of_residence_path')->nullable();
-            $table->string('bank_name');
-            $table->string('account_holder_name');
-            $table->string('account_number', 60);
-            $table->string('branch_code', 30);
+            $table->string('bank_name')->nullable();
+            $table->string('account_holder_name')->nullable();
+            $table->string('account_number', 60)->nullable();
+            $table->string('branch_code', 30)->nullable();
             $table->string('status')->default('pending');
             $table->timestamp('submitted_at')->nullable();
             $table->timestamp('reviewed_at')->nullable();
