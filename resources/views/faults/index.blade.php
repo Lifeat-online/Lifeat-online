@@ -63,41 +63,50 @@
         @endif
 
         <div class="card">
-            <div class="faults-controls">
-                <div>
-                    <label for="category">Category</label>
-                    <select id="category">
-                        <option value="">All</option>
-                        @foreach ($categories as $key => $label)
-                            <option value="{{ $key }}">{{ $label }}</option>
-                        @endforeach
-                    </select>
+            <details class="filter-dropdown" id="fault-filter-dropdown">
+                <summary>
+                    <span>Filters</span>
+                    <span class="filter-dropdown-count" id="fault-filter-count" hidden>0</span>
+                </summary>
+                <div class="faults-controls filter-dropdown-form">
+                    <div>
+                        <label for="category">Category</label>
+                        <select id="category">
+                            <option value="">All</option>
+                            @foreach ($categories as $key => $label)
+                                <option value="{{ $key }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="status">Status</label>
+                        <select id="status">
+                            <option value="">All</option>
+                            @foreach ($statuses as $key => $label)
+                                <option value="{{ $key }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="from">From</label>
+                        <input id="from" type="date">
+                    </div>
+                    <div>
+                        <label for="to">To</label>
+                        <input id="to" type="date">
+                    </div>
+                    <div>
+                        <label for="councillor_id">Councillor</label>
+                        <select id="councillor_id">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; align-items:end; gap:0.6rem;">
+                        <button class="button-link" type="button" id="fault-filter-reset">Reset</button>
+                    </div>
                 </div>
-                <div>
-                    <label for="status">Status</label>
-                    <select id="status">
-                        <option value="">All</option>
-                        @foreach ($statuses as $key => $label)
-                            <option value="{{ $key }}">{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="from">From</label>
-                    <input id="from" type="date">
-                </div>
-                <div>
-                    <label for="to">To</label>
-                    <input id="to" type="date">
-                </div>
-                <div>
-                    <label for="councillor_id">Councillor</label>
-                    <select id="councillor_id">
-                        <option value="">All</option>
-                    </select>
-                </div>
-            </div>
-            <div class="mt-10" style="display:flex; flex-wrap:wrap; gap:0.6rem;">
+            </details>
+            <div style="display:flex; flex-wrap:wrap; gap:0.6rem; margin-top:1rem;">
                 @foreach ($statuses as $key => $label)
                     <span class="pill"><span class="pill-dot {{ $key }}"></span> {{ $label }}</span>
                 @endforeach
@@ -228,6 +237,18 @@
                 return params.toString();
             }
 
+            function updateFilterBadge() {
+                const countEl = document.getElementById('fault-filter-count');
+                const count = ['category', 'status', 'from', 'to', 'councillor_id']
+                    .filter((id) => document.getElementById(id)?.value)
+                    .length;
+
+                if (!countEl) return;
+
+                countEl.textContent = String(count);
+                countEl.hidden = count === 0;
+            }
+
             async function loadCouncillors() {
                 const res = await fetch(endpoints.councillors, { headers: { 'X-CSRF-TOKEN': csrf } });
                 if (!res.ok) return;
@@ -294,7 +315,19 @@
             ['category', 'status', 'from', 'to', 'councillor_id'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (!el) return;
-                el.addEventListener('change', () => loadFaults());
+                el.addEventListener('change', () => {
+                    updateFilterBadge();
+                    loadFaults();
+                });
+            });
+
+            document.getElementById('fault-filter-reset')?.addEventListener('click', () => {
+                ['category', 'status', 'from', 'to', 'councillor_id'].forEach((id) => {
+                    const el = document.getElementById(id);
+                    if (el) el.value = '';
+                });
+                updateFilterBadge();
+                loadFaults();
             });
 
             const offlinePill = document.getElementById('offline-pill');
@@ -305,6 +338,7 @@
             window.addEventListener('online', () => { updateOffline(); loadFaults(); });
             window.addEventListener('offline', updateOffline);
             updateOffline();
+            updateFilterBadge();
 
             init();
         })();
