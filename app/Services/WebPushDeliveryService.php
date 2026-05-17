@@ -11,6 +11,11 @@ use Minishlink\WebPush\WebPush;
 
 class WebPushDeliveryService
 {
+    public function __construct(
+        private readonly VapidKeySetupService $vapidKeys,
+    ) {
+    }
+
     public function sendCampaign(PushCampaign $campaign): array
     {
         if (! $this->isConfigured()) {
@@ -25,9 +30,9 @@ class WebPushDeliveryService
 
         $webPush = new WebPush([
             'VAPID' => [
-                'subject' => config('services.webpush.subject') ?: config('app.url'),
-                'publicKey' => config('services.webpush.public_key'),
-                'privateKey' => config('services.webpush.private_key'),
+                'subject' => $this->vapidKeys->subject(),
+                'publicKey' => $this->vapidKeys->publicKey(),
+                'privateKey' => $this->vapidKeys->privateKey(),
             ],
         ]);
 
@@ -148,17 +153,17 @@ class WebPushDeliveryService
 
     public function isConfigured(): bool
     {
-        return filled(config('services.webpush.public_key'))
-            && filled(config('services.webpush.private_key'));
+        return filled($this->vapidKeys->publicKey())
+            && filled($this->vapidKeys->privateKey());
     }
 
     private function webPush(): WebPush
     {
         return new WebPush([
             'VAPID' => [
-                'subject' => config('services.webpush.subject') ?: config('app.url'),
-                'publicKey' => config('services.webpush.public_key'),
-                'privateKey' => config('services.webpush.private_key'),
+                'subject' => $this->vapidKeys->subject(),
+                'publicKey' => $this->vapidKeys->publicKey(),
+                'privateKey' => $this->vapidKeys->privateKey(),
             ],
         ]);
     }

@@ -2,19 +2,22 @@
 
 namespace App\Services;
 
+use App\Models\Setting;
 use Minishlink\WebPush\VAPID;
-use RuntimeException;
 
 class VapidKeySetupService
 {
     public function status(): array
     {
+        $publicKey = $this->publicKey();
+        $privateKey = $this->privateKey();
+
         return [
-            'configured' => filled(config('services.webpush.public_key')) && filled(config('services.webpush.private_key')),
-            'public_key_configured' => filled(config('services.webpush.public_key')),
-            'private_key_configured' => filled(config('services.webpush.private_key')),
-            'subject' => config('services.webpush.subject') ?: config('app.url'),
-            'env_writable' => $this->envWritable(),
+            'configured' => filled($publicKey) && filled($privateKey),
+            'public_key_configured' => filled($publicKey),
+            'private_key_configured' => filled($privateKey),
+            'subject' => $this->subject(),
+            'storage_ready' => true,
         ];
     }
 
@@ -30,26 +33,12 @@ class VapidKeySetupService
             ];
         }
 
-        $envPath = base_path('.env');
-
-        if (! file_exists($envPath)) {
-            throw new RuntimeException('The .env file was not found on this server.');
-        }
-
-        if (! is_writable($envPath)) {
-            throw new RuntimeException('The .env file is not writable by the web process.');
-        }
-
         $keys = VAPID::createVapidKeys();
-        $subject = config('services.webpush.subject') ?: config('app.url');
+        $subject = $this->subject();
 
-        $contents = (string) file_get_contents($envPath);
-        $contents = $this->setEnvValue($contents, 'WEBPUSH_VAPID_SUBJECT', $subject);
-        $contents = $this->setEnvValue($contents, 'WEBPUSH_VAPID_PUBLIC_KEY', $keys['publicKey']);
-        $contents = $this->setEnvValue($contents, 'WEBPUSH_VAPID_PRIVATE_KEY', $keys['privateKey']);
-
-        file_put_contents($envPath, $contents);
-        $configCacheCleared = $this->clearConfigCache();
+        $this->setSetting('webpush.vapid_subject', $subject);
+        $this->setSetting('webpush.vapid_public_key', $keys['publicKey']);
+        $this->setSetting('webpush.vapid_private_key', $keys['privateKey']);
 
         config([
             'services.webpush.subject' => $subject,
@@ -60,54 +49,34 @@ class VapidKeySetupService
         return [
             ...$this->status(),
             'changed' => true,
-            'config_cache_cleared' => $configCacheCleared,
-            'message' => 'VAPID keys were generated and saved to .env.',
+            'message' => 'VAPID keys were generated and saved to app settings.',
         ];
     }
 
-    private function envWritable(): bool
+    public function subject(): string
     {
-        $envPath = base_path('.env');
-
-        return file_exists($envPath) && is_writable($envPath);
+        return (string) Setting::getValue('webpush.vapid_subject', config('services.webpush.subject') ?: config('app.url'));
     }
 
-    private function setEnvValue(string $contents, string $key, string $value): string
+    public function publicKey(): ?string
     {
-        $line = $key.'='.$this->quoteEnvValue($value);
-
-        if (preg_match('/^'.preg_quote($key, '/').'=.*$/m', $contents) === 1) {
-            return preg_replace('/^'.preg_quote($key, '/').'=.*$/m', $line, $contents) ?? $contents;
-        }
-
-        return rtrim($contents).PHP_EOL.$line.PHP_EOL;
+        return config('services.webpush.public_key') ?: Setting::getValue('webpush.vapid_public_key');
     }
 
-    private function clearConfigCache(): bool
+    public function privateKey(): ?string
     {
-        $configCachePath = base_path('bootstrap/cache/config.php');
-
-        if (! file_exists($configCachePath)) {
-            return false;
-        }
-
-        if (! is_writable($configCachePath)) {
-            throw new RuntimeException('VAPID keys were saved, but bootstrap/cache/config.php is not writable. Clear the Laravel config cache before using push prompts.');
-        }
-
-        return unlink($configCachePath);
+        return config('services.webpush.private_key') ?: Setting::getValue('webpush.vapid_private_key');
     }
 
-    private function quoteEnvValue(string $value): string
+    private function setSetting(string $key, string $value): void
     {
-        if ($value === '') {
-            return '""';
-        }
-
-        if (preg_match('/\s|#|"|\'/', $value) !== 1) {
-            return $value;
-        }
-
-        return '"'.str_replace('"', '\"', $value).'"';
+        Setting::updateOrCreate(
+            ['key' => $key],
+            [
+                'value' => $value,
+                'type' => 'string',
+                'group' => 'webpush',
+            ],
+        );
     }
 }

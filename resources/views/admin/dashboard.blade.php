@@ -269,9 +269,9 @@
                                     </p>
                                 </div>
                                 <div class="rounded-lg bg-slate-50 p-4">
-                                    <p class="text-sm text-gray-500">.env Writable</p>
-                                    <p class="mt-2 text-lg font-semibold {{ $devWebPushStatus['env_writable'] ? 'text-emerald-700' : 'text-red-700' }}" data-vapid-env>
-                                        {{ $devWebPushStatus['env_writable'] ? 'Yes' : 'No' }}
+                                    <p class="text-sm text-gray-500">Storage</p>
+                                    <p class="mt-2 text-lg font-semibold {{ $devWebPushStatus['storage_ready'] ? 'text-emerald-700' : 'text-red-700' }}" data-vapid-env>
+                                        {{ $devWebPushStatus['storage_ready'] ? 'Settings DB' : 'Unavailable' }}
                                     </p>
                                 </div>
                                 <div class="rounded-lg bg-slate-50 p-4">
@@ -620,7 +620,7 @@
                     setText(status, current.configured ? 'Configured' : 'Missing keys');
                     setText(publicKey, current.public_key_configured ? 'Set' : 'Missing');
                     setText(privateKey, current.private_key_configured ? 'Set' : 'Missing');
-                    setText(env, current.env_writable ? 'Yes' : 'No');
+                    setText(env, current.storage_ready ? 'Settings DB' : 'Unavailable');
                     setText(message, payload.message || `Subject: ${current.subject || 'Not set'}`);
                 };
 

@@ -18,6 +18,7 @@ use App\Models\Role;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Models\WriterApplication;
+use App\Services\VapidKeySetupService;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -26,7 +27,7 @@ use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
-    public function __invoke(): View
+    public function __invoke(VapidKeySetupService $vapidKeys): View
     {
         $user = Auth::user();
         $supportThreshold = Carbon::now()->addDays(7);
@@ -92,11 +93,11 @@ class DashboardController extends Controller
             'latestEvents' => Event::latest()->limit(5)->get(),
             'latestArticles' => Article::latest()->limit(5)->get(),
             'latestWriterApplications' => WriterApplication::latest('submitted_at')->limit(5)->get(),
-            ...($canAccessDevDashboard ? $this->buildDevDashboardData() : $this->emptyDevDashboardData()),
+            ...($canAccessDevDashboard ? $this->buildDevDashboardData($vapidKeys) : $this->emptyDevDashboardData()),
         ]);
     }
 
-    private function buildDevDashboardData(): array
+    private function buildDevDashboardData(VapidKeySetupService $vapidKeys): array
     {
         $roles = Role::query()
             ->withCount(['users', 'permissions'])
@@ -166,13 +167,7 @@ class DashboardController extends Controller
                     'note' => 'Legacy or linked admin access',
                 ],
             ],
-            'devWebPushStatus' => [
-                'configured' => filled(config('services.webpush.public_key')) && filled(config('services.webpush.private_key')),
-                'public_key_configured' => filled(config('services.webpush.public_key')),
-                'private_key_configured' => filled(config('services.webpush.private_key')),
-                'subject' => config('services.webpush.subject') ?: config('app.url'),
-                'env_writable' => file_exists(base_path('.env')) && is_writable(base_path('.env')),
-            ],
+            'devWebPushStatus' => $vapidKeys->status(),
             'devRoleCards' => $roles,
             'devPermissionCards' => $permissions->sortByDesc('roles_count')->take(12)->values(),
             'devPrimaryRoleBreakdown' => $primaryRoleBreakdown,
@@ -225,7 +220,7 @@ class DashboardController extends Controller
                 'public_key_configured' => false,
                 'private_key_configured' => false,
                 'subject' => '',
-                'env_writable' => false,
+                'storage_ready' => false,
             ],
             'devRoleCards' => collect(),
             'devPermissionCards' => collect(),

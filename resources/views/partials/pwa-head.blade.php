@@ -5,8 +5,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#f3251e" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#111827" media="(prefers-color-scheme: dark)">
-@if (config('services.webpush.public_key'))
-<meta name="webpush-vapid-public-key" content="{{ config('services.webpush.public_key') }}">
+@php($webPushPublicKey = config('services.webpush.public_key') ?: \App\Models\Setting::getValue('webpush.vapid_public_key'))
+@if ($webPushPublicKey)
+<meta name="webpush-vapid-public-key" content="{{ $webPushPublicKey }}">
 @endif
 <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
 <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('pwa/apple-touch-icon.png') }}">
