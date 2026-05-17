@@ -90,14 +90,14 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         @stack('styles')
     </head>
-    <body class="font-sans antialiased">
+    <body class="font-sans antialiased backend-shell">
         <div class="min-h-screen app-shell-bg">
             @include('layouts.navigation')
 
             <!-- Page Heading -->
             @isset($header)
                 <header class="shadow app-header-surface">
-                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                    <div class="max-w-7xl mx-auto py-7 px-4 sm:px-6 lg:px-8">
                         {{ $header }}
                     </div>
                 </header>

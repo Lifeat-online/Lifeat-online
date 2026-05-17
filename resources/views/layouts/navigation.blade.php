@@ -5,8 +5,9 @@
             <div class="flex min-w-0 flex-1">
                 <!-- Logo -->
                 <div class="shrink-0 flex items-center">
-                    <a href="{{ route('dashboard') }}">
-                        <x-application-logo class="block h-9 w-auto fill-current text-gray-800" />
+                    <a href="{{ route('dashboard') }}" class="flex items-center gap-3 no-underline">
+                        <span class="backend-brand-mark">L@</span>
+                        <span class="hidden text-sm font-black tracking-wide text-gray-900 lg:inline">Life@ Admin</span>
                     </a>
                 </div>
 
@@ -90,7 +91,7 @@
                 <button type="button" class="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 push-toggle-admin" data-push-toggle hidden>Enable alerts</button>
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
-                        <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150">
+                        <button class="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-2 text-sm font-semibold leading-4 text-gray-600 transition ease-in-out duration-150 hover:text-gray-900 focus:outline-none">
                             <div>{{ Auth::user()->name }}</div>
 
                             <div class="ms-1">

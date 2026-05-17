@@ -21,18 +21,18 @@
             border-radius: 26px;
             border: 1px solid rgba(255, 255, 255, 0.16);
             background:
-                radial-gradient(900px circle at 18% 18%, rgba(167, 243, 208, 0.28), transparent 40%),
-                radial-gradient(800px circle at 86% 18%, rgba(147, 197, 253, 0.32), transparent 38%),
-                radial-gradient(900px circle at 60% 105%, rgba(216, 180, 254, 0.24), transparent 45%),
-                linear-gradient(135deg, #0b1220, #1d4ed8 58%, #1e3a8a);
-            color: #eff6ff;
-            box-shadow: 0 26px 60px rgba(2, 6, 23, 0.28);
+                radial-gradient(900px circle at 14% 18%, rgba(245, 197, 104, 0.28), transparent 40%),
+                radial-gradient(800px circle at 88% 20%, rgba(74, 190, 143, 0.26), transparent 38%),
+                radial-gradient(900px circle at 62% 110%, rgba(231, 151, 92, 0.24), transparent 45%),
+                linear-gradient(135deg, #241710, #6f3320 55%, #123d32);
+            color: #fff8ec;
+            box-shadow: 0 26px 60px rgba(77, 47, 24, 0.28);
         }
         html[data-theme="dark"] .hero-panel {
             background:
-                radial-gradient(900px circle at 18% 18%, rgba(96, 165, 250, 0.16), transparent 40%),
-                radial-gradient(900px circle at 82% 22%, rgba(168, 85, 247, 0.14), transparent 40%),
-                linear-gradient(135deg, #020617, #0b1220 55%, #1e3a8a);
+                radial-gradient(900px circle at 18% 18%, rgba(231, 151, 92, 0.18), transparent 40%),
+                radial-gradient(900px circle at 82% 22%, rgba(74, 190, 143, 0.15), transparent 40%),
+                linear-gradient(135deg, #151210, #2b1f19 55%, #10372e);
         }
         .hero-panel::after {
             content: "";
