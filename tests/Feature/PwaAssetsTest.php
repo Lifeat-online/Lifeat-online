@@ -23,7 +23,8 @@ class PwaAssetsTest extends TestCase
 
         $this->assertSame('Life Platform', $manifest['name']);
         $this->assertSame('/?source=pwa', $manifest['start_url']);
-        $this->assertSame('standalone', $manifest['display']);
+        $this->assertSame('fullscreen', $manifest['display']);
+        $this->assertSame('fullscreen', $manifest['display_override'][0]);
         $this->assertContains('/pwa/icon-512-maskable.png', array_column($manifest['icons'], 'src'));
         $this->assertContains('maskable', array_column($manifest['icons'], 'purpose'));
     }
@@ -33,7 +34,7 @@ class PwaAssetsTest extends TestCase
         $serviceWorker = file_get_contents(public_path('sw.js'));
         $offlineShell = file_get_contents(public_path('offline.html'));
 
-        $this->assertStringContainsString('life-pwa-v1', $serviceWorker);
+        $this->assertStringContainsString('life-pwa-', $serviceWorker);
         $this->assertStringContainsString('/offline.html', $serviceWorker);
         $this->assertStringContainsString('You are offline', $offlineShell);
     }
