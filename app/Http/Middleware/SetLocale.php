@@ -13,12 +13,18 @@ class SetLocale
     {
         $supported = array_keys((array) config('localization.supported', ['en' => []]));
         $default = (string) config('localization.default', 'en');
-        $locale = (string) $request->session()->get('locale', $default);
+        $locale = (string) (
+            $request->session()->get('locale')
+            ?: $request->user()?->preferred_locale
+            ?: $request->cookie('locale')
+            ?: $default
+        );
 
         if (! in_array($locale, $supported, true)) {
             $locale = $default;
         }
 
+        $request->session()->put('locale', $locale);
         App::setLocale($locale);
 
         return $next($request);

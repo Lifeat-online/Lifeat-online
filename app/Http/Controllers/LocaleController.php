@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cookie;
 
 class LocaleController extends Controller
 {
@@ -13,6 +14,12 @@ class LocaleController extends Controller
 
         $request->session()->put('locale', $locale);
 
-        return redirect()->back();
+        if ($request->user()) {
+            $request->user()->forceFill(['preferred_locale' => $locale])->save();
+        }
+
+        return redirect()
+            ->back()
+            ->withCookie(Cookie::make('locale', $locale, 60 * 24 * 365));
     }
 }
