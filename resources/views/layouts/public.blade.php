@@ -15,7 +15,10 @@
     <script>
         (() => {
             const key = 'life-theme';
-            const stored = localStorage.getItem(key);
+            let stored = null;
+            try {
+                stored = localStorage.getItem(key);
+            } catch (_) {}
             const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             const theme = stored === 'dark' || stored === 'light' ? stored : (prefersDark ? 'dark' : 'light');
             document.documentElement.dataset.theme = theme;

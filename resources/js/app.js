@@ -9,8 +9,24 @@ Alpine.start();
 
 const themeKey = 'life-theme';
 
+const readStoredTheme = () => {
+    try {
+        return localStorage.getItem(themeKey);
+    } catch (_) {
+        return null;
+    }
+};
+
+const writeStoredTheme = (theme) => {
+    try {
+        localStorage.setItem(themeKey, theme);
+    } catch (_) {
+        // Some mobile browsers can block storage in private contexts.
+    }
+};
+
 const getPreferredTheme = () => {
-    const stored = localStorage.getItem(themeKey);
+    const stored = readStoredTheme();
     if (stored === 'dark' || stored === 'light') return stored;
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 };
@@ -36,8 +52,12 @@ const applyTheme = (theme) => {
     const root = document.documentElement;
     root.dataset.theme = theme;
     root.style.colorScheme = theme;
-    localStorage.setItem(themeKey, theme);
+    writeStoredTheme(theme);
     syncThemeAssets(theme);
+
+    document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+        button.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+    });
 };
 
 const initThemeToggle = () => {
@@ -45,10 +65,13 @@ const initThemeToggle = () => {
     const initialTheme = root.dataset.theme === 'dark' || root.dataset.theme === 'light' ? root.dataset.theme : getPreferredTheme();
     applyTheme(initialTheme);
 
-    document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
-        button.addEventListener('click', () => {
-            applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
-        });
+    document.addEventListener('click', (event) => {
+        const button = event.target instanceof Element ? event.target.closest('[data-theme-toggle]') : null;
+        if (!button) return;
+
+        event.preventDefault();
+        applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
+        document.dispatchEvent(new CustomEvent('life:theme-changed', { detail: { theme: root.dataset.theme } }));
     });
 };
 

@@ -10,7 +10,10 @@
         <script>
             (() => {
                 const key = 'life-theme';
-                const stored = localStorage.getItem(key);
+                let stored = null;
+                try {
+                    stored = localStorage.getItem(key);
+                } catch (_) {}
                 const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
                 const theme = stored === 'dark' || stored === 'light' ? stored : (prefersDark ? 'dark' : 'light');
                 document.documentElement.dataset.theme = theme;
@@ -108,38 +111,6 @@
                 {{ $slot }}
             </main>
         </div>
-        <script>
-            (() => {
-                const key = 'life-theme';
-                const root = document.documentElement;
-
-                const applyTheme = (theme) => {
-                    root.dataset.theme = theme;
-                    root.style.colorScheme = theme;
-                    localStorage.setItem(key, theme);
-
-                    document.querySelectorAll('[data-theme-logo]').forEach((logo) => {
-                        logo.src = theme === 'dark' ? logo.dataset.logoDark : logo.dataset.logoLight;
-                    });
-
-                    document.querySelectorAll('[data-theme-icon-sun]').forEach((icon) => {
-                        icon.style.display = theme === 'dark' ? 'none' : 'block';
-                    });
-
-                    document.querySelectorAll('[data-theme-icon-moon]').forEach((icon) => {
-                        icon.style.display = theme === 'dark' ? 'block' : 'none';
-                    });
-                };
-
-                const toggleTheme = () => applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
-
-                applyTheme(root.dataset.theme === 'dark' ? 'dark' : 'light');
-
-                document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
-                    button.addEventListener('click', toggleTheme);
-                });
-            })();
-        </script>
         @stack('scripts')
     </body>
 </html>
