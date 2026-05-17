@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Setting;
+use App\Models\Article;
 use App\Models\User;
 use App\Services\OpenRouterTranslationService;
 use App\Services\VapidKeySetupService;
@@ -164,5 +165,40 @@ class DevToolsAccessTest extends TestCase
                 'api_key' => 'sk-or-test-translation-key',
             ])
             ->assertForbidden();
+    }
+
+    public function test_dev_owner_can_run_article_translation_batch(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
+
+        $article = Article::create([
+            'user_id' => User::factory()->create(['role' => 'writer'])->id,
+            'title' => 'Batch Translation',
+            'slug' => 'batch-translation',
+            'excerpt' => 'Short batch excerpt',
+            'body' => 'This article should be picked up by the translation batch.',
+            'source_locale' => 'en',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $this->mock(OpenRouterTranslationService::class, function (MockInterface $mock) use ($article): void {
+            $mock->shouldReceive('translateModel')
+                ->once()
+                ->withArgs(fn (Article $target, string $locale, bool $force): bool => $target->is($article) && $locale === 'af' && $force === false)
+                ->andReturn(['ok' => true, 'message' => 'Translation saved.']);
+        });
+
+        $this->actingAs($admin)
+            ->postJson(route('dev.translations.batch'), [
+                'section' => 'articles',
+                'limit' => 5,
+            ])
+            ->assertOk()
+            ->assertJsonPath('processed', 1)
+            ->assertJsonPath('translated', 1);
     }
 }

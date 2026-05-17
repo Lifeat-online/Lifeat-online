@@ -2,13 +2,22 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasContentTranslations;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 
 class Classified extends Model
 {
-    use HasFactory;
+    use HasFactory, HasContentTranslations;
+
+    protected array $translatable = [
+        'title',
+        'description',
+        'city',
+        'region',
+        'country',
+    ];
 
     public const STATUS_PENDING = 'pending';
     public const STATUS_PUBLISHED = 'published';

@@ -290,6 +290,46 @@
                         <p class="mt-3 text-sm text-gray-500" data-openrouter-message>Environment variables still take priority when `OPENROUTER_API_KEY` is set.</p>
                     </div>
 
+                    <div class="rounded-lg bg-white p-6 shadow-sm" data-translation-batch data-endpoint="{{ route('dev.translations.batch') }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">Platform Translation Run</h3>
+                                <p class="mt-1 text-sm text-gray-500">Translate all public content at once, or run one section at a time when you want tighter control.</p>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-batch-section="all">Translate everything</button>
+                            </div>
+                        </div>
+                        <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4" data-translation-section-grid>
+                            @foreach ($devTranslationStatus['sections'] as $section)
+                                <div class="rounded-lg border border-slate-200 p-4" data-section-card="{{ $section['key'] }}">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div>
+                                            <h4 class="font-semibold text-gray-900">{{ $section['label'] }}</h4>
+                                            <p class="mt-1 text-sm text-gray-500">
+                                                <span data-section-missing>{{ $section['missing'] }}</span> missing /
+                                                <span data-section-total>{{ $section['total'] }}</span> total
+                                            </p>
+                                        </div>
+                                        <button type="button" class="rounded-md bg-slate-800 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60" data-batch-section="{{ $section['key'] }}">Translate</button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                        <div class="mt-5 grid gap-4 md:grid-cols-[1fr,auto] md:items-end">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Items per run</label>
+                                <input class="w-full rounded-md border-gray-300" type="number" min="1" max="100" value="20" data-batch-limit>
+                            </div>
+                            <label class="inline-flex items-center gap-2 rounded-md border border-slate-200 px-4 py-2 text-sm text-gray-700">
+                                <input type="checkbox" data-batch-force>
+                                <span>Re-translate current items</span>
+                            </label>
+                        </div>
+                        <p class="mt-3 text-sm text-gray-500" data-batch-status>Idle</p>
+                    </div>
+
                     <div class="grid gap-6 xl:grid-cols-[1fr,1fr]">
                         <div class="rounded-lg bg-white p-6 shadow-sm" data-translation-preview data-endpoint="{{ route('dev.translations.preview') }}">
                             <input type="hidden" name="_token" value="{{ csrf_token() }}">
@@ -802,6 +842,64 @@
                     } finally {
                         button.disabled = false;
                     }
+                });
+            }
+
+            const translationBatch = document.querySelector('[data-translation-batch]');
+            if (translationBatch) {
+                const endpoint = translationBatch.getAttribute('data-endpoint');
+                const token = translationBatch.querySelector('input[name="_token"]')?.value;
+                const buttons = Array.from(translationBatch.querySelectorAll('[data-batch-section]'));
+                const limit = translationBatch.querySelector('[data-batch-limit]');
+                const force = translationBatch.querySelector('[data-batch-force]');
+                const status = translationBatch.querySelector('[data-batch-status]');
+
+                const setBusy = (busy) => {
+                    buttons.forEach((button) => {
+                        button.disabled = busy;
+                    });
+                };
+
+                const renderBatchStatus = (sections) => {
+                    (sections || []).forEach((section) => {
+                        const card = translationBatch.querySelector(`[data-section-card="${section.key}"]`);
+                        if (!card) return;
+                        const missing = card.querySelector('[data-section-missing]');
+                        const total = card.querySelector('[data-section-total]');
+                        if (missing) missing.textContent = section.missing;
+                        if (total) total.textContent = section.total;
+                    });
+                };
+
+                buttons.forEach((button) => {
+                    button.addEventListener('click', async () => {
+                        const section = button.getAttribute('data-batch-section') || 'all';
+                        setBusy(true);
+                        if (status) status.textContent = section === 'all' ? 'Translating platform content...' : `Translating ${section}...`;
+
+                        try {
+                            const response = await fetch(endpoint, {
+                                method: 'POST',
+                                headers: {
+                                    Accept: 'application/json',
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': token || '',
+                                },
+                                body: JSON.stringify({
+                                    section,
+                                    limit: Number(limit?.value || 20),
+                                    force: Boolean(force?.checked),
+                                }),
+                            });
+                            const payload = await response.json().catch(() => ({}));
+                            renderBatchStatus(payload.status);
+                            if (status) status.textContent = payload.message || `Request finished with status ${response.status}.`;
+                        } catch (error) {
+                            if (status) status.textContent = error instanceof Error ? error.message : 'Unable to run translations.';
+                        } finally {
+                            setBusy(false);
+                        }
+                    });
                 });
             }
 

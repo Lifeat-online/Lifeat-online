@@ -179,7 +179,7 @@
                     <select id="category" name="category">
                         <option value="">All categories</option>
                         @foreach ($categories as $category)
-                            <option value="{{ $category->slug }}" @selected($filters['category'] === $category->slug)>{{ $category->name }}</option>
+                            <option value="{{ $category->slug }}" @selected($filters['category'] === $category->slug)>{{ $category->localizedValue('name') }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -282,7 +282,7 @@
                     <div class="sidebar-list-events">
                         @foreach ($featuredCategories as $category)
                             <a class="sidebar-link-events" href="{{ route('events.index', ['category' => $category->slug]) }}">
-                                <span>{{ $category->name }}</span>
+                                <span>{{ $category->localizedValue('name') }}</span>
                                 <span class="muted">{{ $category->visible_events_count }}</span>
                             </a>
                         @endforeach
@@ -327,7 +327,7 @@
                     @if ($loop->first)<div class="event-grid">@endif
                     <article class="card event-card">
                         @if ($event->featured_image)
-                            <img class="event-cover" src="{{ \Illuminate\Support\Facades\Storage::url($event->featured_image) }}" alt="{{ $event->title }}" loading="lazy" decoding="async">
+                            <img class="event-cover" src="{{ \Illuminate\Support\Facades\Storage::url($event->featured_image) }}" alt="{{ $event->localizedValue('title') }}" loading="lazy" decoding="async">
                         @endif
 
                         <div class="event-meta">
@@ -336,28 +336,28 @@
                                 <span class="badge" style="background:rgba(5, 150, 105, 0.12); color:#059669; border:0; margin:0;">{{ number_format($event->distance, 1) }} km away</span>
                             @endisset
                             @if ($event->listing)
-                                <span class="event-host-pill">Hosted by {{ $event->listing->title }}</span>
+                                <span class="event-host-pill">Hosted by {{ $event->listing->localizedValue('title') }}</span>
                             @endif
                         </div>
 
                         <div>
-                            <h3 style="margin:0 0 0.35rem;"><a href="{{ route('events.show', $event) }}">{{ $event->title }}</a></h3>
+                            <h3 style="margin:0 0 0.35rem;"><a href="{{ route('events.show', $event) }}">{{ $event->localizedValue('title') }}</a></h3>
                             <div class="event-meta">
                                 <span>{{ optional($event->start_at)->format('j M Y g:i A') ?: 'Date pending' }}</span>
                                 @if ($event->venue_name)
-                                    <span>{{ $event->venue_name }}</span>
+                                    <span>{{ $event->localizedValue('venue_name') }}</span>
                                 @endif
                                 @if ($event->city)
-                                    <span>{{ $event->city }}{{ $event->region ? ', '.$event->region : '' }}</span>
+                                    <span>{{ $event->localizedValue('city') }}{{ $event->localizedValue('region') ? ', '.$event->localizedValue('region') : '' }}</span>
                                 @endif
                             </div>
                         </div>
 
-                        <p style="margin:0;">{{ $event->excerpt ?: \Illuminate\Support\Str::limit(strip_tags((string) $event->description), 170) }}</p>
+                        <p style="margin:0;">{{ $event->localizedValue('excerpt') ?: \Illuminate\Support\Str::limit(strip_tags((string) $event->localizedValue('description')), 170) }}</p>
 
                         <div>
                             @foreach ($event->categories->take(3) as $category)
-                                <span class="badge">{{ $category->name }}</span>
+                                <span class="badge">{{ $category->localizedValue('name') }}</span>
                             @endforeach
                         </div>
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Article;
 use App\Models\Setting;
 use App\Services\OpenRouterTranslationService;
+use App\Services\PlatformTranslationBatchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -88,6 +89,31 @@ class TranslationController extends Controller
             'message' => $result['message'] ?? 'Translation request completed.',
             'model' => $translator->model(),
         ], ($result['ok'] ?? false) ? 200 : 422);
+    }
+
+    public function batch(Request $request, PlatformTranslationBatchService $batch): JsonResponse
+    {
+        $this->ensureDevOwner($request);
+
+        $sectionKeys = collect($batch->sectionOptions())->pluck('key')->all();
+
+        $validated = $request->validate([
+            'section' => ['required', 'string', Rule::in([...$sectionKeys, 'all'])],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'force' => ['nullable', 'boolean'],
+        ]);
+
+        $result = $batch->translate(
+            $validated['section'],
+            (int) ($validated['limit'] ?? 20),
+            $request->boolean('force')
+        );
+
+        return response()->json([
+            ...$result,
+            'message' => "Processed {$result['processed']} translation targets: {$result['translated']} translated, {$result['skipped']} current, {$result['failed']} failed.",
+            'status' => $batch->status(),
+        ], $result['ok'] ? 200 : 422);
     }
 
     private function ensureDevOwner(Request $request): void

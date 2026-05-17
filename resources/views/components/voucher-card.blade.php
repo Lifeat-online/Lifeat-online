@@ -12,7 +12,7 @@
             <div class="meta">
                 <span class="truncate">
                     @if ($listing)
-                        <a href="{{ route('directory.show', $listing) }}">{{ $listing->title }}</a>
+                        <a href="{{ route('directory.show', $listing) }}">{{ $listing->localizedValue('title') }}</a>
                     @else
                         Business
                     @endif
@@ -23,9 +23,9 @@
             </div>
             <h3 class="h3-card">
                 @if ($listing)
-                    <a href="{{ route('vouchers.show', [$listing, $voucher]) }}">{{ $voucher->title }}</a>
+                    <a href="{{ route('vouchers.show', [$listing, $voucher]) }}">{{ $voucher->localizedValue('title') }}</a>
                 @else
-                    {{ $voucher->title }}
+                    {{ $voucher->localizedValue('title') }}
                 @endif
             </h3>
         </div>
@@ -37,13 +37,13 @@
         </div>
     </div>
 
-    @if ($voucher->description)
-        <p class="muted mt-08">{{ \Illuminate\Support\Str::limit($voucher->description, 150) }}</p>
+    @if ($voucher->localizedValue('description'))
+        <p class="muted mt-08">{{ \Illuminate\Support\Str::limit($voucher->localizedValue('description'), 150) }}</p>
     @endif
 
     <div class="mt-10 flex flex-wrap gap-2">
         @foreach ($voucher->categories->take(3) as $category)
-            <span class="badge">{{ $category->name }}</span>
+            <span class="badge">{{ $category->localizedValue('name') }}</span>
         @endforeach
         @if (! $isActive)
             <span class="badge" style="opacity:0.72;">Unavailable</span>
@@ -55,7 +55,7 @@
             @if ($listing->logo_path)
                 <img
                     src="{{ \Illuminate\Support\Facades\Storage::url($listing->logo_path) }}"
-                    alt="{{ $listing->title }} logo"
+                    alt="{{ $listing->localizedValue('title') }} logo"
                     loading="lazy"
                     decoding="async"
                     class="w-10 h-10 rounded-xl border"

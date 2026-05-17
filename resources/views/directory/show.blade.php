@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', $listing->title.' | Directory')
+@section('title', $listing->localizedValue('title').' | Directory')
 
 @push('styles')
     <style>
@@ -194,18 +194,18 @@
             <div class="detail-top" style="margin-top:0.75rem;">
                 <div>
                     <div class="detail-meta">
-                        <span>{{ $listing->city ?: 'Location pending' }}{{ $listing->region ? ', '.$listing->region : '' }}</span>
+                        <span>{{ $listing->localizedValue('city') ?: 'Location pending' }}{{ $listing->localizedValue('region') ? ', '.$listing->localizedValue('region') : '' }}</span>
                         @if ($listing->is_featured)
                             <span class="featured-pill">Featured listing</span>
                         @endif
                     </div>
-                    <h1 style="font-size:clamp(2rem, 3.5vw, 3rem); line-height:1.08; margin:0.5rem 0 0.75rem;">{{ $listing->title }}</h1>
+                    <h1 style="font-size:clamp(2rem, 3.5vw, 3rem); line-height:1.08; margin:0.5rem 0 0.75rem;">{{ $listing->localizedValue('title') }}</h1>
                     <p class="section-subtitle" style="max-width:48rem;">
-                        {{ $listing->excerpt ?: \Illuminate\Support\Str::limit(strip_tags((string) $listing->description), 220) }}
+                        {{ $listing->localizedValue('excerpt') ?: \Illuminate\Support\Str::limit(strip_tags((string) $listing->localizedValue('description')), 220) }}
                     </p>
                     <div style="margin-top:0.9rem;">
                         @foreach ($listing->categories as $category)
-                            <span class="badge">{{ $category->name }}</span>
+                            <span class="badge">{{ $category->localizedValue('name') }}</span>
                         @endforeach
                     </div>
                     <div class="action-row">
@@ -222,12 +222,12 @@
                 </div>
 
                 @if ($listing->logo_path)
-                    <img class="detail-logo" src="{{ \Illuminate\Support\Facades\Storage::url($listing->logo_path) }}" alt="{{ $listing->title }} logo" loading="lazy" decoding="async">
+                    <img class="detail-logo" src="{{ \Illuminate\Support\Facades\Storage::url($listing->logo_path) }}" alt="{{ $listing->localizedValue('title') }} logo" loading="lazy" decoding="async">
                 @endif
             </div>
 
             @if ($coverImage)
-                <img class="detail-cover" src="{{ \Illuminate\Support\Facades\Storage::url($coverImage) }}" alt="{{ $listing->title }}" decoding="async" fetchpriority="high">
+                <img class="detail-cover" src="{{ \Illuminate\Support\Facades\Storage::url($coverImage) }}" alt="{{ $listing->localizedValue('title') }}" decoding="async" fetchpriority="high">
             @endif
         </div>
 
@@ -257,7 +257,7 @@
                             <p class="section-subtitle">Everything you need to contact, visit, and learn about this business — all in one place.</p>
                         </div>
                     </div>
-                    <div style="margin-top:0.75rem;">{!! nl2br(e($listing->description ?: $listing->excerpt ?: 'Business description coming soon.')) !!}</div>
+                    <div style="margin-top:0.75rem;">{!! nl2br(e($listing->localizedValue('description') ?: $listing->localizedValue('excerpt') ?: 'Business description coming soon.')) !!}</div>
                 </article>
 
                 @if ($listing->photos->isNotEmpty())
@@ -271,7 +271,7 @@
                         <div class="gallery-grid" style="margin-top:0.9rem;">
                             @foreach ($listing->photos as $photo)
                                 <div>
-                                    <img src="{{ \Illuminate\Support\Facades\Storage::url($photo->image_path) }}" alt="{{ $photo->caption ?: $listing->title }}" loading="lazy" decoding="async">
+                                    <img src="{{ \Illuminate\Support\Facades\Storage::url($photo->image_path) }}" alt="{{ $photo->caption ?: $listing->localizedValue('title') }}" loading="lazy" decoding="async">
                                     @if ($photo->caption)
                                         <p class="muted" style="margin-top:0.5rem;">{{ $photo->caption }}</p>
                                     @endif
@@ -294,7 +294,7 @@
                             @foreach ($listing->vouchers as $voucher)
                                 <div class="event-item" style="display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap; align-items:center;">
                                     <div>
-                                        <strong><a href="{{ route('vouchers.show', [$listing, $voucher]) }}">{{ $voucher->title }}</a></strong>
+                                        <strong><a href="{{ route('vouchers.show', [$listing, $voucher]) }}">{{ $voucher->localizedValue('title') }}</a></strong>
                                         <div class="detail-meta">
                                             <span>{{ $voucher->formattedValue() ?: 'Offer' }}</span>
                                             @if ($voucher->end_at)
@@ -352,11 +352,11 @@
                     <div class="event-list" style="margin-top:0.9rem;">
                         @forelse ($listing->events as $event)
                             <div class="event-item">
-                                <h3 style="margin:0 0 0.4rem;"><a href="{{ route('events.show', $event) }}">{{ $event->title }}</a></h3>
+                                <h3 style="margin:0 0 0.4rem;"><a href="{{ route('events.show', $event) }}">{{ $event->localizedValue('title') }}</a></h3>
                                 <div class="detail-meta">
                                     <span>{{ optional($event->start_at)->format('j M Y g:i A') ?: 'Date pending' }}</span>
                                     @if ($event->venue_name)
-                                        <span>{{ $event->venue_name }}</span>
+                                        <span>{{ $event->localizedValue('venue_name') }}</span>
                                     @endif
                                 </div>
                             </div>
@@ -385,8 +385,8 @@
                                 Not available yet
                             @endif
                         </div>
-                        <div class="info-item"><strong>Address</strong><br>{{ $listing->address_line ?: 'Not available yet' }}</div>
-                        <div class="info-item"><strong>City / Region</strong><br>{{ $listing->city ?: 'Unknown' }}{{ $listing->region ? ', '.$listing->region : '' }}</div>
+                        <div class="info-item"><strong>Address</strong><br>{{ $listing->localizedValue('address_line') ?: 'Not available yet' }}</div>
+                        <div class="info-item"><strong>City / Region</strong><br>{{ $listing->localizedValue('city') ?: 'Unknown' }}{{ $listing->localizedValue('region') ? ', '.$listing->localizedValue('region') : '' }}</div>
                         <div class="info-item"><strong>Website</strong><br>
                             @if($listing->website_url)
                                 <a href="{{ $listing->website_url }}" target="_blank" rel="noreferrer" class="text-primary hover:underline" style="color:var(--primary-dark); word-break:break-all;">{{ $listing->website_url }}</a>
@@ -412,7 +412,7 @@
                                 map-id="listing-map"
                                 :lat="(float) $listing->latitude"
                                 :lng="(float) $listing->longitude"
-                                :label="$listing->title"
+                                :label="$listing->localizedValue('title')"
                                 height="260px"
                             />
                         </div>
@@ -452,13 +452,13 @@
                         @forelse ($relatedListings as $relatedListing)
                             <div class="related-item">
                                 <div class="detail-meta">
-                                    <span>{{ $relatedListing->city ?: 'Location pending' }}</span>
+                                    <span>{{ $relatedListing->localizedValue('city') ?: 'Location pending' }}</span>
                                     @if ($relatedListing->is_featured)
                                         <span class="featured-pill">Featured</span>
                                     @endif
                                 </div>
-                                <h4 style="margin:0.45rem 0;"><a href="{{ route('directory.show', $relatedListing) }}">{{ $relatedListing->title }}</a></h4>
-                                <p style="margin:0;">{{ \Illuminate\Support\Str::limit($relatedListing->excerpt ?: strip_tags((string) $relatedListing->description), 110) }}</p>
+                                <h4 style="margin:0.45rem 0;"><a href="{{ route('directory.show', $relatedListing) }}">{{ $relatedListing->localizedValue('title') }}</a></h4>
+                                <p style="margin:0;">{{ \Illuminate\Support\Str::limit($relatedListing->localizedValue('excerpt') ?: strip_tags((string) $relatedListing->localizedValue('description')), 110) }}</p>
                             </div>
                         @empty
                             <div class="empty-state">No related listings found yet.</div>

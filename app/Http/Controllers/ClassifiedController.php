@@ -12,6 +12,7 @@ class ClassifiedController extends Controller
     {
         $q = trim((string) $request->string('q'));
         $classifieds = Classified::query()
+            ->with('contentTranslations')
             ->where('status', 'published')
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($inner) use ($q) {
@@ -33,6 +34,8 @@ class ClassifiedController extends Controller
     public function show(Classified $classified): View
     {
         abort_if($classified->status !== 'published', 404);
+        $classified->load('contentTranslations');
+
         return view('classifieds.show', ['classified' => $classified]);
     }
 }

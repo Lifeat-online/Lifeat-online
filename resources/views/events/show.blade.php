@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', $event->title.' | Events')
+@section('title', $event->localizedValue('title').' | Events')
 
 @push('styles')
     <style>
@@ -156,17 +156,17 @@
                     <span class="event-pill">All day</span>
                 @endif
                 @if ($event->listing)
-                    <span class="event-pill">Hosted by {{ $event->listing->title }}</span>
+                    <span class="event-pill">Hosted by {{ $event->listing->localizedValue('title') }}</span>
                 @endif
             </div>
 
-            <h1 style="font-size:clamp(2rem, 3.5vw, 3rem); line-height:1.08; margin:0.65rem 0 0.8rem;">{{ $event->title }}</h1>
+            <h1 style="font-size:clamp(2rem, 3.5vw, 3rem); line-height:1.08; margin:0.65rem 0 0.8rem;">{{ $event->localizedValue('title') }}</h1>
             <p class="section-subtitle" style="max-width:48rem;">
-                {{ $event->excerpt ?: \Illuminate\Support\Str::limit(strip_tags((string) $event->description), 220) }}
+                {{ $event->localizedValue('excerpt') ?: \Illuminate\Support\Str::limit(strip_tags((string) $event->localizedValue('description')), 220) }}
             </p>
             <div style="margin-top:0.9rem;">
                 @foreach ($event->categories as $category)
-                    <span class="badge">{{ $category->name }}</span>
+                    <span class="badge">{{ $category->localizedValue('name') }}</span>
                 @endforeach
             </div>
             <div class="action-row">
@@ -179,7 +179,7 @@
             </div>
 
             @if ($event->featured_image)
-                <img class="event-detail-cover" src="{{ \Illuminate\Support\Facades\Storage::url($event->featured_image) }}" alt="{{ $event->title }}" decoding="async" fetchpriority="high">
+                <img class="event-detail-cover" src="{{ \Illuminate\Support\Facades\Storage::url($event->featured_image) }}" alt="{{ $event->localizedValue('title') }}" decoding="async" fetchpriority="high">
             @endif
         </div>
 
@@ -209,7 +209,7 @@
                             <p class="section-subtitle">Full details including date, venue, organiser, and everything you need to plan your visit.</p>
                         </div>
                     </div>
-                    <div style="margin-top:0.75rem;">{!! nl2br(e($event->description ?: $event->excerpt ?: 'Event details coming soon.')) !!}</div>
+                    <div style="margin-top:0.75rem;">{!! nl2br(e($event->localizedValue('description') ?: $event->localizedValue('excerpt') ?: 'Event details coming soon.')) !!}</div>
                 </article>
 
                 <article class="card">
@@ -220,9 +220,9 @@
                         </div>
                     </div>
                     <div class="info-grid" style="margin-top:0.9rem;">
-                        <div class="info-item"><strong>Venue</strong><br>{{ $event->venue_name ?: 'To be confirmed' }}</div>
-                        <div class="info-item"><strong>Address</strong><br>{{ $event->address_line ?: 'To be confirmed' }}</div>
-                        <div class="info-item"><strong>City / Region</strong><br>{{ $event->city ?: 'To be confirmed' }}{{ $event->region ? ', '.$event->region : '' }}</div>
+                        <div class="info-item"><strong>Venue</strong><br>{{ $event->localizedValue('venue_name') ?: 'To be confirmed' }}</div>
+                        <div class="info-item"><strong>Address</strong><br>{{ $event->localizedValue('address_line') ?: 'To be confirmed' }}</div>
+                        <div class="info-item"><strong>City / Region</strong><br>{{ $event->localizedValue('city') ?: 'To be confirmed' }}{{ $event->localizedValue('region') ? ', '.$event->localizedValue('region') : '' }}</div>
                         <div class="info-item"><strong>Schedule</strong><br>
                             {{ optional($event->start_at)->format('j M Y g:i A') ?: 'Date pending' }}
                             @if ($event->end_at)
@@ -246,11 +246,11 @@
                                 <div class="event-info-list">
                                     <span>{{ optional($relatedEvent->start_at)->format('j M Y g:i A') ?: 'Date pending' }}</span>
                                     @if ($relatedEvent->listing)
-                                        <span>{{ $relatedEvent->listing->title }}</span>
+                                        <span>{{ $relatedEvent->listing->localizedValue('title') }}</span>
                                     @endif
                                 </div>
-                                <h3 style="margin:0.45rem 0 0.35rem;"><a href="{{ route('events.show', $relatedEvent) }}">{{ $relatedEvent->title }}</a></h3>
-                                <p style="margin:0;">{{ \Illuminate\Support\Str::limit($relatedEvent->excerpt ?: strip_tags((string) $relatedEvent->description), 110) }}</p>
+                                <h3 style="margin:0.45rem 0 0.35rem;"><a href="{{ route('events.show', $relatedEvent) }}">{{ $relatedEvent->localizedValue('title') }}</a></h3>
+                                <p style="margin:0;">{{ \Illuminate\Support\Str::limit($relatedEvent->localizedValue('excerpt') ?: strip_tags((string) $relatedEvent->localizedValue('description')), 110) }}</p>
                             </div>
                         @empty
                             <div class="empty-state">No related events found yet.</div>
@@ -272,7 +272,7 @@
                         </div>
                         <div class="info-item"><strong>Hosted by</strong><br>
                             @if ($event->listing)
-                                <a href="{{ route('directory.show', $event->listing) }}">{{ $event->listing->title }}</a>
+                                <a href="{{ route('directory.show', $event->listing) }}">{{ $event->listing->localizedValue('title') }}</a>
                             @else
                                 No linked listing yet
                             @endif
@@ -292,7 +292,7 @@
                     @php
                         $mapLat = $event->latitude ?? $event->listing?->latitude;
                         $mapLng = $event->longitude ?? $event->listing?->longitude;
-                        $mapLabel = $event->venue_name ?? $event->title;
+                        $mapLabel = $event->localizedValue('venue_name') ?? $event->localizedValue('title');
                     @endphp
                     @if ($mapLat && $mapLng)
                         <div style="margin-top:0.9rem; border-radius:14px; overflow:hidden;">

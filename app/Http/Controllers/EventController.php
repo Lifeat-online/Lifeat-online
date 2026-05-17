@@ -21,6 +21,7 @@ class EventController extends Controller
 
         $categories = Category::query()
             ->where('type', 'event')
+            ->with('contentTranslations')
             ->withCount([
                 'events as visible_events_count' => fn ($query) => $query->published(),
             ])
@@ -28,7 +29,7 @@ class EventController extends Controller
             ->orderBy('name')
             ->get();
 
-        $events = Event::with(['listing', 'categories'])
+        $events = Event::with(['listing.contentTranslations', 'categories.contentTranslations', 'contentTranslations'])
             ->published()
             ->when($userLat && $userLng, function ($query) use ($userLat, $userLng, $radius) {
                 // We use COALESCE to fallback to listing coordinates if event coordinates are null
@@ -147,11 +148,11 @@ class EventController extends Controller
     {
         abort_if(! $event->isPubliclyVisible(), 404);
 
-        $event->load(['listing.categories', 'owner', 'categories']);
+        $event->load(['listing.categories.contentTranslations', 'listing.contentTranslations', 'owner', 'categories.contentTranslations', 'contentTranslations']);
 
         $categoryIds = $event->categories->modelKeys();
 
-        $relatedEvents = Event::with(['listing', 'categories'])
+        $relatedEvents = Event::with(['listing.contentTranslations', 'categories.contentTranslations', 'contentTranslations'])
             ->published()
             ->whereKeyNot($event->getKey())
             ->when(! empty($categoryIds), function ($query) use ($categoryIds) {
@@ -165,7 +166,7 @@ class EventController extends Controller
             'event' => $event,
             'relatedEvents' => $relatedEvents,
             'eventStats' => [
-                'organiser' => $event->listing?->title,
+                'organiser' => $event->listing?->localizedValue('title'),
                 'starts' => $event->start_at,
                 'ends' => $event->end_at,
                 'is_all_day' => $event->is_all_day,

@@ -267,7 +267,7 @@
                         <select id="category" name="category">
                             <option value="">All categories</option>
                             @foreach ($categories as $category)
-                                <option value="{{ $category->slug }}" @selected($filters['category'] === $category->slug)>{{ $category->name }}</option>
+                                <option value="{{ $category->slug }}" @selected($filters['category'] === $category->slug)>{{ $category->localizedValue('name') }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -370,7 +370,7 @@
                     <div class="sidebar-list">
                         @foreach ($featuredCategories as $category)
                             <a class="sidebar-link" href="{{ route('directory.index', ['category' => $category->slug]) }}">
-                                <span>{{ $category->name }}</span>
+                                <span>{{ $category->localizedValue('name') }}</span>
                                 <span class="muted">{{ $category->visible_listings_count }}</span>
                             </a>
                         @endforeach
@@ -415,13 +415,13 @@
                     @if ($loop->first)<div class="listing-grid">@endif
                     <article class="card listing-card">
                         @if ($listing->featured_image)
-                            <img class="listing-cover" src="{{ \Illuminate\Support\Facades\Storage::url($listing->featured_image) }}" alt="{{ $listing->title }}" loading="lazy" decoding="async">
+                            <img class="listing-cover" src="{{ \Illuminate\Support\Facades\Storage::url($listing->featured_image) }}" alt="{{ $listing->localizedValue('title') }}" loading="lazy" decoding="async">
                         @endif
 
                         <div class="listing-top">
                             <div>
                                 <div class="listing-meta">
-                                    <span>{{ $listing->city ?: 'Location pending' }}{{ $listing->region ? ', '.$listing->region : '' }}</span>
+                                    <span>{{ $listing->localizedValue('city') ?: 'Location pending' }}{{ $listing->localizedValue('region') ? ', '.$listing->localizedValue('region') : '' }}</span>
                                     @isset($listing->distance)
                                         <span class="badge" style="background:rgba(5, 150, 105, 0.12); color:#059669; border:0;">{{ number_format($listing->distance, 1) }} km away</span>
                                     @endisset
@@ -429,10 +429,10 @@
                                         <span class="featured-pill">Featured</span>
                                     @endif
                                 </div>
-                                <h3 style="margin:0.45rem 0 0.2rem;"><a href="{{ route('directory.show', $listing) }}">{{ $listing->title }}</a></h3>
+                                <h3 style="margin:0.45rem 0 0.2rem;"><a href="{{ route('directory.show', $listing) }}">{{ $listing->localizedValue('title') }}</a></h3>
                             </div>
                             @if ($listing->logo_path)
-                                <img class="listing-logo" src="{{ \Illuminate\Support\Facades\Storage::url($listing->logo_path) }}" alt="{{ $listing->title }} logo" loading="lazy" decoding="async">
+                                <img class="listing-logo" src="{{ \Illuminate\Support\Facades\Storage::url($listing->logo_path) }}" alt="{{ $listing->localizedValue('title') }} logo" loading="lazy" decoding="async">
                             @endif
                         </div>
 
@@ -446,11 +446,11 @@
                             @endif
                         </div>
 
-                        <p style="margin:0;">{{ $listing->excerpt ?: \Illuminate\Support\Str::limit(strip_tags((string) $listing->description), 170) }}</p>
+                        <p style="margin:0;">{{ $listing->localizedValue('excerpt') ?: \Illuminate\Support\Str::limit(strip_tags((string) $listing->localizedValue('description')), 170) }}</p>
 
                         <div>
                             @foreach ($listing->categories->take(3) as $category)
-                                <span class="badge">{{ $category->name }}</span>
+                                <span class="badge">{{ $category->localizedValue('name') }}</span>
                             @endforeach
                         </div>
 
@@ -462,7 +462,7 @@
                                 <span>Email: <a href="mailto:{{ $listing->email }}" class="hover:underline" style="color:var(--primary-dark);">{{ $listing->email }}</a></span>
                             @endif
                             @if ($listing->address_line)
-                                <span>Address: {{ $listing->address_line }}</span>
+                                <span>Address: {{ $listing->localizedValue('address_line') }}</span>
                             @endif
                         </div>
 

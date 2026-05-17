@@ -19,13 +19,15 @@ class VoucherController extends Controller
 
         $categories = Category::query()
             ->where('type', 'listing')
+            ->with('contentTranslations')
             ->orderBy('name')
             ->get();
 
         $vouchers = Voucher::query()
             ->with([
-                'listing' => fn ($query) => $query->with('categories'),
-                'categories',
+                'listing' => fn ($query) => $query->with(['categories.contentTranslations', 'contentTranslations']),
+                'categories.contentTranslations',
+                'contentTranslations',
             ])
             ->active()
             ->whereHas('listing', fn ($listing) => $listing->where('status', 'published'))
@@ -65,7 +67,8 @@ class VoucherController extends Controller
         abort_if($listing->status !== 'published', 404);
         abort_unless($voucher->listing_id === $listing->id, 404);
 
-        $voucher->load(['listing', 'categories']);
+        $voucher->load(['listing.contentTranslations', 'categories.contentTranslations', 'contentTranslations']);
+        $listing->load('contentTranslations');
 
         return view('vouchers.show', [
             'listing' => $listing,

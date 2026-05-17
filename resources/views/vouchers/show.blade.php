@@ -1,15 +1,15 @@
 @extends('layouts.public')
 
-@section('title', $voucher->title.' | Vouchers')
+@section('title', $voucher->localizedValue('title').' | Vouchers')
 
 @section('content')
     <section class="section">
         <div class="section-head" data-reveal>
             <div>
                 <div class="eyebrow">Voucher offer</div>
-                <h1>{{ $voucher->title }}</h1>
+                <h1>{{ $voucher->localizedValue('title') }}</h1>
                 <div class="meta">
-                    <span><a href="{{ route('directory.show', $listing) }}">{{ $listing->title }}</a></span>
+                    <span><a href="{{ route('directory.show', $listing) }}">{{ $listing->localizedValue('title') }}</a></span>
                     @if ($voucher->start_at)
                         <span>Starts {{ $voucher->start_at->format('j M Y') }}</span>
                     @endif
@@ -48,10 +48,10 @@
         <div class="grid grid-2">
             <article class="card" data-reveal>
                 <h3 class="h3-block">Offer</h3>
-                <p>{{ $voucher->description ?: 'Details coming soon.' }}</p>
+                <p>{{ $voucher->localizedValue('description') ?: 'Details coming soon.' }}</p>
                 <div style="margin-top:0.75rem;">
                     @foreach ($voucher->categories as $category)
-                        <span class="badge">{{ $category->name }}</span>
+                        <span class="badge">{{ $category->localizedValue('name') }}</span>
                     @endforeach
                 </div>
             </article>
@@ -64,7 +64,7 @@
                 @if ($voucher->terms)
                     <div style="margin-top:0.75rem;">
                         <strong>Terms</strong>
-                        <div class="muted" style="margin-top:0.35rem;">{!! nl2br(e($voucher->terms)) !!}</div>
+                        <div class="muted" style="margin-top:0.35rem;">{!! nl2br(e($voucher->localizedValue('terms'))) !!}</div>
                     </div>
                 @endif
             </article>

@@ -22,6 +22,7 @@ class DirectoryController extends Controller
 
         $categories = Category::query()
             ->where('type', 'listing')
+            ->with('contentTranslations')
             ->withCount([
                 'listings as visible_listings_count' => fn ($query) => $query->published(),
             ])
@@ -29,7 +30,7 @@ class DirectoryController extends Controller
             ->orderBy('name')
             ->get();
 
-        $listings = Listing::with('categories')
+        $listings = Listing::with(['categories.contentTranslations', 'contentTranslations'])
             ->withCount(['reviews' => fn ($query) => $query->where('status', 'approved')])
             ->withAvg(['reviews' => fn ($query) => $query->where('status', 'approved')], 'rating')
             ->published()
@@ -149,11 +150,12 @@ class DirectoryController extends Controller
         abort_if(! $listing->isPubliclyVisible(), 404);
 
         $listing->load([
-            'categories',
+            'categories.contentTranslations',
+            'contentTranslations',
             'owner',
             'photos',
-            'vouchers' => fn ($query) => $query->active()->with('categories')->orderByDesc('published_at')->orderByDesc('id')->limit(6),
-            'events' => fn ($query) => $query->published()->orderBy('start_at')->limit(3),
+            'vouchers' => fn ($query) => $query->active()->with(['categories.contentTranslations', 'contentTranslations'])->orderByDesc('published_at')->orderByDesc('id')->limit(6),
+            'events' => fn ($query) => $query->published()->with('contentTranslations')->orderBy('start_at')->limit(3),
             'reviews' => fn ($query) => $query->where('status', 'approved')->latest(),
             'reviews.author',
         ])->loadCount([
@@ -164,7 +166,7 @@ class DirectoryController extends Controller
 
         $categoryIds = $listing->categories->modelKeys();
 
-        $relatedListings = Listing::with('categories')
+        $relatedListings = Listing::with(['categories.contentTranslations', 'contentTranslations'])
             ->withCount(['reviews' => fn ($query) => $query->where('status', 'approved')])
             ->published()
             ->whereKeyNot($listing->getKey())

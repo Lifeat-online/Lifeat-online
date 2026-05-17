@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasContentTranslations;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,7 +14,18 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Event extends Model
 {
-    use HasFactory;
+    use HasFactory, HasContentTranslations;
+
+    protected array $translatable = [
+        'title',
+        'excerpt',
+        'description',
+        'venue_name',
+        'address_line',
+        'city',
+        'region',
+        'country',
+    ];
 
     protected $fillable = [
         'listing_id',

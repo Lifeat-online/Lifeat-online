@@ -33,8 +33,8 @@
         @forelse ($classifieds as $item)
             @if ($loop->first)<div class="grid grid-2">@endif
             <article class="card">
-                <h3><a href="{{ route('classifieds.show', $item) }}">{{ $item->title }}</a></h3>
-                <p class="muted">{{ $item->city ?: 'Location' }}</p>
+                <h3><a href="{{ route('classifieds.show', $item) }}">{{ $item->localizedValue('title') }}</a></h3>
+                <p class="muted">{{ $item->localizedValue('city') ?: 'Location' }}</p>
                 <p>
                     @if ($item->contact_for_price)
                         Contact for price

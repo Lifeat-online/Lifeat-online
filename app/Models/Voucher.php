@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasContentTranslations;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +13,13 @@ use Illuminate\Support\Str;
 
 class Voucher extends Model
 {
-    use HasFactory;
+    use HasFactory, HasContentTranslations;
+
+    protected array $translatable = [
+        'title',
+        'description',
+        'terms',
+    ];
 
     public const TYPE_DISCOUNT_AMOUNT = 'discount_amount';
     public const TYPE_DISCOUNT_PERCENT = 'discount_percent';
