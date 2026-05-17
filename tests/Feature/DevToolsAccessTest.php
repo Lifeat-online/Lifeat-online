@@ -391,6 +391,58 @@ class DevToolsAccessTest extends TestCase
         $this->assertSame('json_object', $requests[1][0]->data()['response_format']['type']);
     }
 
+    public function test_openrouter_translation_extracts_json_object_from_messy_model_response(): void
+    {
+        config([
+            'services.openrouter.key' => 'sk-or-test',
+        ]);
+
+        Http::fake([
+            '*' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => 'Here is the translation: {"title":"Gemeenskapsnuus"} Thanks.',
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $translated = app(OpenRouterTranslationService::class)->translateContent([
+            'title' => 'Community News',
+        ], 'af');
+
+        $this->assertSame(['title' => 'Gemeenskapsnuus'], $translated);
+    }
+
+    public function test_openrouter_translation_reports_invalid_json_preview(): void
+    {
+        config([
+            'services.openrouter.key' => 'sk-or-test',
+        ]);
+
+        Http::fake([
+            '*' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => 'I translated it, but not as JSON.',
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $translator = app(OpenRouterTranslationService::class);
+
+        $this->assertNull($translator->translateContent([
+            'title' => 'Community News',
+        ], 'af'));
+        $this->assertStringContainsString('OpenRouter returned invalid JSON', $translator->lastFailureMessage());
+        $this->assertStringContainsString('I translated it, but not as JSON.', $translator->lastFailureMessage());
+    }
+
     public function test_interface_translations_are_applied_to_rendered_platform_html(): void
     {
         InterfaceTranslation::create([

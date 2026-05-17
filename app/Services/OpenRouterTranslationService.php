@@ -114,9 +114,11 @@ class OpenRouterTranslationService
                 return null;
             }
 
-            $decoded = json_decode($this->normalizeJsonResponse($message), true, 512, JSON_THROW_ON_ERROR);
+            $decoded = $this->decodeJsonResponse($message);
 
             if (! is_array($decoded)) {
+                $this->lastFailureMessage ??= 'OpenRouter response was not a JSON object.';
+
                 return null;
             }
 
@@ -289,7 +291,85 @@ class OpenRouterTranslationService
             return trim($matches[1]);
         }
 
-        return $message;
+        if ($this->looksLikeJsonObject($message)) {
+            return $message;
+        }
+
+        $object = $this->extractFirstJsonObject($message);
+
+        return $object ?? $message;
+    }
+
+    private function decodeJsonResponse(string $message): ?array
+    {
+        $normalized = $this->normalizeJsonResponse($message);
+        $decoded = json_decode($normalized, true);
+
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return $decoded;
+        }
+
+        $this->lastFailureMessage = 'OpenRouter returned invalid JSON: '.json_last_error_msg().'. Response preview: '.mb_substr(trim($message), 0, 180);
+
+        return null;
+    }
+
+    private function looksLikeJsonObject(string $message): bool
+    {
+        return str_starts_with(trim($message), '{') && str_ends_with(trim($message), '}');
+    }
+
+    private function extractFirstJsonObject(string $message): ?string
+    {
+        $length = strlen($message);
+        $start = strpos($message, '{');
+
+        if ($start === false) {
+            return null;
+        }
+
+        $depth = 0;
+        $inString = false;
+        $escaped = false;
+
+        for ($index = $start; $index < $length; $index++) {
+            $char = $message[$index];
+
+            if ($inString) {
+                if ($escaped) {
+                    $escaped = false;
+                    continue;
+                }
+
+                if ($char === '\\') {
+                    $escaped = true;
+                    continue;
+                }
+
+                if ($char === '"') {
+                    $inString = false;
+                }
+
+                continue;
+            }
+
+            if ($char === '"') {
+                $inString = true;
+                continue;
+            }
+
+            if ($char === '{') {
+                $depth++;
+            } elseif ($char === '}') {
+                $depth--;
+
+                if ($depth === 0) {
+                    return substr($message, $start, $index - $start + 1);
+                }
+            }
+        }
+
+        return null;
     }
 
     private function providerErrorMessage(Response $response): string
