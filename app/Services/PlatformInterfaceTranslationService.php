@@ -34,6 +34,7 @@ class PlatformInterfaceTranslationService
             'skipped' => 0,
             'failed' => 0,
             'errors' => [],
+            'halted' => false,
         ];
 
         foreach ($this->targetLocales() as $locale) {
@@ -52,7 +53,21 @@ class PlatformInterfaceTranslationService
             $translated = $this->translator->translateContent($payload, $locale);
 
             if ($translated === null) {
+                if ($this->translator->wasRateLimited()) {
+                    $summary['processed'] += $items->count();
+                    $summary['failed'] += $items->count();
+                    $summary['halted'] = true;
+                    $this->recordError($summary, $this->rateLimitMessage());
+
+                    return $summary;
+                }
+
                 $this->translateIndividually($items, $locale, $summary);
+
+                if ($summary['halted']) {
+                    return $summary;
+                }
+
                 continue;
             }
 
@@ -94,6 +109,14 @@ class PlatformInterfaceTranslationService
 
             if (! is_string($translation) || trim($translation) === '') {
                 $summary['failed']++;
+
+                if ($this->translator->wasRateLimited()) {
+                    $summary['halted'] = true;
+                    $this->recordError($summary, $this->rateLimitMessage());
+
+                    return;
+                }
+
                 $this->recordError($summary, $this->translator->lastFailureMessage() ?: 'Platform interface translation failed.');
                 continue;
             }
@@ -123,6 +146,12 @@ class PlatformInterfaceTranslationService
         if ($message !== '' && ! in_array($message, $summary['errors'], true) && count($summary['errors']) < 5) {
             $summary['errors'][] = $message;
         }
+    }
+
+    private function rateLimitMessage(): string
+    {
+        return ($this->translator->lastFailureMessage() ?: 'OpenRouter rate limit reached.')
+            .' Wait a minute, then retry with Items per run set to 1-3, or switch to a paid/non-free OpenRouter model for bulk translation.';
     }
 
     public function translationsFor(string $locale): array

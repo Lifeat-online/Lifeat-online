@@ -12,6 +12,7 @@ use Throwable;
 class OpenRouterTranslationService
 {
     private ?string $lastFailureMessage = null;
+    private ?int $lastFailureStatus = null;
 
     public function translateModel(Model $model, string $targetLocale = 'af', bool $force = false): array
     {
@@ -69,6 +70,7 @@ class OpenRouterTranslationService
     public function translateContent(array $content, string $targetLocale = 'af'): ?array
     {
         $this->lastFailureMessage = null;
+        $this->lastFailureStatus = null;
         $apiKey = $this->apiKey();
 
         if ($apiKey === '') {
@@ -93,6 +95,7 @@ class OpenRouterTranslationService
             }
 
             if (! $response->successful()) {
+                $this->lastFailureStatus = $response->status();
                 $this->lastFailureMessage = 'OpenRouter returned '.$response->status().': '.$this->providerErrorMessage($response);
 
                 Log::warning('OpenRouter translation failed.', [
@@ -134,6 +137,16 @@ class OpenRouterTranslationService
     public function lastFailureMessage(): ?string
     {
         return $this->lastFailureMessage;
+    }
+
+    public function lastFailureStatus(): ?int
+    {
+        return $this->lastFailureStatus;
+    }
+
+    public function wasRateLimited(): bool
+    {
+        return $this->lastFailureStatus === 429;
     }
 
     public function model(): string

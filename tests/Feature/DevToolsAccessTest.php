@@ -249,6 +249,9 @@ class DevToolsAccessTest extends TestCase
                 ->once()
                 ->withArgs(fn (Article $target, string $locale, bool $force): bool => $target->is($article) && $locale === 'af' && $force === false)
                 ->andReturn(['ok' => false, 'message' => 'OpenRouter returned 429: Rate limit exceeded.']);
+            $mock->shouldReceive('wasRateLimited')
+                ->twice()
+                ->andReturnFalse();
         });
 
         $this->actingAs($admin)
@@ -262,6 +265,60 @@ class DevToolsAccessTest extends TestCase
             ->assertJsonPath('errors.0', 'OpenRouter returned 429: Rate limit exceeded.')
             ->assertJsonFragment([
                 'message' => 'Processed 1 translation targets: 0 translated, 0 current, 1 failed. First issue: OpenRouter returned 429: Rate limit exceeded.',
+            ]);
+    }
+
+    public function test_translation_batch_stops_early_when_openrouter_rate_limits(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
+
+        $firstArticle = Article::create([
+            'user_id' => User::factory()->create(['role' => 'writer'])->id,
+            'title' => 'Rate Limited One',
+            'slug' => 'rate-limited-one',
+            'excerpt' => 'Short excerpt',
+            'body' => 'This article will hit rate limits.',
+            'source_locale' => 'en',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        Article::create([
+            'user_id' => User::factory()->create(['role' => 'writer'])->id,
+            'title' => 'Rate Limited Two',
+            'slug' => 'rate-limited-two',
+            'excerpt' => 'Short excerpt',
+            'body' => 'This article should not be attempted in the same run.',
+            'source_locale' => 'en',
+            'status' => 'published',
+            'published_at' => now()->subMinute(),
+        ]);
+
+        $this->mock(OpenRouterTranslationService::class, function (MockInterface $mock) use ($firstArticle): void {
+            $mock->shouldReceive('translateModel')
+                ->once()
+                ->withArgs(fn (Article $target, string $locale, bool $force): bool => $target->is($firstArticle) && $locale === 'af' && $force === false)
+                ->andReturn(['ok' => false, 'message' => 'OpenRouter returned 429: Provider rate limit exceeded.']);
+            $mock->shouldReceive('wasRateLimited')
+                ->twice()
+                ->andReturnTrue();
+        });
+
+        $this->actingAs($admin)
+            ->postJson(route('dev.translations.batch'), [
+                'section' => 'articles',
+                'limit' => 5,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('processed', 1)
+            ->assertJsonPath('failed', 1)
+            ->assertJsonPath('halted', true)
+            ->assertJsonPath('sections.0.halted', true)
+            ->assertJsonFragment([
+                'message' => 'Processed 1 translation targets: 0 translated, 0 current, 1 failed. First issue: OpenRouter returned 429: Provider rate limit exceeded. Wait a minute, then retry with Items per run set to 1-3, or switch to a paid/non-free OpenRouter model for bulk translation. Batch stopped early to avoid repeated failed provider calls.',
             ]);
     }
 

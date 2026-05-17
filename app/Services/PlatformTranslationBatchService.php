@@ -109,6 +109,7 @@ class PlatformTranslationBatchService
             'skipped' => 0,
             'failed' => 0,
             'errors' => [],
+            'halted' => false,
             'sections' => [],
         ];
 
@@ -125,6 +126,12 @@ class PlatformTranslationBatchService
                 $summary['failed'] += $sectionSummary['failed'];
                 $summary['errors'] = $this->mergeErrors($summary['errors'], $sectionSummary['errors'] ?? []);
                 $summary['sections'][] = $sectionSummary;
+
+                if ($sectionSummary['halted'] ?? false) {
+                    $summary['halted'] = true;
+                    break;
+                }
+
                 continue;
             }
 
@@ -136,6 +143,7 @@ class PlatformTranslationBatchService
                 'skipped' => 0,
                 'failed' => 0,
                 'errors' => [],
+                'halted' => false,
             ];
 
             $targets = $force
@@ -161,13 +169,25 @@ class PlatformTranslationBatchService
                         $this->recordError(
                             $sectionSummary,
                             $summary,
-                            $result['message'] ?? 'Translation failed.'
+                            $this->translator->wasRateLimited()
+                                ? $this->rateLimitMessage($result['message'] ?? null)
+                                : ($result['message'] ?? 'Translation failed.')
                         );
+
+                        if ($this->translator->wasRateLimited()) {
+                            $sectionSummary['halted'] = true;
+                            $summary['halted'] = true;
+                            break 2;
+                        }
                     }
                 }
             }
 
             $summary['sections'][] = $sectionSummary;
+
+            if ($summary['halted']) {
+                break;
+            }
         }
 
         $summary['ok'] = $summary['failed'] === 0;
@@ -205,6 +225,13 @@ class PlatformTranslationBatchService
         }
 
         return $current;
+    }
+
+    private function rateLimitMessage(?string $message = null): string
+    {
+        return trim((string) $message) !== ''
+            ? trim((string) $message).' Wait a minute, then retry with Items per run set to 1-3, or switch to a paid/non-free OpenRouter model for bulk translation.'
+            : 'OpenRouter rate limit reached. Wait a minute, then retry with Items per run set to 1-3, or switch to a paid/non-free OpenRouter model for bulk translation.';
     }
 
     private function queryFor(string $sectionKey): Builder

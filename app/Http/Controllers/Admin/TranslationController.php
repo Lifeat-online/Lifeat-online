@@ -115,6 +115,10 @@ class TranslationController extends Controller
             $message .= ' First issue: '.collect($result['errors'])->first();
         }
 
+        if ($result['halted'] ?? false) {
+            $message .= ' Batch stopped early to avoid repeated failed provider calls.';
+        }
+
         return response()->json([
             ...$result,
             'message' => $message,
