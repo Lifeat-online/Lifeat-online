@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\VapidKeySetupService;
 use App\Services\WebPushDeliveryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
@@ -64,6 +65,35 @@ class AdminPushNotificationTest extends TestCase
             'recipient' => 'all active browser subscriptions',
             'status' => 'sent',
         ]);
+    }
+
+    public function test_web_push_notice_about_optional_math_extensions_does_not_break_manual_send(): void
+    {
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        $keys = [
+            'publicKey' => rtrim(strtr(base64_encode(str_repeat("\x04", 65)), '+/', '-_'), '='),
+            'privateKey' => rtrim(strtr(base64_encode(str_repeat("\x01", 32)), '+/', '-_'), '='),
+        ];
+
+        $this->mock(VapidKeySetupService::class, function (MockInterface $mock) use ($keys): void {
+            $mock->shouldReceive('publicKey')->andReturn($keys['publicKey']);
+            $mock->shouldReceive('privateKey')->andReturn($keys['privateKey']);
+            $mock->shouldReceive('subject')->andReturn('https://example.com');
+        });
+
+        $result = app(WebPushDeliveryService::class)->sendManual($admin, [
+            'title' => 'Backend push test',
+            'body' => 'This is a test message.',
+            'url' => route('admin.dashboard'),
+        ], 'self');
+
+        $this->assertSame([
+            'configured' => true,
+            'attempted' => 0,
+            'sent' => 0,
+            'failed' => 0,
+            'expired' => 0,
+        ], $result);
     }
 
     public function test_non_admin_roles_cannot_open_push_notification_test_section(): void

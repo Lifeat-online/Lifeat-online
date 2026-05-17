@@ -28,13 +28,7 @@ class WebPushDeliveryService
             ];
         }
 
-        $webPush = new WebPush([
-            'VAPID' => [
-                'subject' => $this->vapidKeys->subject(),
-                'publicKey' => $this->vapidKeys->publicKey(),
-                'privateKey' => $this->vapidKeys->privateKey(),
-            ],
-        ]);
+        $webPush = $this->webPush();
 
         $payload = json_encode($this->payloadForCampaign($campaign), JSON_THROW_ON_ERROR);
         $attempted = 0;
@@ -159,13 +153,22 @@ class WebPushDeliveryService
 
     private function webPush(): WebPush
     {
-        return new WebPush([
-            'VAPID' => [
-                'subject' => $this->vapidKeys->subject(),
-                'publicKey' => $this->vapidKeys->publicKey(),
-                'privateKey' => $this->vapidKeys->privateKey(),
-            ],
-        ]);
+        set_error_handler(static function (int $severity, string $message): bool {
+            return $severity === E_USER_NOTICE
+                && str_contains($message, 'GMP or BCMath extension');
+        });
+
+        try {
+            return new WebPush([
+                'VAPID' => [
+                    'subject' => $this->vapidKeys->subject(),
+                    'publicKey' => $this->vapidKeys->publicKey(),
+                    'privateKey' => $this->vapidKeys->privateKey(),
+                ],
+            ]);
+        } finally {
+            restore_error_handler();
+        }
     }
 
     private function flush(WebPush $webPush, int $attempted): array
