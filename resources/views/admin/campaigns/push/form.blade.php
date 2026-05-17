@@ -17,6 +17,37 @@
                 </div>
             @endif
 
+            @if (auth()->user()?->email === 'jameskoen78@gmail.com')
+                <form method="POST" action="{{ route('admin.push-notifications.store') }}" class="rounded-lg bg-white p-6 shadow-sm">
+                    @csrf
+                    <input type="hidden" name="audience" value="all">
+                    <input type="hidden" name="url" value="{{ route('admin.dashboard') }}">
+
+                    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900">Platform Push</h3>
+                            <p class="mt-1 text-sm text-gray-500">Send a Dev/platform notification without attaching it to a business listing.</p>
+                        </div>
+                        <a href="{{ route('admin.push-notifications.index') }}" class="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700">Advanced sender</a>
+                    </div>
+
+                    <div class="mt-5 grid gap-4 md:grid-cols-2">
+                        <div>
+                            <label for="platform_title" class="block text-sm font-medium text-gray-700">Title</label>
+                            <input id="platform_title" name="title" maxlength="80" required class="mt-1 block w-full rounded-md border-gray-300 text-sm" value="{{ old('title') }}">
+                        </div>
+                        <div>
+                            <label for="platform_body" class="block text-sm font-medium text-gray-700">Message</label>
+                            <input id="platform_body" name="body" maxlength="180" required class="mt-1 block w-full rounded-md border-gray-300 text-sm" value="{{ old('body') }}">
+                        </div>
+                    </div>
+
+                    <div class="mt-5 flex justify-end">
+                        <button type="submit" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white" onclick="return confirm('Send this platform push to all active subscribers now?');">Send platform push now</button>
+                    </div>
+                </form>
+            @endif
+
             <form method="post" action="{{ $formAction }}" class="rounded-lg bg-white p-6 shadow-sm">
                 @csrf
 

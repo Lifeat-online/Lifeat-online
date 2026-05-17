@@ -100,4 +100,33 @@ class AdminCampaignCreationTest extends TestCase
         $this->assertSame('scheduled', $campaign->status);
         $this->assertSame('listing_city', $campaign->audience_scope);
     }
+
+    public function test_dev_owner_sees_platform_push_sender_on_push_campaign_create_page(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.campaigns.push.create'))
+            ->assertOk()
+            ->assertSee('Platform Push')
+            ->assertSee('Send platform push now')
+            ->assertSee(route('admin.push-notifications.store'), false);
+    }
+
+    public function test_non_dev_owner_does_not_see_platform_push_sender_on_push_campaign_create_page(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'other-admin@example.com',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.campaigns.push.create'))
+            ->assertOk()
+            ->assertDontSee('Platform Push')
+            ->assertDontSee('Send platform push now');
+    }
 }
