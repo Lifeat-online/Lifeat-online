@@ -82,6 +82,9 @@ class AiPhaseOneTest extends TestCase
             ->get(route('admin.dashboard', ['tab' => 'ai']))
             ->assertOk()
             ->assertSee('Voice Test')
+            ->assertSee('Voice Providers')
+            ->assertSee('NVIDIA Speech NIM')
+            ->assertSee('NVIDIA Speech NIM testing expects a hosted or local endpoint', false)
             ->assertSee(route('ask-life.speak'), false)
             ->assertSee('data-voice-test', false);
     }
@@ -144,12 +147,24 @@ class AiPhaseOneTest extends TestCase
             ->postJson(route('dev.ai.settings.store'), [
                 'provider' => 'openrouter',
                 'voice_provider' => 'nvidia',
-                'voice_key' => 'nvapi-voice-test',
-                'voice_voice_id' => 'Magpie-Multilingual.EN-US.Aria',
-                'voice_english_model' => 'en-US',
-                'voice_afrikaans_model' => 'en-US',
-                'voice_base_url' => 'http://localhost:9000/v1',
-                'voice_output_format' => 'wav_22050',
+                'voice_keys' => [
+                    'nvidia' => 'nvapi-voice-test',
+                ],
+                'voice_voice_ids' => [
+                    'nvidia' => 'Magpie-Multilingual.EN-US.Aria',
+                ],
+                'voice_english_models' => [
+                    'nvidia' => 'en-US',
+                ],
+                'voice_afrikaans_models' => [
+                    'nvidia' => 'en-US',
+                ],
+                'voice_base_urls' => [
+                    'nvidia' => 'http://localhost:9000/v1',
+                ],
+                'voice_output_formats' => [
+                    'nvidia' => 'wav_22050',
+                ],
             ])
             ->assertOk()
             ->assertJsonPath('voice_status.provider', 'nvidia')

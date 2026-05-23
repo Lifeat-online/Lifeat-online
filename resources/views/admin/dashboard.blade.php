@@ -373,42 +373,49 @@
                         </div>
 
                         <div class="mt-6">
-                            <h4 class="font-semibold text-gray-900">Voice Provider</h4>
-                            <p class="mt-1 text-sm text-gray-500">Used by Jimmy's speaker button. Audio is cached after the first generation so repeated answers do not keep spending API calls.</p>
-                            <div class="mt-4 rounded-lg border border-emerald-100 bg-emerald-50/60 p-4">
-                                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                    <div>
-                                        <h4 class="font-semibold text-gray-900">{{ $devVoiceStatus['provider_label'] ?? 'ElevenLabs' }}</h4>
-                                        <p class="text-xs text-gray-500">{{ ($devVoiceStatus['configured'] ?? false) ? 'configured' : 'not ready' }} / {{ $devVoiceStatus['source'] ?? 'Missing' }}</p>
+                            <h4 class="font-semibold text-gray-900">Voice Providers</h4>
+                            <p class="mt-1 text-sm text-gray-500">Used by Jimmy's speaker button. Select the active provider above, then configure ElevenLabs or NVIDIA Speech NIM here.</p>
+                            <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                                @foreach (($devVoiceStatus['providers'] ?? []) as $provider)
+                                    <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 p-4">
+                                        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                            <div>
+                                                <h4 class="font-semibold text-gray-900">{{ $provider['label'] }}</h4>
+                                                <p class="text-xs text-gray-500">{{ $provider['type'] }} @if ($provider['configured']) / configured @else / not ready @endif</p>
+                                            </div>
+                                            <span class="rounded-full bg-white px-2 py-1 text-xs text-emerald-700">{{ $provider['source'] }}</span>
+                                        </div>
+                                        <div class="mt-4 grid gap-3 lg:grid-cols-2">
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Voice ID / voice name</label>
+                                                <input class="w-full rounded-md border-gray-300 text-sm" name="voice_voice_ids[{{ $provider['key'] }}]" value="{{ $provider['voice_id'] }}">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Output format</label>
+                                                <input class="w-full rounded-md border-gray-300 text-sm" name="voice_output_formats[{{ $provider['key'] }}]" value="{{ $provider['output_format'] }}">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium uppercase text-gray-500">English model / language</label>
+                                                <input class="w-full rounded-md border-gray-300 text-sm" name="voice_english_models[{{ $provider['key'] }}]" value="{{ $provider['english_model'] }}">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Afrikaans model / language</label>
+                                                <input class="w-full rounded-md border-gray-300 text-sm" name="voice_afrikaans_models[{{ $provider['key'] }}]" value="{{ $provider['afrikaans_model'] }}">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Base URL</label>
+                                                <input class="w-full rounded-md border-gray-300 text-sm" name="voice_base_urls[{{ $provider['key'] }}]" value="{{ $provider['base_url'] }}">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium uppercase text-gray-500">API key</label>
+                                                <input class="w-full rounded-md border-gray-300 text-sm" type="password" autocomplete="off" name="voice_keys[{{ $provider['key'] }}]" placeholder="{{ $provider['masked_key'] ?: (($provider['key_optional'] ?? false) ? 'Optional for local testing' : 'Paste key to save') }}">
+                                            </div>
+                                        </div>
+                                        @if (($provider['key'] ?? '') === 'nvidia')
+                                            <p class="mt-3 rounded-md bg-white px-3 py-2 text-xs text-emerald-800">NVIDIA Speech NIM testing expects a hosted or local endpoint such as <code>http://localhost:9000/v1</code>; Jimmy calls <code>/audio/synthesize</code>.</p>
+                                        @endif
                                     </div>
-                                    <span class="rounded-full bg-white px-2 py-1 text-xs text-emerald-700">{{ $devVoiceStatus['masked_key'] ?: 'No saved key' }}</span>
-                                </div>
-                                <div class="mt-4 grid gap-3 lg:grid-cols-2">
-                                    <div>
-                                        <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Voice ID</label>
-                                        <input class="w-full rounded-md border-gray-300 text-sm" name="voice_voice_id" value="{{ $devVoiceStatus['voice_id'] }}">
-                                    </div>
-                                    <div>
-                                        <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Output format</label>
-                                        <input class="w-full rounded-md border-gray-300 text-sm" name="voice_output_format" value="{{ $devVoiceStatus['output_format'] }}">
-                                    </div>
-                                    <div>
-                                        <label class="mb-1 block text-xs font-medium uppercase text-gray-500">English model</label>
-                                        <input class="w-full rounded-md border-gray-300 text-sm" name="voice_english_model" value="{{ $devVoiceStatus['english_model'] }}">
-                                    </div>
-                                    <div>
-                                        <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Afrikaans model</label>
-                                        <input class="w-full rounded-md border-gray-300 text-sm" name="voice_afrikaans_model" value="{{ $devVoiceStatus['afrikaans_model'] }}">
-                                    </div>
-                                    <div>
-                                        <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Base URL</label>
-                                        <input class="w-full rounded-md border-gray-300 text-sm" name="voice_base_url" value="{{ $devVoiceStatus['base_url'] }}">
-                                    </div>
-                                    <div>
-                                        <label class="mb-1 block text-xs font-medium uppercase text-gray-500">API key</label>
-                                        <input class="w-full rounded-md border-gray-300 text-sm" type="password" autocomplete="off" name="voice_key" placeholder="{{ $devVoiceStatus['masked_key'] ?: 'Paste key to save if required' }}">
-                                    </div>
-                                </div>
+                                @endforeach
                             </div>
                         </div>
 

@@ -47,6 +47,18 @@ class AiSettingsController extends Controller
             'voice_afrikaans_model' => ['nullable', 'string', 'max:255'],
             'voice_base_url' => ['nullable', 'string', 'max:500'],
             'voice_output_format' => ['nullable', 'string', 'max:80'],
+            'voice_keys' => ['nullable', 'array'],
+            'voice_keys.*' => ['nullable', 'string', 'max:1000'],
+            'voice_voice_ids' => ['nullable', 'array'],
+            'voice_voice_ids.*' => ['nullable', 'string', 'max:255'],
+            'voice_english_models' => ['nullable', 'array'],
+            'voice_english_models.*' => ['nullable', 'string', 'max:255'],
+            'voice_afrikaans_models' => ['nullable', 'array'],
+            'voice_afrikaans_models.*' => ['nullable', 'string', 'max:255'],
+            'voice_base_urls' => ['nullable', 'array'],
+            'voice_base_urls.*' => ['nullable', 'string', 'max:500'],
+            'voice_output_formats' => ['nullable', 'array'],
+            'voice_output_formats.*' => ['nullable', 'string', 'max:80'],
             'azure_openai_api_version' => ['nullable', 'string', 'max:80'],
         ]);
 
@@ -101,6 +113,39 @@ class AiSettingsController extends Controller
 
         if (filled($validated['azure_openai_api_version'] ?? null)) {
             $this->setSetting($request, 'ai.azure_openai_api_version', trim($validated['azure_openai_api_version']), 'string');
+        }
+
+        foreach ($voiceProviders as $provider) {
+            $key = trim((string) data_get($validated, "voice_keys.{$provider}", ''));
+            $voiceId = trim((string) data_get($validated, "voice_voice_ids.{$provider}", ''));
+            $englishModel = trim((string) data_get($validated, "voice_english_models.{$provider}", ''));
+            $afrikaansModel = trim((string) data_get($validated, "voice_afrikaans_models.{$provider}", ''));
+            $baseUrl = trim((string) data_get($validated, "voice_base_urls.{$provider}", ''));
+            $outputFormat = trim((string) data_get($validated, "voice_output_formats.{$provider}", ''));
+
+            if ($key !== '') {
+                $this->setSetting($request, "voice.{$provider}_api_key", $key, 'secret');
+            }
+
+            if ($voiceId !== '') {
+                $this->setSetting($request, "voice.{$provider}_voice_id", $voiceId, 'string');
+            }
+
+            if ($englishModel !== '') {
+                $this->setSetting($request, "voice.{$provider}_english_model", $englishModel, 'string');
+            }
+
+            if ($afrikaansModel !== '') {
+                $this->setSetting($request, "voice.{$provider}_afrikaans_model", $afrikaansModel, 'string');
+            }
+
+            if ($baseUrl !== '') {
+                $this->setSetting($request, "voice.{$provider}_base_url", rtrim($baseUrl, '/'), 'string');
+            }
+
+            if ($outputFormat !== '') {
+                $this->setSetting($request, "voice.{$provider}_output_format", $outputFormat, 'string');
+            }
         }
 
         $voiceProvider = filled($validated['voice_provider'] ?? null) ? $validated['voice_provider'] : $voice->provider();
