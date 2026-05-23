@@ -1,22 +1,22 @@
 <div class="ask-life-widget" data-ask-life data-endpoint="{{ route('ask-life.store') }}" data-speak-endpoint="{{ route('ask-life.speak') }}">
-    <button type="button" class="ask-life-fab" data-ask-life-toggle aria-expanded="false" aria-controls="ask-life-panel" title="Ask Life@">
+    <button type="button" class="ask-life-fab" data-ask-life-toggle aria-expanded="false" aria-controls="ask-life-panel" title="Ask Jimmy">
         <x-icon name="sparkles" class="w-5 h-5" />
-        <span>Ask Life@</span>
+        <span>Ask Jimmy</span>
     </button>
 
-    <section id="ask-life-panel" class="ask-life-panel" data-ask-life-panel hidden aria-label="Ask Life@">
+    <section id="ask-life-panel" class="ask-life-panel" data-ask-life-panel hidden aria-label="Ask Jimmy">
         <div class="ask-life-head">
             <div>
-                <strong>Ask Life@</strong>
+                <strong>Jimmy</strong>
                 <p>Businesses, articles, events, vouchers, classifieds, and faults.</p>
             </div>
-            <button type="button" class="ask-life-close" data-ask-life-toggle aria-label="Close Ask Life@">
+            <button type="button" class="ask-life-close" data-ask-life-toggle aria-label="Close Jimmy">
                 <x-icon name="x" class="w-5 h-5" />
             </button>
         </div>
 
         <div class="ask-life-messages" data-ask-life-messages>
-            <div class="ask-life-message ask-life-message-bot">What should I find for you?</div>
+            <div class="ask-life-message ask-life-message-bot">Hi, I am Jimmy. What should I find for you?</div>
         </div>
 
         <form class="ask-life-form" data-ask-life-form>
@@ -108,7 +108,7 @@
             button.type = 'button';
             button.className = 'ask-life-speak';
             button.title = 'Listen to this answer';
-            button.setAttribute('aria-label', 'Listen to this Ask Life answer');
+            button.setAttribute('aria-label', 'Listen to Jimmy read this answer');
             button.textContent = 'Listen';
 
             button.addEventListener('click', async () => {
@@ -175,7 +175,7 @@
             appendMessage(text, 'user');
             question.value = '';
             question.disabled = true;
-            const pending = appendMessage('Checking Life@ sources...', 'bot');
+            const pending = appendMessage('Jimmy is checking Life@ sources...', 'bot');
 
             try {
                 const response = await fetch(endpoint, {
@@ -193,7 +193,7 @@
                 appendSpeakButton(pending, data.answer || pending.textContent, data.locale || 'en');
                 appendSources(data.sources || [], data.search_url);
             } catch (error) {
-                pending.textContent = 'Ask Life@ is unavailable right now. Try the full search page.';
+                pending.textContent = 'Jimmy is unavailable right now. Try the full search page.';
                 appendSources([], '{{ route('search.index') }}');
             } finally {
                 question.disabled = false;

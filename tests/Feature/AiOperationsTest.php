@@ -53,17 +53,17 @@ class AiOperationsTest extends TestCase
 
         $this->actingAs($admin)
             ->put(route('admin.ai-operations.prompts.update', 'ask_life'), [
-                'system' => 'Custom Ask Life system prompt. Return only JSON.',
+                'system' => 'Custom Jimmy system prompt. Return only JSON.',
                 'version' => 'ask_life_custom_v1',
                 'output_language' => 'af',
             ])
             ->assertRedirect();
 
-        $this->assertSame('Custom Ask Life system prompt. Return only JSON.', Setting::getValue('ai_prompt.ask_life.system'));
+        $this->assertSame('Custom Jimmy system prompt. Return only JSON.', Setting::getValue('ai_prompt.ask_life.system'));
         $this->assertSame('ask_life_custom_v1', Setting::getValue('ai_prompt.ask_life.version'));
 
         $prompt = app(AiPromptCatalog::class)->get('ask_life');
-        $this->assertSame('Custom Ask Life system prompt. Return only JSON.', $prompt['system']);
+        $this->assertSame('Custom Jimmy system prompt. Return only JSON.', $prompt['system']);
         $this->assertSame('ask_life_custom_v1', $prompt['version']);
         $this->assertSame('af', $prompt['output_language']);
         $this->assertTrue($prompt['is_custom']);
@@ -168,9 +168,9 @@ class AiOperationsTest extends TestCase
             'model' => 'eleven_flash_v2_5',
             'prompt_version' => 'ask_life_voice_v1',
             'input_hash' => hash('sha256', 'voice'),
-            'input_summary' => 'Read this Ask Life answer aloud.',
+            'input_summary' => 'Read this Jimmy answer aloud.',
             'input_payload' => [
-                'text' => 'Read this Ask Life answer aloud.',
+                'text' => 'Read this Jimmy answer aloud.',
                 'locale' => 'en',
             ],
             'status' => AiGeneration::STATUS_FAILED,

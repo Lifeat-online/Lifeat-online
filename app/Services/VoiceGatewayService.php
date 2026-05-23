@@ -37,6 +37,7 @@ class VoiceGatewayService
                 'configured' => $this->configured($key),
                 'source' => $this->apiKeySource($key),
                 'masked_key' => $this->maskedApiKey($key),
+                'key_optional' => (bool) config("services.voice.providers.{$key}.key_optional", false),
             ])
             ->values()
             ->all();
@@ -128,7 +129,9 @@ class VoiceGatewayService
     {
         $provider ??= $this->provider();
 
-        return $this->apiKey($provider) !== ''
+        $keyOptional = (bool) config("services.voice.providers.{$provider}.key_optional", false);
+
+        return ($keyOptional || $this->apiKey($provider) !== '')
             && $this->voiceId($provider) !== ''
             && $this->model($provider, 'en') !== ''
             && $this->model($provider, 'af') !== ''
@@ -145,6 +148,10 @@ class VoiceGatewayService
 
         if ((string) Setting::getValue("voice.{$provider}_api_key", '') !== '') {
             return 'Voice settings';
+        }
+
+        if ((bool) config("services.voice.providers.{$provider}.key_optional", false)) {
+            return 'Optional local key';
         }
 
         return 'Missing';
@@ -167,7 +174,7 @@ class VoiceGatewayService
         }
 
         if (! $this->configured()) {
-            return ['ok' => false, 'message' => "{$this->providerLabel()} is not configured for spoken Ask Life@ replies."];
+            return ['ok' => false, 'message' => "{$this->providerLabel()} is not configured for Jimmy's spoken replies."];
         }
 
         $provider = $this->provider();
@@ -180,7 +187,7 @@ class VoiceGatewayService
         if (Storage::disk('public')->exists($path)) {
             return [
                 'ok' => true,
-                'message' => 'Spoken Ask Life@ reply loaded from cache.',
+                'message' => 'Spoken Jimmy reply loaded from cache.',
                 'audio_url' => Storage::disk('public')->url($path),
                 'locale' => $locale,
                 'cached' => true,
@@ -226,7 +233,7 @@ class VoiceGatewayService
         }
 
         try {
-            $audio = $this->generateWithElevenLabs($text, $locale, $model, $voiceId, $outputFormat);
+            $audio = $this->generateAudio($provider, $text, $locale, $model, $voiceId, $outputFormat);
             Storage::disk('public')->put($path, $audio['bytes']);
 
             $generation->update([
@@ -249,7 +256,7 @@ class VoiceGatewayService
 
             return [
                 'ok' => true,
-                'message' => 'Spoken Ask Life@ reply generated.',
+                'message' => 'Spoken Jimmy reply generated.',
                 'audio_url' => Storage::disk('public')->url($path),
                 'locale' => $locale,
                 'cached' => false,
@@ -315,7 +322,7 @@ class VoiceGatewayService
                 ],
             ]);
 
-        $this->throwIfFailed($response);
+        $this->throwIfFailed($response, 'elevenlabs');
 
         $bytes = $response->body();
         if ($bytes === '') {
@@ -328,7 +335,40 @@ class VoiceGatewayService
         ];
     }
 
-    private function throwIfFailed(Response $response): void
+    private function generateAudio(string $provider, string $text, string $locale, string $model, string $voiceId, string $outputFormat): array
+    {
+        $type = (string) config("services.voice.providers.{$provider}.type", 'text_to_speech');
+
+        return match ($type) {
+            'nvidia_speech_nim' => $this->generateWithNvidiaSpeechNim($provider, $text, $locale, $model, $voiceId, $outputFormat),
+            default => $this->generateWithElevenLabs($text, $locale, $model, $voiceId, $outputFormat),
+        };
+    }
+
+    private function generateWithNvidiaSpeechNim(string $provider, string $text, string $locale, string $model, string $voiceId, string $outputFormat): array
+    {
+        $language = $this->nvidiaLanguage($model, $locale);
+        $request = Http::accept($this->mimeTypeForFormat($outputFormat))
+            ->asMultipart()
+            ->timeout($this->timeout());
+
+        if ($this->apiKey($provider) !== '') {
+            $request = $request->withToken($this->apiKey($provider));
+        }
+
+        $response = $request->post($this->nvidiaSpeechEndpoint($provider), [
+            'language' => $language,
+            'text' => $text,
+            'voice' => $voiceId,
+            'sample_rate_hz' => $this->sampleRateForFormat($outputFormat),
+        ]);
+
+        $this->throwIfFailed($response, $provider);
+
+        return $this->audioFromResponse($response, $this->mimeTypeForFormat($outputFormat));
+    }
+
+    private function throwIfFailed(Response $response, ?string $provider = null): void
     {
         if ($response->successful()) {
             return;
@@ -340,7 +380,9 @@ class VoiceGatewayService
             ?: $response->json('detail')
             ?: $response->body();
 
-        throw new RuntimeException('ElevenLabs returned '.$response->status().': '.Str::limit(trim((string) $message), 300));
+        $label = $provider ? $this->providerLabel($provider) : 'Voice provider';
+
+        throw new RuntimeException($label.' returned '.$response->status().': '.Str::limit(trim((string) $message), 300));
     }
 
     private function apiKey(string $provider): string
@@ -391,6 +433,77 @@ class VoiceGatewayService
             str_starts_with($outputFormat, 'opus') => 'audio/ogg',
             default => 'audio/mpeg',
         };
+    }
+
+    private function nvidiaSpeechEndpoint(string $provider): string
+    {
+        $baseUrl = $this->baseUrl($provider);
+
+        if (Str::endsWith($baseUrl, '/audio/synthesize')) {
+            return $baseUrl;
+        }
+
+        return $baseUrl.'/audio/synthesize';
+    }
+
+    private function nvidiaLanguage(string $model, string $locale): string
+    {
+        $model = trim($model);
+        if ($model !== '') {
+            return $model;
+        }
+
+        return $locale === 'af' ? 'en-US' : 'en-US';
+    }
+
+    private function sampleRateForFormat(string $outputFormat): int
+    {
+        if (preg_match('/_(\d{4,6})/', $outputFormat, $matches)) {
+            return max(8000, (int) $matches[1]);
+        }
+
+        return 22050;
+    }
+
+    private function audioFromResponse(Response $response, string $fallbackMimeType): array
+    {
+        $mimeType = (string) ($response->header('Content-Type') ?: $fallbackMimeType);
+        $body = $response->body();
+
+        if (str_contains(Str::lower($mimeType), 'json') || Str::startsWith(trim($body), '{')) {
+            $payload = $response->json();
+            foreach (['audio', 'audio_content', 'audioContent', 'data.audio', 'data.0.audio', 'data.0.b64_json'] as $path) {
+                $audio = data_get($payload, $path);
+
+                if (is_string($audio) && trim($audio) !== '') {
+                    return [
+                        'bytes' => $this->decodeBase64Audio($audio),
+                        'mime_type' => $fallbackMimeType,
+                    ];
+                }
+            }
+        }
+
+        if ($body === '') {
+            throw new RuntimeException('Voice provider returned an empty audio file.');
+        }
+
+        return ['bytes' => $body, 'mime_type' => $mimeType];
+    }
+
+    private function decodeBase64Audio(string $base64): string
+    {
+        if (str_contains($base64, ',')) {
+            $base64 = (string) Str::after($base64, ',');
+        }
+
+        $bytes = base64_decode($base64, true);
+
+        if ($bytes === false || $bytes === '') {
+            throw new RuntimeException('Voice provider returned invalid base64 audio data.');
+        }
+
+        return $bytes;
     }
 
     private function timeout(): int

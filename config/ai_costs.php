@@ -67,5 +67,8 @@ return [
         'elevenlabs' => [
             'default_per_1000_characters' => env('AI_COST_ELEVENLABS_PER_1000_CHARACTERS', 0.06),
         ],
+        'nvidia' => [
+            'default_per_1000_characters' => env('AI_COST_NVIDIA_VOICE_PER_1000_CHARACTERS', 0),
+        ],
     ],
 ];

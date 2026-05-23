@@ -233,6 +233,18 @@ return [
                 'output_format' => env('ELEVENLABS_OUTPUT_FORMAT', 'mp3_44100_128'),
                 'type' => 'text_to_speech',
             ],
+            'nvidia' => [
+                'label' => 'NVIDIA Speech NIM',
+                'key' => env('NVIDIA_SPEECH_API_KEY', env('NVIDIA_API_KEY', env('NVIDIA_NIM_API_KEY', ''))),
+                'voice_id' => env('NVIDIA_TTS_VOICE', 'Magpie-Multilingual.EN-US.Aria'),
+                'model' => env('NVIDIA_TTS_MODEL', 'en-US'),
+                'english_model' => env('NVIDIA_TTS_ENGLISH_LANGUAGE', env('NVIDIA_TTS_MODEL', 'en-US')),
+                'afrikaans_model' => env('NVIDIA_TTS_AFRIKAANS_LANGUAGE', 'en-US'),
+                'base_url' => env('NVIDIA_TTS_BASE_URL', 'http://localhost:9000/v1'),
+                'output_format' => env('NVIDIA_TTS_OUTPUT_FORMAT', 'wav_22050'),
+                'type' => 'nvidia_speech_nim',
+                'key_optional' => env('NVIDIA_TTS_KEY_OPTIONAL', true),
+            ],
         ],
     ],
 

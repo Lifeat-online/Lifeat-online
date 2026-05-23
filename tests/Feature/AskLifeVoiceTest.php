@@ -88,12 +88,95 @@ class AskLifeVoiceTest extends TestCase
         ]);
     }
 
+    public function test_ask_life_voice_supports_nvidia_speech_nim_for_testing(): void
+    {
+        config([
+            'services.voice.provider' => 'nvidia',
+            'services.voice.providers.nvidia.key' => 'nvapi-test',
+            'services.voice.providers.nvidia.voice_id' => 'Magpie-Multilingual.EN-US.Aria',
+            'services.voice.providers.nvidia.english_model' => 'en-US',
+            'services.voice.providers.nvidia.afrikaans_model' => 'en-US',
+            'services.voice.providers.nvidia.base_url' => 'http://localhost:9000/v1',
+            'services.voice.providers.nvidia.output_format' => 'wav_22050',
+            'services.voice.providers.nvidia.type' => 'nvidia_speech_nim',
+            'services.voice.providers.nvidia.key_optional' => true,
+        ]);
+
+        Http::fake([
+            'http://localhost:9000/v1/audio/synthesize' => Http::response('WAV_BYTES', 200, ['Content-Type' => 'audio/wav']),
+        ]);
+
+        $this->postJson(route('ask-life.speak'), [
+            'text' => 'Hi, I am Jimmy. I can help with Life@.',
+            'locale' => 'en',
+        ])
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('locale', 'en')
+            ->assertJsonPath('mime_type', 'audio/wav')
+            ->assertJsonPath('cached', false);
+
+        $files = Storage::disk('public')->allFiles('ask-life/voice');
+        $this->assertCount(1, $files);
+        $this->assertStringEndsWith('.wav', $files[0]);
+        Storage::disk('public')->assertExists($files[0]);
+
+        $this->assertDatabaseHas('ai_generations', [
+            'feature_key' => 'ask_life_voice',
+            'provider' => 'nvidia',
+            'model' => 'en-US',
+            'output_language' => 'en',
+            'status' => AiGeneration::STATUS_ACCEPTED,
+        ]);
+
+        Http::assertSent(function ($request): bool {
+            return $request->url() === 'http://localhost:9000/v1/audio/synthesize'
+                && $request->hasHeader('Authorization', 'Bearer nvapi-test')
+                && Str::contains($request->body(), [
+                    'name="language"',
+                    'en-US',
+                    'name="voice"',
+                    'Magpie-Multilingual.EN-US.Aria',
+                    'name="sample_rate_hz"',
+                    '22050',
+                ]);
+        });
+    }
+
+    public function test_ask_life_voice_allows_nvidia_local_nim_without_api_key(): void
+    {
+        config([
+            'services.voice.provider' => 'nvidia',
+            'services.voice.providers.nvidia.key' => '',
+            'services.voice.providers.nvidia.voice_id' => 'Magpie-Multilingual.EN-US.Aria',
+            'services.voice.providers.nvidia.english_model' => 'en-US',
+            'services.voice.providers.nvidia.afrikaans_model' => 'en-US',
+            'services.voice.providers.nvidia.base_url' => 'http://localhost:9000/v1',
+            'services.voice.providers.nvidia.output_format' => 'wav_22050',
+            'services.voice.providers.nvidia.type' => 'nvidia_speech_nim',
+            'services.voice.providers.nvidia.key_optional' => true,
+        ]);
+
+        Http::fake([
+            'http://localhost:9000/v1/audio/synthesize' => Http::response('WAV_BYTES', 200, ['Content-Type' => 'audio/wav']),
+        ]);
+
+        $this->postJson(route('ask-life.speak'), [
+            'text' => 'Jimmy local voice test.',
+            'locale' => 'en',
+        ])
+            ->assertOk()
+            ->assertJsonPath('ok', true);
+
+        Http::assertSent(fn ($request): bool => ! $request->hasHeader('Authorization'));
+    }
+
     public function test_ask_life_voice_reuses_cached_audio_for_same_answer(): void
     {
         Http::fake(fn () => Http::response('MP3_BYTES', 200, ['Content-Type' => 'audio/mpeg']));
 
         $payload = [
-            'text' => 'A short Ask Life answer to play twice.',
+            'text' => 'A short Jimmy answer to play twice.',
             'locale' => 'en',
         ];
 

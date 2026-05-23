@@ -171,7 +171,7 @@ class AiOperationsController extends Controller
     {
         $question = (string) data_get($payload, 'question', '');
         if ($question === '') {
-            return ['ok' => false, 'message' => 'Ask Life@ retry is missing its original question.'];
+            return ['ok' => false, 'message' => 'Jimmy retry is missing its original question.'];
         }
 
         return $askLife->answer($question, $request->user());

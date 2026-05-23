@@ -1,6 +1,6 @@
 # Life@ AI Implementation Opportunities And Roadmap
 
-Status: Phase 1 foundation implemented; Ask Life@, commercial copy, AI article translation, AI event description, research collector, Editorial Agent brief queue, Jimmy draft-writing stage, and Image Agent implemented
+Status: Phase 1 foundation implemented; Jimmy chat, commercial copy, AI article translation, AI event description, research collector, Editorial Agent brief queue, Jimmy draft-writing stage, and Image Agent implemented
 Last updated: 2026-05-23
 
 ## Purpose
@@ -60,7 +60,7 @@ Life@ should keep provider choice configurable so testing and production can div
 
 ## Voice Layer Strategy
 
-Recommendation: use ElevenLabs as the default speech provider for spoken Ask Life@, article audio snippets, and future voice-agent experiences.
+Recommendation: use ElevenLabs as the default speech provider for Jimmy, article audio snippets, and future voice-agent experiences.
 
 Why ElevenLabs is the right default for Life@:
 - Voice quality: Eleven v3 is positioned as the expressive/high-quality model and supports 70+ languages, including Afrikaans (`afr`).
@@ -71,12 +71,12 @@ Why ElevenLabs is the right default for Life@:
 Recommended model split:
 - Spoken chat responses: Eleven Flash v2.5 for speed.
 - Higher-quality article narration or promos: Eleven v3 or Multilingual v2/v3 depending on current pricing and audio quality tests.
-- Local branded assistant voice: start with a standard ElevenLabs voice, then test a consented local Bethlehem voice clone once the chat experience proves useful.
+- Local branded Jimmy voice: start with a standard ElevenLabs voice, then test a consented local Bethlehem voice clone once the chat experience proves useful.
 
 Stack flow:
 
 ```text
-User asks Ask Life@
+User asks Jimmy
     -> Gemini/OpenRouter text response from Life@ sources
     -> Language detection: English = en, Afrikaans = af
     -> ElevenLabs text-to-speech
@@ -90,13 +90,14 @@ Implementation notes:
 - Use browser autoplay rules correctly: only play audio after explicit user action.
 - Always keep text visible; audio is an enhancement, not the only way to receive the answer.
 - Detect output language from the model response and pass the matching ElevenLabs language code when the API/model requires it.
-- Add a mute/voice toggle in the Ask Life@ widget before enabling audio by default.
+- Add a mute/voice toggle in the Jimmy widget before enabling audio by default.
 
 Implementation checkpoint:
-- `VoiceGatewayService` now handles ElevenLabs text-to-speech separately from the text/image AI gateway.
-- The Ask Life@ widget has a speaker button that calls `/ask-life/speak` after the user clicks, generates English or Afrikaans audio, and reuses cached audio for repeated answers.
-- Dev/admin AI settings now include ElevenLabs API key, voice ID, English model, Afrikaans model, base URL, and output format.
-- The AI tab includes a Voice Test panel so the configured Life@ voice can be generated and played from the browser before wider rollout.
+- `VoiceGatewayService` now handles speech providers separately from the text/image AI gateway.
+- The Jimmy widget has a speaker button that calls `/ask-life/speak` after the user clicks, generates English or Afrikaans audio, and reuses cached audio for repeated answers.
+- Dev/admin AI settings now include voice provider, API key, voice ID, English model/language, Afrikaans model/language, base URL, and output format.
+- The AI tab includes a Voice Test panel so Jimmy's configured voice can be generated and played from the browser before wider rollout.
+- NVIDIA Speech NIM is available as a testing provider for English/self-hosted voice experiments. Keep ElevenLabs as the default for production Afrikaans support.
 - Audio generation is logged in `ai_generations` with feature key `ask_life_voice`, provider, model, locale, cache path, and character count.
 
 AI operations checkpoint:
@@ -118,6 +119,7 @@ Alternatives:
 | Provider | Fit For Life@ | Afrikaans | Notes |
 | --- | --- | --- | --- |
 | ElevenLabs | Best default | Yes | Strong quality, low-latency Flash option, voice cloning path. |
+| NVIDIA Speech NIM / Riva TTS | Testing/self-hosted | Not currently preferred | Useful for local GPU or hosted NIM experiments; strongest for English testing until Afrikaans is supported. |
 | Google Cloud TTS / Chirp | Good backup | Good language coverage | Attractive if Life@ standardises on Google/Gemini infrastructure. |
 | OpenAI TTS | Good English fallback | Needs testing | Useful if production AI moves heavily to OpenAI, but Afrikaans quality must be tested. |
 | Deepgram Aura | Call-centre/realtime fallback | Needs testing | Strong realtime focus, but not the best default for Life@ bilingual community identity. |
@@ -125,7 +127,8 @@ Alternatives:
 
 Pricing assumptions:
 - ElevenLabs API pricing changes by plan and model. The current planning assumption is roughly USD 0.05-0.06 per 1,000 characters for Flash/Turbo API TTS, subject to plan and provider updates.
-- A 200-character spoken Ask Life@ response is therefore cents-level in ZAR, especially with response/audio caching.
+- A 200-character spoken Jimmy response is therefore cents-level in ZAR, especially with response/audio caching.
+- NVIDIA Speech NIM local/self-hosted testing can be configured at R0 per 1,000 characters in app cost tracking, with real GPU/server cost tracked separately.
 - Re-check ElevenLabs pricing before enabling high-volume automatic narration, daily audio digests, or push-to-audio features.
 
 ## 1. Search - Make It Actually Intelligent
@@ -473,8 +476,8 @@ Implementation notes:
 
 ## 10. Platform-Wide AI - Cross-Cutting Features
 
-- Easy: "Ask Life@" chatbot. Persistent chat that answers from live platform content: businesses, articles, events, classifieds, vouchers, faults, and transport help.
-- Easy: Spoken Ask Life@. Add an optional speaker button that reads Ask Life@ answers in English or Afrikaans using ElevenLabs, while keeping the text answer and source links visible.
+- Easy: Jimmy chatbot. Persistent chat that answers from live platform content: businesses, articles, events, classifieds, vouchers, faults, and transport help.
+- Easy: Spoken Jimmy. Add an optional speaker button that reads Jimmy answers in English or Afrikaans using ElevenLabs by default, while keeping the text answer and source links visible.
 - Easy: Bilingual AI throughout. Any generated copy, summaries, notifications, and support messages should be available in English and Afrikaans.
 - Medium: Smart push notification targeting. Segment users by location and interests instead of only broad city/region blasts.
 - Medium: Content moderation pipeline. Review classifieds, fault reports, comments, business copy, event copy, and public submissions for spam, abuse, and POPIA-risky personal data.
@@ -493,7 +496,7 @@ Implementation notes:
 - The chatbot should use retrieval from Life@ content and cite source objects internally.
 - It should refuse to invent business hours, prices, municipal statuses, or emergency advice when Life@ does not have the data.
 - Start the chatbot with platform content only. Add external web sources later if there is a clear editorial workflow.
-- Spoken answers should use ElevenLabs first, cache repeated audio, and require a user click before playback.
+- Spoken answers should use ElevenLabs first, cache repeated audio, and require a user click before playback. NVIDIA Speech NIM can be tested from Dev/admin when a hosted or local endpoint is available.
 
 ## 11. Admin, Finance, And Operations AI
 
@@ -546,7 +549,7 @@ The highest value, lowest complexity starting points:
    - Builds on existing packages, push composer, vouchers, and listing-first monetisation.
    - Gives sales staff and business owners immediate value.
 
-6. Ask Life@ chatbot, limited to platform data.
+6. Jimmy chatbot, limited to platform data.
    - High visibility.
    - Useful even while content volume is still growing.
    - Should launch after basic retrieval and source controls are ready.
@@ -595,16 +598,16 @@ Acceptance checks:
 - Listing-first package gating remains enforced.
 - Moderation queue receives AI risk flags but does not auto-delete content.
 
-### Phase 3: Semantic Search And Ask Life@
+### Phase 3: Semantic Search And Jimmy
 
 Goal: make discovery feel genuinely intelligent.
 
 Deliverables:
-- Public Ask Life@ widget with live Life@ source retrieval, fallback answers, and source links. Implemented in the first continuation slice without embeddings.
+- Public Jimmy widget with live Life@ source retrieval, fallback answers, and source links. Implemented in the first continuation slice without embeddings.
 - Embeddings pipeline for listings, articles, events, classifieds, vouchers, and fault categories.
 - Natural language search intent extraction.
 - Similar businesses and related content suggestions.
-- Ask Life@ retrieval chatbot with source-aware answers.
+- Jimmy retrieval chatbot with source-aware answers.
 - Query correction and bilingual synonym support.
 
 Acceptance checks:
@@ -772,7 +775,7 @@ The cleanest first build is:
 4. Add listing quality score to the admin listing index/detail page.
 5. Add fault description auto-category in the public fault report flow.
 6. Add article SEO/meta generation in the article editor.
-7. Add Ask Life@ from live public platform data.
+7. Add Jimmy from live public platform data.
 8. Add commercial copy helpers for adverts, push campaigns, and vouchers.
 9. Add AI-assisted article translation and event description drafting.
 10. Add the RSS/Google News research collector and scheduled `life:research:collect` command.

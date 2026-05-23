@@ -133,6 +133,36 @@ class AiPhaseOneTest extends TestCase
         ]);
     }
 
+    public function test_dev_owner_can_save_nvidia_speech_nim_voice_settings(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson(route('dev.ai.settings.store'), [
+                'provider' => 'openrouter',
+                'voice_provider' => 'nvidia',
+                'voice_key' => 'nvapi-voice-test',
+                'voice_voice_id' => 'Magpie-Multilingual.EN-US.Aria',
+                'voice_english_model' => 'en-US',
+                'voice_afrikaans_model' => 'en-US',
+                'voice_base_url' => 'http://localhost:9000/v1',
+                'voice_output_format' => 'wav_22050',
+            ])
+            ->assertOk()
+            ->assertJsonPath('voice_status.provider', 'nvidia')
+            ->assertJsonPath('voice_status.configured', true);
+
+        $this->assertSame('nvidia', Setting::getValue('voice.provider'));
+        $this->assertSame('nvapi-voice-test', Setting::getValue('voice.nvidia_api_key'));
+        $this->assertSame('Magpie-Multilingual.EN-US.Aria', Setting::getValue('voice.nvidia_voice_id'));
+        $this->assertSame('en-US', Setting::getValue('voice.nvidia_english_model'));
+        $this->assertSame('http://localhost:9000/v1', Setting::getValue('voice.nvidia_base_url'));
+        $this->assertSame('wav_22050', Setting::getValue('voice.nvidia_output_format'));
+    }
+
     public function test_article_seo_endpoint_returns_structured_metadata(): void
     {
         config([

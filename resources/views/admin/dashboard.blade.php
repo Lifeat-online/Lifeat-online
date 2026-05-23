@@ -301,7 +301,7 @@
                                     <option value="{{ $provider['key'] }}" @selected(($devVoiceStatus['provider'] ?? 'elevenlabs') === $provider['key'])>{{ $provider['label'] }}</option>
                                 @endforeach
                             </select>
-                            <p class="mt-1 text-xs text-gray-500">ElevenLabs powers spoken Ask Life@ replies. English uses the low-latency Flash model; Afrikaans can use Eleven v3.</p>
+                            <p class="mt-1 text-xs text-gray-500">ElevenLabs is the default for Jimmy's spoken replies. NVIDIA Speech NIM is available for English/self-hosted testing.</p>
                         </div>
 
                         <div class="mt-6 grid gap-4 lg:grid-cols-2">
@@ -374,7 +374,7 @@
 
                         <div class="mt-6">
                             <h4 class="font-semibold text-gray-900">Voice Provider</h4>
-                            <p class="mt-1 text-sm text-gray-500">Used by the Ask Life@ speaker button. Audio is cached after the first generation so repeated answers do not keep spending API calls.</p>
+                            <p class="mt-1 text-sm text-gray-500">Used by Jimmy's speaker button. Audio is cached after the first generation so repeated answers do not keep spending API calls.</p>
                             <div class="mt-4 rounded-lg border border-emerald-100 bg-emerald-50/60 p-4">
                                 <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                     <div>
@@ -406,7 +406,7 @@
                                     </div>
                                     <div>
                                         <label class="mb-1 block text-xs font-medium uppercase text-gray-500">API key</label>
-                                        <input class="w-full rounded-md border-gray-300 text-sm" type="password" autocomplete="off" name="voice_key" placeholder="{{ $devVoiceStatus['masked_key'] ?: 'Paste ElevenLabs key to save' }}">
+                                        <input class="w-full rounded-md border-gray-300 text-sm" type="password" autocomplete="off" name="voice_key" placeholder="{{ $devVoiceStatus['masked_key'] ?: 'Paste key to save if required' }}">
                                     </div>
                                 </div>
                             </div>
@@ -424,7 +424,7 @@
                         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div>
                                 <h3 class="text-lg font-semibold text-gray-900">Voice Test</h3>
-                                <p class="mt-1 text-sm text-gray-500">Preview the configured Life@ voice in English or Afrikaans before exposing spoken replies more widely.</p>
+                                <p class="mt-1 text-sm text-gray-500">Preview Jimmy's configured voice in English or Afrikaans before exposing spoken replies more widely.</p>
                             </div>
                             <div class="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
                                 <p><strong>Provider:</strong> {{ $devVoiceStatus['provider_label'] ?? 'ElevenLabs' }}</p>
@@ -434,7 +434,7 @@
                         <div class="mt-5 grid gap-4 lg:grid-cols-[1fr,12rem,auto] lg:items-end">
                             <div>
                                 <label class="mb-1 block text-sm font-medium text-gray-700">Test sentence</label>
-                                <textarea class="w-full rounded-md border-gray-300 text-sm" rows="2" maxlength="1000" data-voice-test-text>Hi, I am Ask Life@. I can help you find local businesses, events, articles, vouchers, classifieds, and fault reports.</textarea>
+                                <textarea class="w-full rounded-md border-gray-300 text-sm" rows="2" maxlength="1000" data-voice-test-text>Hi, I am Jimmy. I can help you find local businesses, events, articles, vouchers, classifieds, and fault reports.</textarea>
                             </div>
                             <div>
                                 <label class="mb-1 block text-sm font-medium text-gray-700">Language</label>
