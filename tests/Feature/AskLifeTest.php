@@ -112,4 +112,48 @@ class AskLifeTest extends TestCase
             'status' => AiGeneration::STATUS_DRAFT,
         ]);
     }
+
+    public function test_jimmy_can_answer_conversationally_from_platform_guides(): void
+    {
+        config([
+            'services.ai.provider' => 'openrouter',
+            'services.ai.providers.openrouter.key' => 'sk-or-test',
+            'services.ai.providers.openrouter.model' => 'openai/gpt-oss-120b',
+        ]);
+
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'answer' => 'I am Jimmy. I can help you find your way around Life@, but I will not pretend we have a verified listing or event when we do not. Tell me the town and what you need, and I will point you to the best next step.',
+                                'confidence' => 0.72,
+                                'source_ids' => ['guide:search', 'guide:directory'],
+                                'follow_up_questions' => ['Which town should I focus on?'],
+                            ]),
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $this->postJson(route('ask-life.store'), [
+            'question' => 'Jimmy, what can you help me with?',
+        ])
+            ->assertOk()
+            ->assertJsonPath('source', 'ai')
+            ->assertJsonPath('sources.0.id', 'guide:search')
+            ->assertJsonPath('sources.1.id', 'guide:directory')
+            ->assertSee('I am Jimmy', false);
+
+        Http::assertSent(function ($request): bool {
+            $body = $request->body();
+
+            return str_contains($body, 'strong sense of honour, integrity, and truth')
+                && str_contains($body, 'guide:search')
+                && str_contains($body, 'Business directory')
+                && str_contains($body, 'platform guide sources');
+        });
+    }
 }

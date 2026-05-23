@@ -99,6 +99,8 @@ Implementation checkpoint:
 - The AI tab includes a Voice Test panel so Jimmy's configured voice can be generated and played from the browser before wider rollout.
 - NVIDIA Speech NIM is available as a testing provider for English/self-hosted voice experiments. Keep ElevenLabs as the default for production Afrikaans support.
 - Audio generation is logged in `ai_generations` with feature key `ask_life_voice`, provider, model, locale, cache path, and character count.
+- Jimmy is not just a search wrapper. His prompt now includes a character and integrity contract: warm, practical, conversational, honest about uncertainty, and careful not to invent facts outside supplied Life@ sources.
+- Jimmy receives a small platform guide source map in addition to live public records, so he can help users choose the right Life@ workflow even when there is no exact listing, event, voucher, classified, article, or fault match yet.
 
 AI operations checkpoint:
 - `/admin/ai-operations` now gives the Dev owner a control room for AI generations, provider/model/status stats, errors, output previews, and retry actions where the original input payload is stored.

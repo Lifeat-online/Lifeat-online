@@ -105,18 +105,20 @@ class AskLifeService
     public function sourcesForQuestion(string $question): Collection
     {
         $terms = $this->terms($question);
+        $dynamicSources = collect();
 
-        if ($terms === []) {
-            return collect();
+        if ($terms !== []) {
+            $dynamicSources = collect()
+                ->merge($this->listingSources($terms))
+                ->merge($this->eventSources($terms))
+                ->merge($this->articleSources($terms))
+                ->merge($this->voucherSources($terms))
+                ->merge($this->classifiedSources($terms))
+                ->merge($this->faultSources($terms));
         }
 
-        return collect()
-            ->merge($this->listingSources($terms))
-            ->merge($this->eventSources($terms))
-            ->merge($this->articleSources($terms))
-            ->merge($this->voucherSources($terms))
-            ->merge($this->classifiedSources($terms))
-            ->merge($this->faultSources($terms))
+        return $dynamicSources
+            ->merge($this->platformGuideSources($question, $terms))
             ->take(18)
             ->values();
     }
@@ -345,8 +347,184 @@ class AskLifeService
             ]);
     }
 
+    private function platformGuideSources(string $question, array $terms): Collection
+    {
+        $normalized = mb_strtolower($question.' '.implode(' ', $terms));
+        $broadHelp = trim($normalized) === ''
+            || str_contains($normalized, 'help')
+            || str_contains($normalized, 'what can')
+            || str_contains($normalized, 'how can')
+            || str_contains($normalized, 'jimmy')
+            || str_contains($normalized, 'assist')
+            || str_contains($normalized, 'ondersteun')
+            || str_contains($normalized, 'help my');
+
+        $guides = collect($this->platformGuides());
+
+        if ($broadHelp) {
+            return $guides->values();
+        }
+
+        $matched = $guides->filter(function (array $guide) use ($normalized): bool {
+            foreach ($guide['keywords'] as $keyword) {
+                if ($keyword !== '' && str_contains($normalized, $keyword)) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
+
+        return $matched->isNotEmpty()
+            ? $matched->values()
+            : $guides->whereIn('id', ['guide:directory', 'guide:search', 'guide:contact'])->values();
+    }
+
+    private function platformGuides(): array
+    {
+        return [
+            [
+                'id' => 'guide:search',
+                'type' => 'guide',
+                'title' => 'Jimmy can help you navigate Life@',
+                'summary' => 'Jimmy can help users find local businesses, articles, events, vouchers, classifieds, civic faults, transport help, and business onboarding steps. He should be honest when Life@ does not have a verified record yet.',
+                'location' => 'Life@',
+                'url' => route('search.index'),
+                'meta' => [
+                    'best_for' => 'General help, follow-up questions, and finding the right Life@ section.',
+                ],
+                'keywords' => ['help', 'assist', 'jimmy', 'what can', 'how can', 'find', 'search', 'soek'],
+            ],
+            [
+                'id' => 'guide:directory',
+                'type' => 'guide',
+                'title' => 'Business directory',
+                'summary' => 'The directory lists published local businesses. Users can search by business type, category, town, service, or business name.',
+                'location' => 'Life@ Directory',
+                'url' => route('directory.index'),
+                'meta' => [
+                    'best_for' => 'Finding businesses and services.',
+                ],
+                'keywords' => ['business', 'businesses', 'directory', 'service', 'services', 'shop', 'store', 'mechanic', 'plumber', 'restaurant', 'besigheid', 'winkel', 'gids'],
+            ],
+            [
+                'id' => 'guide:add-listing',
+                'type' => 'guide',
+                'title' => 'Add a business listing',
+                'summary' => 'Business owners can start a listing, choose staff-assisted or self-service onboarding, and unlock advertising options after the listing journey starts.',
+                'location' => 'Life@ Onboarding',
+                'url' => route('add-listing.index'),
+                'meta' => [
+                    'best_for' => 'Adding or registering a business on Life@.',
+                ],
+                'keywords' => ['add business', 'adding business', 'list business', 'listing', 'register business', 'onboard', 'advertise', 'adverteer', 'registreer'],
+            ],
+            [
+                'id' => 'guide:events',
+                'type' => 'guide',
+                'title' => 'Events',
+                'summary' => 'Life@ events help users discover what is happening nearby. Event details should come from published event records.',
+                'location' => 'Life@ Events',
+                'url' => route('events.index'),
+                'meta' => [
+                    'best_for' => 'Finding local events and dates.',
+                ],
+                'keywords' => ['event', 'events', 'weekend', 'festival', 'market', 'show', 'concert', 'geleentheid', 'gebeure'],
+            ],
+            [
+                'id' => 'guide:articles',
+                'type' => 'guide',
+                'title' => 'Articles and local updates',
+                'summary' => 'Life@ articles cover local stories and community updates. Jimmy should summarize only published article records supplied to him.',
+                'location' => 'Life@ Articles',
+                'url' => route('articles.index'),
+                'meta' => [
+                    'best_for' => 'Local news, updates, and explainers.',
+                ],
+                'keywords' => ['article', 'articles', 'news', 'story', 'stories', 'update', 'load shedding', 'water', 'nuus'],
+            ],
+            [
+                'id' => 'guide:vouchers',
+                'type' => 'guide',
+                'title' => 'Vouchers and offers',
+                'summary' => 'Life@ vouchers show active offers from listed businesses. Voucher value and terms must come from published voucher records.',
+                'location' => 'Life@ Vouchers',
+                'url' => route('vouchers.index'),
+                'meta' => [
+                    'best_for' => 'Deals, specials, discounts, and local offers.',
+                ],
+                'keywords' => ['voucher', 'vouchers', 'deal', 'special', 'discount', 'offer', 'coupon', 'koepon', 'aanbod'],
+            ],
+            [
+                'id' => 'guide:classifieds',
+                'type' => 'guide',
+                'title' => 'Classifieds',
+                'summary' => 'Life@ classifieds help users find or submit local items and community listings. Prices and availability must come from published classified records.',
+                'location' => 'Life@ Classifieds',
+                'url' => route('classifieds.index'),
+                'meta' => [
+                    'best_for' => 'Buying, selling, and browsing local classified items.',
+                ],
+                'keywords' => ['classified', 'classifieds', 'sell', 'buy', 'sale', 'bakkie', 'car', 'item', 'marketplace', 'koop', 'verkoop'],
+            ],
+            [
+                'id' => 'guide:faults',
+                'type' => 'guide',
+                'title' => 'Civic fault reports',
+                'summary' => 'Life@ faults help users view and report approved civic issues such as water leaks, potholes, streetlights, dumping, and electricity problems.',
+                'location' => 'Life@ Faults',
+                'url' => route('faults.index'),
+                'meta' => [
+                    'best_for' => 'Viewing or reporting local civic issues.',
+                ],
+                'keywords' => ['fault', 'faults', 'pothole', 'water leak', 'burst pipe', 'streetlight', 'dumping', 'electricity', 'report', 'fout', 'slaggat'],
+            ],
+            [
+                'id' => 'guide:transport',
+                'type' => 'guide',
+                'title' => 'Transport help',
+                'summary' => 'Life@ transport can guide users toward ride, taxi, delivery, or moving-request workflows when those services are available.',
+                'location' => 'Life@ Transport',
+                'url' => route('transport.index'),
+                'meta' => [
+                    'best_for' => 'Taxi, delivery, bakkie, parcel, and moving help.',
+                ],
+                'keywords' => ['taxi', 'transport', 'delivery', 'parcel', 'ride', 'bakkie', 'move', 'moving', 'aflewering', 'vervoer'],
+            ],
+            [
+                'id' => 'guide:contact',
+                'type' => 'guide',
+                'title' => 'Contact Life@',
+                'summary' => 'When a user needs human help, Life@ contact is the safest next step. Jimmy should not pretend to make official decisions or access private admin records.',
+                'location' => 'Life@ Support',
+                'url' => route('contact.index'),
+                'meta' => [
+                    'best_for' => 'Human support, uncertainty, corrections, or private account help.',
+                ],
+                'keywords' => ['contact', 'support', 'person', 'human', 'helpdesk', 'private', 'account', 'payment', 'billing', 'ondersteuning'],
+            ],
+        ];
+    }
+
     private function fallbackAnswer(string $question, Collection $sources, string $reason): array
     {
+        if ($sources->isNotEmpty() && $sources->every(fn (array $source): bool => ($source['type'] ?? null) === 'guide')) {
+            return [
+                'ok' => true,
+                'source' => 'fallback',
+                'answer' => 'I can help you work out where to go on Life@: businesses, events, local articles, vouchers, classifieds, civic fault reports, transport help, and business onboarding. I will be honest when I do not have a verified Life@ record yet, and I will point you to the safest next step.',
+                'locale' => $this->detectLocale($question),
+                'confidence' => 0.35,
+                'sources' => $sources->take(8)->values()->all(),
+                'follow_up_questions' => [
+                    'What town should I focus on?',
+                    'Are you looking for a business, event, article, voucher, classified, fault report, or transport help?',
+                ],
+                'search_url' => route('search.index', ['q' => $question]),
+                'message' => $reason,
+            ];
+        }
+
         $topTypes = $sources
             ->groupBy('type')
             ->map(fn (Collection $items, string $type): string => $items->count().' '.$type.($items->count() === 1 ? '' : 's'))
