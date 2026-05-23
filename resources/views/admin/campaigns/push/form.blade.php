@@ -126,6 +126,16 @@
                 </div>
 
                 <div class="mt-5">
+                    @include('partials.ai-copy-assistant', [
+                        'endpoint' => route('admin.ai.push-copy'),
+                        'mode' => 'push',
+                        'heading' => 'AI Push Copy',
+                        'description' => 'Draft a short campaign title, headline, and push message from this listing, audience, and offer.',
+                        'placeholder' => 'Example: promote weekend lunch special to Bethlehem users. Keep it warm and concise.',
+                    ])
+                </div>
+
+                <div class="mt-5">
                     <label for="message" class="block text-sm font-medium text-gray-700">Push message</label>
                     <textarea id="message" name="message" rows="6" class="mt-1 block w-full rounded-md border-gray-300 text-sm" required>{{ old('message', $campaign->message) }}</textarea>
                 </div>

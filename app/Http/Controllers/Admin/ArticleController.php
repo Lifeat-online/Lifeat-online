@@ -116,7 +116,7 @@ class ArticleController extends Controller
 
     public function edit(Article $article): View
     {
-        $article->load(['categories', 'tags', 'locations', 'author', 'wordLedger', 'revisionNotes.author']);
+        $article->load(['categories', 'tags', 'locations', 'author', 'wordLedger', 'revisionNotes.author', 'contentTranslations']);
 
         return view('admin.articles.form', [
             'article' => $article,
@@ -228,7 +228,11 @@ class ArticleController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'slug' => ['required', 'string', 'max:255', Rule::unique('articles', 'slug')->ignore($article?->id)],
             'excerpt' => ['nullable', 'string'],
+            'seo_title' => ['nullable', 'string', 'max:255'],
+            'seo_description' => ['nullable', 'string', 'max:500'],
             'body' => ['nullable', 'string'],
+            'featured_image_caption' => ['nullable', 'string', 'max:255'],
+            'featured_image_credit' => ['nullable', 'string', 'max:255'],
             'source_locale' => ['nullable', Rule::in(array_keys((array) config('localization.supported')))],
             'revision_note' => ['nullable', 'string'],
             'submitted_at' => ['nullable', 'date'],
@@ -268,9 +272,19 @@ class ArticleController extends Controller
         if ($request->boolean('remove_featured_image') && $article?->featured_image) {
             $this->deleteFile($article->featured_image);
             $data['featured_image'] = null;
+            $data['featured_image_caption'] = null;
+            $data['featured_image_credit'] = null;
+            $data['featured_image_is_ai_generated'] = false;
+            $data['featured_image_prompt'] = null;
+            $data['featured_image_provider'] = null;
+            $data['featured_image_model'] = null;
         } elseif ($request->hasFile('featured_image_upload')) {
             $this->deleteFile($article?->featured_image);
             $data['featured_image'] = $this->storeImage($request->file('featured_image_upload'), 'articles/featured');
+            $data['featured_image_is_ai_generated'] = false;
+            $data['featured_image_prompt'] = null;
+            $data['featured_image_provider'] = null;
+            $data['featured_image_model'] = null;
         }
 
         return $data;

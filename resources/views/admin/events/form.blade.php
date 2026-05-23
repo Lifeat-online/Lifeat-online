@@ -25,6 +25,17 @@
                     @if ($formMethod !== 'POST')
                         @method($formMethod)
                     @endif
+                    @if ($event->exists)
+                        <input type="hidden" name="event_id" value="{{ $event->id }}">
+                    @endif
+
+                    @include('partials.ai-copy-assistant', [
+                        'mode' => 'event',
+                        'endpoint' => route('admin.ai.event-description'),
+                        'heading' => 'AI Event Description Writer',
+                        'description' => 'Draft a title, excerpt, description, Afrikaans summary, and missing-detail checklist from the current event fields.',
+                        'placeholder' => 'Add organiser notes, audience, ticket details, programme highlights, or what still needs to be confirmed.',
+                    ])
 
                     <div class="grid gap-6 md:grid-cols-2">
                         <div>

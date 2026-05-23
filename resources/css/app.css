@@ -190,6 +190,227 @@
         transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
     }
 
+    .ask-life-widget {
+        position: fixed;
+        right: max(1rem, env(safe-area-inset-right));
+        bottom: max(1rem, env(safe-area-inset-bottom));
+        z-index: 80;
+        display: grid;
+        justify-items: end;
+        gap: 0.75rem;
+        max-width: min(25rem, calc(100vw - 2rem));
+    }
+
+    .ask-life-fab,
+    .ask-life-submit,
+    .ask-life-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        cursor: pointer;
+        transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+    }
+
+    .ask-life-fab {
+        gap: 0.5rem;
+        min-height: 3rem;
+        border-radius: 999px;
+        background: linear-gradient(135deg, rgb(var(--brand-rgb)), rgb(var(--accent-rgb)));
+        color: #ffffff;
+        padding: 0.8rem 1rem;
+        font-weight: 800;
+        box-shadow: 0 18px 42px rgb(var(--brand-rgb) / 0.28);
+    }
+
+    .ask-life-fab:hover,
+    .ask-life-submit:hover,
+    .ask-life-close:hover {
+        transform: translateY(-1px);
+    }
+
+    .ask-life-panel {
+        width: min(25rem, calc(100vw - 2rem));
+        overflow: hidden;
+        border: 1px solid rgb(var(--border-rgb) / 0.9);
+        border-radius: 1rem;
+        background: rgb(var(--surface-rgb) / 0.98);
+        box-shadow: var(--shadow);
+    }
+
+    .ask-life-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px solid rgb(var(--border-rgb) / 0.75);
+        background: linear-gradient(135deg, rgb(var(--brand-rgb) / 0.12), rgb(var(--accent-rgb) / 0.12));
+        padding: 1rem;
+    }
+
+    .ask-life-head strong {
+        display: block;
+        font-size: 1rem;
+    }
+
+    .ask-life-head p {
+        margin: 0.2rem 0 0;
+        color: rgb(var(--muted-rgb));
+        font-size: 0.85rem;
+        line-height: 1.35;
+    }
+
+    .ask-life-close {
+        width: 2rem;
+        height: 2rem;
+        flex: 0 0 auto;
+        border-radius: 999px;
+        background: rgb(var(--surface-rgb) / 0.75);
+        color: var(--text);
+    }
+
+    .ask-life-messages {
+        display: flex;
+        max-height: 20rem;
+        flex-direction: column;
+        gap: 0.65rem;
+        overflow-y: auto;
+        padding: 1rem;
+    }
+
+    .ask-life-message {
+        max-width: 88%;
+        border: 1px solid rgb(var(--border-rgb) / 0.7);
+        border-radius: 0.9rem;
+        padding: 0.75rem 0.85rem;
+        font-size: 0.9rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+    }
+
+    .ask-life-message-bot {
+        align-self: flex-start;
+        background: rgb(var(--elevated-rgb) / 0.85);
+        color: var(--text);
+    }
+
+    .ask-life-message-user {
+        align-self: flex-end;
+        border-color: rgb(var(--brand-rgb) / 0.45);
+        background: rgb(var(--brand-rgb) / 0.12);
+        color: var(--text);
+    }
+
+    .ask-life-sources {
+        display: grid;
+        gap: 0.45rem;
+    }
+
+    .ask-life-source-link {
+        display: grid;
+        gap: 0.15rem;
+        border: 1px solid rgb(var(--border-rgb) / 0.72);
+        border-radius: 0.75rem;
+        background: rgb(var(--surface-rgb) / 0.78);
+        padding: 0.65rem 0.75rem;
+        color: var(--text);
+        text-decoration: none;
+    }
+
+    .ask-life-source-link span {
+        color: rgb(var(--muted-rgb));
+        font-size: 0.72rem;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+
+    .ask-life-source-link strong {
+        font-size: 0.86rem;
+        line-height: 1.28;
+    }
+
+    .ask-life-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-top: 0.65rem;
+    }
+
+    .ask-life-speak {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2rem;
+        border: 1px solid rgb(var(--brand-rgb) / 0.28);
+        border-radius: 999px;
+        background: rgb(var(--brand-rgb) / 0.1);
+        color: rgb(var(--brand-rgb));
+        cursor: pointer;
+        padding: 0.4rem 0.7rem;
+        font-size: 0.76rem;
+        font-weight: 800;
+        line-height: 1;
+        transition: background 160ms ease, opacity 160ms ease, transform 160ms ease;
+    }
+
+    .ask-life-speak:hover {
+        background: rgb(var(--brand-rgb) / 0.16);
+        transform: translateY(-1px);
+    }
+
+    .ask-life-speak:disabled {
+        cursor: wait;
+        opacity: 0.7;
+        transform: none;
+    }
+
+    .ask-life-form {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.6rem;
+        border-top: 1px solid rgb(var(--border-rgb) / 0.75);
+        padding: 0.85rem;
+    }
+
+    .ask-life-form textarea {
+        min-height: 3rem;
+        max-height: 7rem;
+        resize: vertical;
+        border: 1px solid rgb(var(--border-rgb) / 0.85);
+        border-radius: 0.75rem;
+        background: rgb(var(--surface-rgb));
+        color: var(--text);
+        padding: 0.7rem 0.8rem;
+        font-size: 0.9rem;
+        line-height: 1.4;
+    }
+
+    .ask-life-submit {
+        width: 3rem;
+        height: 3rem;
+        align-self: end;
+        border-radius: 0.75rem;
+        background: rgb(var(--brand-rgb));
+        color: #ffffff;
+        box-shadow: 0 10px 22px rgb(var(--brand-rgb) / 0.2);
+    }
+
+    @media (max-width: 640px) {
+        .ask-life-widget {
+            right: 0.75rem;
+            bottom: 0.75rem;
+            max-width: calc(100vw - 1.5rem);
+        }
+
+        .ask-life-panel {
+            width: calc(100vw - 1.5rem);
+        }
+
+        .ask-life-fab span {
+            display: none;
+        }
+    }
+
     html[data-theme="dark"] .site-header {
         background: rgb(var(--surface-rgb) / 0.90);
         box-shadow: 0 1px 3px rgb(0 0 0 / 0.40), 0 1px 2px rgb(0 0 0 / 0.28);

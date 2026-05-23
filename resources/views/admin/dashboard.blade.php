@@ -14,6 +14,7 @@
                 <a href="{{ route('admin.campaigns.push.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Push Campaigns</a>
                 @if (Auth::user()->hasRole('admin', 'editor'))
                     <a href="{{ route('admin.push-notifications.index') }}" class="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white">Send Push</a>
+                    <a href="{{ route('admin.article-briefs.index') }}" class="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white">Brief Review</a>
                 @endif
                 <a href="{{ route('admin.vouchers.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Vouchers</a>
                 <a href="{{ route('admin.integrations.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Integrations</a>
@@ -83,12 +84,17 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto space-y-6 sm:px-6 lg:px-8">
+            @if (session('status'))
+                <div class="rounded-lg bg-green-50 p-4 text-sm text-green-800 shadow-sm">{{ session('status') }}</div>
+            @endif
+
             @if ($canAccessDevDashboard)
                 <div class="rounded-lg bg-white p-3 shadow-sm" data-dashboard-tabs>
                     <div class="flex flex-wrap gap-3">
                         <button type="button" data-tab-trigger="overview" class="rounded-md px-4 py-2 text-sm font-medium transition-colors">Overview</button>
                         @if ($devToolsAvailable)
                             <button type="button" data-tab-trigger="dev" class="rounded-md px-4 py-2 text-sm font-medium transition-colors">Dev</button>
+                            <button type="button" data-tab-trigger="ai" class="rounded-md px-4 py-2 text-sm font-medium transition-colors">AI</button>
                             <button type="button" data-tab-trigger="translations" class="rounded-md px-4 py-2 text-sm font-medium transition-colors">Translations</button>
                         @endif
                     </div>
@@ -235,6 +241,230 @@
             </section>
 
             @if ($canAccessDevDashboard && $devToolsAvailable)
+                <section data-tab-panel="ai" class="space-y-6" hidden>
+                    <div class="rounded-lg bg-white p-6 shadow-sm">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">AI Provider Control</h3>
+                                <p class="mt-1 text-sm text-gray-500">Testing should stay on OpenRouter with free models where possible. Direct OpenAI and Gemini keys are ready for production once quality and costs are settled.</p>
+                                <a href="{{ route('admin.ai-operations.index') }}" class="mt-3 inline-flex rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white">Open AI Operations</a>
+                            </div>
+                            <div class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-gray-600">
+                                <p><strong>Active:</strong> {{ $devAiStatus['provider_label'] ?? 'OpenRouter' }}</p>
+                                <p><strong>Status:</strong> {{ ($devAiStatus['configured'] ?? false) ? 'Configured' : 'Missing key or model' }}</p>
+                                <p><strong>Model:</strong> {{ $devAiStatus['model'] ?: '-' }}</p>
+                                <p><strong>Source:</strong> {{ $devAiStatus['source'] ?? 'Missing' }}</p>
+                            </div>
+                            <div class="rounded-lg bg-fuchsia-50 px-4 py-3 text-sm text-fuchsia-900">
+                                <p><strong>Images:</strong> {{ $devAiImageStatus['provider_label'] ?? 'OpenAI Images' }}</p>
+                                <p><strong>Status:</strong> {{ ($devAiImageStatus['configured'] ?? false) ? 'Configured' : 'Missing key or model' }}</p>
+                                <p><strong>Model:</strong> {{ $devAiImageStatus['model'] ?: '-' }}</p>
+                                <p><strong>Size:</strong> {{ $devAiImageStatus['size'] ?: '-' }}</p>
+                            </div>
+                            <div class="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                                <p><strong>Voice:</strong> {{ $devVoiceStatus['provider_label'] ?? 'ElevenLabs' }}</p>
+                                <p><strong>Status:</strong> {{ ($devVoiceStatus['configured'] ?? false) ? 'Configured' : 'Missing key or voice' }}</p>
+                                <p><strong>English:</strong> {{ $devVoiceStatus['english_model'] ?: '-' }}</p>
+                                <p><strong>Afrikaans:</strong> {{ $devVoiceStatus['afrikaans_model'] ?: '-' }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="post" action="{{ route('dev.ai.settings.store') }}" class="rounded-lg bg-white p-6 shadow-sm">
+                        @csrf
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                            <div class="max-w-md">
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Active AI provider</label>
+                                <select class="w-full rounded-md border-gray-300" name="provider">
+                                    @foreach (($devAiStatus['providers'] ?? []) as $provider)
+                                        <option value="{{ $provider['key'] }}" @selected(($devAiStatus['provider'] ?? 'openrouter') === $provider['key'])>{{ $provider['label'] }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <button type="submit" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Save AI settings</button>
+                        </div>
+
+                        <div class="mt-6 max-w-md">
+                            <label class="mb-1 block text-sm font-medium text-gray-700">Active image provider</label>
+                            <select class="w-full rounded-md border-gray-300" name="image_provider">
+                                @foreach (($devAiImageStatus['providers'] ?? []) as $provider)
+                                    <option value="{{ $provider['key'] }}" @selected(($devAiImageStatus['provider'] ?? 'openai') === $provider['key'])>{{ $provider['label'] }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1 text-xs text-gray-500">Testing default: OpenRouter. Preferred direct production choices: OpenAI Images or Google Gemini Images.</p>
+                        </div>
+
+                        <div class="mt-6 max-w-md">
+                            <label class="mb-1 block text-sm font-medium text-gray-700">Active voice provider</label>
+                            <select class="w-full rounded-md border-gray-300" name="voice_provider">
+                                @foreach (($devVoiceStatus['providers'] ?? []) as $provider)
+                                    <option value="{{ $provider['key'] }}" @selected(($devVoiceStatus['provider'] ?? 'elevenlabs') === $provider['key'])>{{ $provider['label'] }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1 text-xs text-gray-500">ElevenLabs powers spoken Ask Life@ replies. English uses the low-latency Flash model; Afrikaans can use Eleven v3.</p>
+                        </div>
+
+                        <div class="mt-6 grid gap-4 lg:grid-cols-2">
+                            @foreach (($devAiStatus['providers'] ?? []) as $provider)
+                                <div class="rounded-lg border border-gray-200 p-4">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div>
+                                            <h4 class="font-semibold text-gray-900">{{ $provider['label'] }}</h4>
+                                            <p class="text-xs text-gray-500">{{ $provider['type'] }} @if ($provider['configured']) / configured @else / not ready @endif</p>
+                                        </div>
+                                        <span class="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">{{ $provider['source'] }}</span>
+                                    </div>
+                                    <div class="mt-4 grid gap-3">
+                                        <div>
+                                            <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Model / deployment</label>
+                                            <input class="w-full rounded-md border-gray-300 text-sm" name="models[{{ $provider['key'] }}]" value="{{ $provider['model'] }}">
+                                        </div>
+                                        <div>
+                                            <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Base URL / endpoint</label>
+                                            <input class="w-full rounded-md border-gray-300 text-sm" name="base_urls[{{ $provider['key'] }}]" value="{{ $provider['base_url'] }}">
+                                        </div>
+                                        @if (! $provider['key_optional'])
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium uppercase text-gray-500">API key</label>
+                                                <input class="w-full rounded-md border-gray-300 text-sm" type="password" autocomplete="off" name="keys[{{ $provider['key'] }}]" placeholder="{{ $provider['masked_key'] ?: 'Paste key to save' }}">
+                                            </div>
+                                        @else
+                                            <p class="text-xs text-gray-500">Local provider key is optional.</p>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+
+                        <div class="mt-6">
+                            <h4 class="font-semibold text-gray-900">Image Providers</h4>
+                            <p class="mt-1 text-sm text-gray-500">Used by the Image Agent for Jimmy article drafts. Generated images are labelled as AI-generated illustrations.</p>
+                            <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                                @foreach (($devAiImageStatus['providers'] ?? []) as $provider)
+                                    <div class="rounded-lg border border-fuchsia-100 bg-fuchsia-50/50 p-4">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div>
+                                                <h4 class="font-semibold text-gray-900">{{ $provider['label'] }}</h4>
+                                                <p class="text-xs text-gray-500">{{ $provider['type'] }} @if ($provider['configured']) / configured @else / not ready @endif</p>
+                                            </div>
+                                            <span class="rounded-full bg-white px-2 py-1 text-xs text-fuchsia-700">{{ $provider['source'] }}</span>
+                                        </div>
+                                        <div class="mt-4 grid gap-3">
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Image model</label>
+                                                <input class="w-full rounded-md border-gray-300 text-sm" name="image_models[{{ $provider['key'] }}]" value="{{ $provider['model'] }}">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Base URL / endpoint</label>
+                                                <input class="w-full rounded-md border-gray-300 text-sm" name="image_base_urls[{{ $provider['key'] }}]" value="{{ $provider['base_url'] }}">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Size</label>
+                                                <input class="w-full rounded-md border-gray-300 text-sm" name="image_sizes[{{ $provider['key'] }}]" value="{{ $provider['size'] }}">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium uppercase text-gray-500">API key</label>
+                                                <input class="w-full rounded-md border-gray-300 text-sm" type="password" autocomplete="off" name="image_keys[{{ $provider['key'] }}]" placeholder="{{ $provider['masked_key'] ?: 'Paste key to save' }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <div class="mt-6">
+                            <h4 class="font-semibold text-gray-900">Voice Provider</h4>
+                            <p class="mt-1 text-sm text-gray-500">Used by the Ask Life@ speaker button. Audio is cached after the first generation so repeated answers do not keep spending API calls.</p>
+                            <div class="mt-4 rounded-lg border border-emerald-100 bg-emerald-50/60 p-4">
+                                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                    <div>
+                                        <h4 class="font-semibold text-gray-900">{{ $devVoiceStatus['provider_label'] ?? 'ElevenLabs' }}</h4>
+                                        <p class="text-xs text-gray-500">{{ ($devVoiceStatus['configured'] ?? false) ? 'configured' : 'not ready' }} / {{ $devVoiceStatus['source'] ?? 'Missing' }}</p>
+                                    </div>
+                                    <span class="rounded-full bg-white px-2 py-1 text-xs text-emerald-700">{{ $devVoiceStatus['masked_key'] ?: 'No saved key' }}</span>
+                                </div>
+                                <div class="mt-4 grid gap-3 lg:grid-cols-2">
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Voice ID</label>
+                                        <input class="w-full rounded-md border-gray-300 text-sm" name="voice_voice_id" value="{{ $devVoiceStatus['voice_id'] }}">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Output format</label>
+                                        <input class="w-full rounded-md border-gray-300 text-sm" name="voice_output_format" value="{{ $devVoiceStatus['output_format'] }}">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium uppercase text-gray-500">English model</label>
+                                        <input class="w-full rounded-md border-gray-300 text-sm" name="voice_english_model" value="{{ $devVoiceStatus['english_model'] }}">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Afrikaans model</label>
+                                        <input class="w-full rounded-md border-gray-300 text-sm" name="voice_afrikaans_model" value="{{ $devVoiceStatus['afrikaans_model'] }}">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Base URL</label>
+                                        <input class="w-full rounded-md border-gray-300 text-sm" name="voice_base_url" value="{{ $devVoiceStatus['base_url'] }}">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium uppercase text-gray-500">API key</label>
+                                        <input class="w-full rounded-md border-gray-300 text-sm" type="password" autocomplete="off" name="voice_key" placeholder="{{ $devVoiceStatus['masked_key'] ?: 'Paste ElevenLabs key to save' }}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 max-w-md">
+                            <label class="mb-1 block text-sm font-medium text-gray-700">Azure OpenAI API version</label>
+                            <input class="w-full rounded-md border-gray-300 text-sm" name="azure_openai_api_version" value="{{ \App\Models\Setting::getValue('ai.azure_openai_api_version', config('services.ai.providers.azure_openai.api_version')) }}">
+                        </div>
+                        <p class="mt-3 text-sm text-gray-500">Environment variables still take priority over saved keys. Empty key fields keep the existing saved key.</p>
+                    </form>
+
+                    <div class="rounded-lg bg-white p-6 shadow-sm" data-voice-test data-endpoint="{{ route('ask-life.speak') }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">Voice Test</h3>
+                                <p class="mt-1 text-sm text-gray-500">Preview the configured Life@ voice in English or Afrikaans before exposing spoken replies more widely.</p>
+                            </div>
+                            <div class="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                                <p><strong>Provider:</strong> {{ $devVoiceStatus['provider_label'] ?? 'ElevenLabs' }}</p>
+                                <p><strong>Voice ID:</strong> {{ $devVoiceStatus['voice_id'] ?: '-' }}</p>
+                            </div>
+                        </div>
+                        <div class="mt-5 grid gap-4 lg:grid-cols-[1fr,12rem,auto] lg:items-end">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Test sentence</label>
+                                <textarea class="w-full rounded-md border-gray-300 text-sm" rows="2" maxlength="1000" data-voice-test-text>Hi, I am Ask Life@. I can help you find local businesses, events, articles, vouchers, classifieds, and fault reports.</textarea>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Language</label>
+                                <select class="w-full rounded-md border-gray-300 text-sm" data-voice-test-locale>
+                                    <option value="en">English</option>
+                                    <option value="af">Afrikaans</option>
+                                </select>
+                            </div>
+                            <button type="button" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-voice-test-submit>Generate voice</button>
+                        </div>
+                        <div class="mt-4 grid gap-3 lg:grid-cols-[1fr,auto] lg:items-center">
+                            <p class="text-sm text-gray-500" data-voice-test-status>Idle</p>
+                            <audio class="w-full min-w-64" controls hidden data-voice-test-audio></audio>
+                        </div>
+                    </div>
+
+                    <form method="post" action="{{ route('dev.ai.test') }}" class="rounded-lg bg-white p-6 shadow-sm">
+                        @csrf
+                        <h3 class="text-lg font-semibold text-gray-900">Provider Test</h3>
+                        <p class="mt-1 text-sm text-gray-500">Runs one structured JSON request through the active provider and logs it in the AI audit table.</p>
+                        <div class="mt-4 grid gap-4 lg:grid-cols-[1fr,auto] lg:items-end">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Test prompt</label>
+                                <input class="w-full rounded-md border-gray-300" name="prompt" value="Confirm Life@ AI provider routing is ready.">
+                            </div>
+                            <button type="submit" class="rounded-md bg-slate-700 px-4 py-2 text-sm font-semibold text-white">Run test</button>
+                        </div>
+                    </form>
+                </section>
+
                 <section data-tab-panel="translations" class="space-y-6" hidden>
                     <div class="rounded-lg bg-white p-6 shadow-sm">
                         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -797,6 +1027,66 @@
             document.addEventListener('visibilitychange', handleMetricVisibilityChange);
             document.addEventListener('dashboard-tab:changed', handleMetricTabChange);
             window.addEventListener('pagehide', stopMetricPolling);
+
+            const voiceTest = document.querySelector('[data-voice-test]');
+            if (voiceTest) {
+                const endpoint = voiceTest.getAttribute('data-endpoint');
+                const token = voiceTest.querySelector('input[name="_token"]')?.value;
+                const text = voiceTest.querySelector('[data-voice-test-text]');
+                const locale = voiceTest.querySelector('[data-voice-test-locale]');
+                const button = voiceTest.querySelector('[data-voice-test-submit]');
+                const status = voiceTest.querySelector('[data-voice-test-status]');
+                const audio = voiceTest.querySelector('[data-voice-test-audio]');
+
+                button?.addEventListener('click', async () => {
+                    const value = text?.value?.trim() || '';
+
+                    if (value === '') {
+                        if (status) status.textContent = 'Add a sentence to test first.';
+                        text?.focus();
+                        return;
+                    }
+
+                    button.disabled = true;
+                    if (status) status.textContent = 'Generating voice sample...';
+
+                    try {
+                        const response = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': token || '',
+                            },
+                            body: JSON.stringify({
+                                text: value,
+                                locale: locale?.value || 'en',
+                            }),
+                        });
+                        const payload = await response.json().catch(() => ({}));
+
+                        if (!response.ok || !payload.ok || !payload.audio_url) {
+                            throw new Error(payload.message || `Voice test failed with status ${response.status}.`);
+                        }
+
+                        if (audio) {
+                            audio.src = payload.audio_url;
+                            audio.hidden = false;
+                            await audio.play();
+                        }
+
+                        if (status) {
+                            status.textContent = payload.cached
+                                ? `Playing cached ${payload.locale || locale?.value || 'en'} sample.`
+                                : `Generated and playing ${payload.locale || locale?.value || 'en'} sample.`;
+                        }
+                    } catch (error) {
+                        if (status) status.textContent = error instanceof Error ? error.message : 'Unable to generate the voice test.';
+                    } finally {
+                        button.disabled = false;
+                    }
+                });
+            }
 
             const vapidSetup = document.querySelector('[data-vapid-setup]');
             if (vapidSetup) {

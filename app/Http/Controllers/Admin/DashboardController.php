@@ -19,10 +19,13 @@ use App\Models\Role;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Models\WriterApplication;
+use App\Services\AiGatewayService;
+use App\Services\AiImageService;
 use App\Services\OpenRouterTranslationService;
 use App\Services\GoogleMapsService;
 use App\Services\PlatformTranslationBatchService;
 use App\Services\VapidKeySetupService;
+use App\Services\VoiceGatewayService;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -31,7 +34,7 @@ use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
-    public function __invoke(VapidKeySetupService $vapidKeys, OpenRouterTranslationService $translations, PlatformTranslationBatchService $translationBatch, GoogleMapsService $maps): View
+    public function __invoke(VapidKeySetupService $vapidKeys, OpenRouterTranslationService $translations, PlatformTranslationBatchService $translationBatch, GoogleMapsService $maps, AiGatewayService $ai, AiImageService $images, VoiceGatewayService $voice): View
     {
         $user = Auth::user();
         $supportThreshold = Carbon::now()->addDays(7);
@@ -97,11 +100,11 @@ class DashboardController extends Controller
             'latestEvents' => Event::latest()->limit(5)->get(),
             'latestArticles' => Article::latest()->limit(5)->get(),
             'latestWriterApplications' => WriterApplication::latest('submitted_at')->limit(5)->get(),
-            ...($canAccessDevDashboard ? $this->buildDevDashboardData($vapidKeys, $translations, $translationBatch, $maps) : $this->emptyDevDashboardData()),
+            ...($canAccessDevDashboard ? $this->buildDevDashboardData($vapidKeys, $translations, $translationBatch, $maps, $ai, $images, $voice) : $this->emptyDevDashboardData()),
         ]);
     }
 
-    private function buildDevDashboardData(VapidKeySetupService $vapidKeys, OpenRouterTranslationService $translations, PlatformTranslationBatchService $translationBatch, GoogleMapsService $maps): array
+    private function buildDevDashboardData(VapidKeySetupService $vapidKeys, OpenRouterTranslationService $translations, PlatformTranslationBatchService $translationBatch, GoogleMapsService $maps, AiGatewayService $ai, AiImageService $images, VoiceGatewayService $voice): array
     {
         $roles = Role::query()
             ->withCount(['users', 'permissions'])
@@ -172,6 +175,9 @@ class DashboardController extends Controller
                 ],
             ],
             'devWebPushStatus' => $vapidKeys->status(),
+            'devAiStatus' => $ai->status(),
+            'devAiImageStatus' => $images->status(),
+            'devVoiceStatus' => $voice->status(),
             'devTranslationStatus' => $this->translationStatus($translations, $translationBatch),
             'devMapStatus' => $this->mapStatus($maps),
             'devRoleCards' => $roles,
@@ -227,6 +233,40 @@ class DashboardController extends Controller
                 'private_key_configured' => false,
                 'subject' => '',
                 'storage_ready' => false,
+            ],
+            'devAiStatus' => [
+                'provider' => 'openrouter',
+                'provider_label' => 'OpenRouter',
+                'model' => '',
+                'configured' => false,
+                'source' => 'Missing',
+                'masked_key' => '',
+                'providers' => [],
+            ],
+            'devAiImageStatus' => [
+                'provider' => 'openrouter',
+                'provider_label' => 'OpenRouter Images',
+                'model' => '',
+                'base_url' => '',
+                'size' => '1024x1024',
+                'configured' => false,
+                'source' => 'Missing',
+                'masked_key' => '',
+                'providers' => [],
+            ],
+            'devVoiceStatus' => [
+                'provider' => 'elevenlabs',
+                'provider_label' => 'ElevenLabs',
+                'voice_id' => '',
+                'model' => '',
+                'english_model' => 'eleven_flash_v2_5',
+                'afrikaans_model' => 'eleven_v3',
+                'base_url' => 'https://api.elevenlabs.io/v1',
+                'output_format' => 'mp3_44100_128',
+                'configured' => false,
+                'source' => 'Missing',
+                'masked_key' => '',
+                'providers' => [],
             ],
             'devTranslationStatus' => [
                 'supported_locales' => collect(config('localization.supported'))->keys()->all(),

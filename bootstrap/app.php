@@ -29,6 +29,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('renewals:send-payment-reminders --hours=24')->dailyAt('09:00');
         $schedule->command('subscriptions:sweep-expired')->hourly();
         $schedule->command('push-campaigns:dispatch-due')->everyFifteenMinutes();
+        $schedule->command('life:research:collect --limit=25')->hourlyAt(10);
+        $schedule->command('life:editorial:brief --limit=10')->hourlyAt(20);
+        $schedule->command('life:jimmy:write --limit=3')->hourlyAt(30);
+        $schedule->command('life:images:generate --limit=3')->hourlyAt(40);
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');

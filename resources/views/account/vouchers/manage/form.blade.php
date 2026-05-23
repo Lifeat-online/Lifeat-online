@@ -80,6 +80,16 @@
                 </div>
             </div>
 
+            <div style="margin-top:1rem;">
+                @include('partials.ai-copy-assistant', [
+                    'endpoint' => route('account.listings.ai.voucher-copy', $listing),
+                    'mode' => 'voucher',
+                    'heading' => 'AI Voucher Copy',
+                    'description' => 'Draft a customer-friendly voucher title, description, and terms from your offer.',
+                    'placeholder' => 'Example: R50 off first service, valid until month end, booking required.',
+                ])
+            </div>
+
             <div class="grid grid-2" style="margin-top:1rem;">
                 <div>
                     <label for="start_at">Start date</label>

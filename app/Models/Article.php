@@ -23,13 +23,22 @@ class Article extends Model
     ];
 
     protected $fillable = [
+        'article_brief_id',
         'user_id',
         'editor_user_id',
         'title',
         'slug',
         'excerpt',
+        'seo_title',
+        'seo_description',
         'body',
         'featured_image',
+        'featured_image_caption',
+        'featured_image_credit',
+        'featured_image_is_ai_generated',
+        'featured_image_prompt',
+        'featured_image_provider',
+        'featured_image_model',
         'source_locale',
         'status',
         'submitted_at',
@@ -41,6 +50,7 @@ class Article extends Model
         return [
             'submitted_at' => 'datetime',
             'published_at' => 'datetime',
+            'featured_image_is_ai_generated' => 'boolean',
         ];
     }
 
@@ -57,6 +67,11 @@ class Article extends Model
     public function editor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'editor_user_id');
+    }
+
+    public function brief(): BelongsTo
+    {
+        return $this->belongsTo(ArticleBrief::class, 'article_brief_id');
     }
 
     public function categories(): BelongsToMany

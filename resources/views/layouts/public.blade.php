@@ -338,6 +338,7 @@
             </div>
         @endif
     </footer>
+    @include('partials.ask-life-widget')
     @stack('scripts')
 </body>
 </html>

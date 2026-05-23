@@ -81,6 +81,13 @@
                         <span>Be specific: size, nearby landmarks, visible hazards.</span>
                         <span><span id="desc-count">0</span>/500</span>
                     </div>
+                    <div class="mt-10 notice" data-fault-ai-panel data-endpoint="{{ route('faults.report.categorize') }}">
+                        <div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center; justify-content:space-between;">
+                            <span>Use the description to suggest the closest category and severity.</span>
+                            <button type="button" class="button-link" data-fault-ai-submit>Suggest category</button>
+                        </div>
+                        <p class="help" data-fault-ai-status>Suggestions are only pre-filled. You can change them before submitting.</p>
+                    </div>
                 </div>
 
                 <div class="mt-10">
@@ -204,6 +211,63 @@
             if (desc) {
                 desc.addEventListener('input', updateCounter);
                 updateCounter();
+            }
+
+            const faultAiPanel = document.querySelector('[data-fault-ai-panel]');
+            if (faultAiPanel) {
+                const button = faultAiPanel.querySelector('[data-fault-ai-submit]');
+                const status = faultAiPanel.querySelector('[data-fault-ai-status]');
+                const category = document.getElementById('category');
+                const severity = document.getElementById('severity');
+                const address = document.getElementById('address_label');
+
+                button?.addEventListener('click', async () => {
+                    const text = desc?.value?.trim() || '';
+                    if (text.length < 8) {
+                        if (status) status.textContent = 'Add a little more detail first.';
+                        desc?.focus();
+                        return;
+                    }
+
+                    button.disabled = true;
+                    if (status) status.textContent = 'Checking fault description...';
+
+                    try {
+                        const response = await fetch(faultAiPanel.dataset.endpoint, {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': csrf,
+                            },
+                            body: JSON.stringify({
+                                description: text,
+                                address_label: address?.value || '',
+                            }),
+                        });
+                        const payload = await response.json().catch(() => ({}));
+                        const suggestion = payload.payload || {};
+
+                        if (suggestion.category && category?.querySelector(`option[value="${suggestion.category}"]`)) {
+                            category.value = suggestion.category;
+                        }
+
+                        if (suggestion.severity && severity?.querySelector(`option[value="${suggestion.severity}"]`)) {
+                            severity.value = suggestion.severity;
+                        }
+
+                        if (status) {
+                            const confidence = suggestion.confidence !== undefined
+                                ? ` Confidence: ${Math.round(Number(suggestion.confidence) * 100)}%.`
+                                : '';
+                            status.textContent = `${payload.message || 'Suggestion ready.'} ${suggestion.explanation || ''}${confidence}`;
+                        }
+                    } catch (error) {
+                        if (status) status.textContent = error instanceof Error ? error.message : 'Unable to suggest a category.';
+                    } finally {
+                        button.disabled = false;
+                    }
+                });
             }
 
             const dbName = 'da-fault-reports';

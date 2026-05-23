@@ -30,6 +30,10 @@ class ProductionReadinessCommandTest extends TestCase
             ->expectsOutputToContain('renewals:send-payment-reminders --hours=24')
             ->expectsOutputToContain('subscriptions:sweep-expired')
             ->expectsOutputToContain('push-campaigns:dispatch-due')
+            ->expectsOutputToContain('life:research:collect --limit=25')
+            ->expectsOutputToContain('life:editorial:brief --limit=10')
+            ->expectsOutputToContain('life:jimmy:write --limit=3')
+            ->expectsOutputToContain('life:images:generate --limit=3')
             ->assertExitCode(0);
     }
 }

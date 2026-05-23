@@ -2,7 +2,10 @@
     <x-slot name="header">
         <div class="flex items-center justify-between gap-4">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">Manage Articles</h2>
-            <a href="{{ route('admin.articles.create') }}" class="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white">Create Article</a>
+            <div class="flex flex-wrap gap-2">
+                <a href="{{ route('admin.article-briefs.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Brief Review</a>
+                <a href="{{ route('admin.articles.create') }}" class="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white">Create Article</a>
+            </div>
         </div>
     </x-slot>
 

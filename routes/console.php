@@ -2,9 +2,14 @@
 
 use App\Models\Order;
 use App\Models\PushCampaign;
+use App\Models\ResearchSource;
 use App\Models\Subscription;
 use App\Services\NotificationDispatchService;
 use App\Services\PushCampaignDispatchService;
+use App\Services\EditorialBriefService;
+use App\Services\AiImageService;
+use App\Services\JimmyWritingService;
+use App\Services\Research\ResearchCollectorService;
 use App\Services\SubscriptionLifecycleService;
 use App\Services\SubscriptionRenewalService;
 use App\Support\ProductionReadiness\EnvironmentCheck;
@@ -39,6 +44,113 @@ Artisan::command('webpush:keys', function () {
     $this->line('WEBPUSH_VAPID_PUBLIC_KEY='.$keys['publicKey']);
     $this->line('WEBPUSH_VAPID_PRIVATE_KEY='.$keys['privateKey']);
 })->purpose('Generate VAPID keys for browser push notifications');
+
+Artisan::command('life:research:collect
+    {--source=* : Limit collection to one or more research source slugs}
+    {--limit= : Maximum items to process per source}
+    {--seed : Seed or refresh default research sources before collecting}
+    {--dry-run : Fetch and parse feeds without writing research items}', function (ResearchCollectorService $collector) {
+    if ($this->option('seed') || ResearchSource::query()->count() === 0) {
+        $seeded = $collector->seedDefaultSources();
+        $this->line("Research sources seeded: {$seeded['created']} created, {$seeded['updated']} updated.");
+    }
+
+    $limit = $this->option('limit') !== null
+        ? (int) $this->option('limit')
+        : (int) config('life_research.default_limit', 25);
+
+    $summary = $collector->collect(
+        array_values(array_filter((array) $this->option('source'))),
+        $limit,
+        (bool) $this->option('dry-run')
+    );
+
+    foreach ($summary['source_results'] as $result) {
+        $line = "{$result['source']}: {$result['created']} new, {$result['duplicates']} duplicate(s), {$result['skipped']} skipped, {$result['parsed']} parsed";
+
+        if (($result['error'] ?? null) !== null) {
+            $this->warn($line.' - '.$result['error']);
+        } else {
+            $this->line($line);
+        }
+    }
+
+    $this->info("Research collection complete: {$summary['created']} new item(s), {$summary['duplicates']} duplicate(s), {$summary['failed']} failed source(s).");
+
+    return $summary['sources'] > 0 && $summary['failed'] >= $summary['sources']
+        ? Command::FAILURE
+        : Command::SUCCESS;
+})->purpose('Collect local story signals from configured RSS and Google News sources');
+
+Artisan::command('life:editorial:brief
+    {--limit=10 : Maximum research items to brief}
+    {--item=* : Limit generation to one or more research item IDs}', function (EditorialBriefService $briefs) {
+    $summary = $briefs->generatePending(
+        (int) $this->option('limit'),
+        null,
+        array_map('intval', array_filter((array) $this->option('item')))
+    );
+
+    foreach ($summary['errors'] as $error) {
+        $this->warn("Research item {$error['item_id']}: {$error['message']}");
+    }
+
+    $this->info("Editorial briefs complete: {$summary['created']} created, {$summary['failed']} failed, {$summary['skipped']} skipped.");
+
+    return $summary['failed'] > 0 && $summary['created'] === 0
+        ? Command::FAILURE
+        : Command::SUCCESS;
+})->purpose('Generate editor-reviewable article briefs from collected research items');
+
+Artisan::command('life:jimmy:write
+    {--limit=3 : Maximum approved briefs Jimmy should draft}
+    {--brief=* : Limit drafting to one or more article brief IDs}', function (JimmyWritingService $jimmy) {
+    $summary = $jimmy->draftApproved(
+        (int) $this->option('limit'),
+        null,
+        array_map('intval', array_filter((array) $this->option('brief')))
+    );
+
+    foreach ($summary['articles'] as $article) {
+        $this->line("Draft created: {$article->title} ({$article->slug})");
+    }
+
+    foreach ($summary['errors'] as $error) {
+        $this->warn("Article brief {$error['brief_id']}: {$error['message']}");
+    }
+
+    $this->info("Jimmy writing complete: {$summary['created']} drafted, {$summary['failed']} failed, {$summary['skipped']} skipped.");
+
+    return $summary['failed'] > 0 && $summary['created'] === 0
+        ? Command::FAILURE
+        : Command::SUCCESS;
+})->purpose('Create unpublished article drafts from approved Life@ editorial briefs');
+
+Artisan::command('life:images:generate
+    {--limit=3 : Maximum Jimmy article drafts to illustrate}
+    {--article=* : Limit generation to one or more article IDs}
+    {--force : Replace an existing featured image}', function (AiImageService $images) {
+    $summary = $images->generatePending(
+        (int) $this->option('limit'),
+        null,
+        array_map('intval', array_filter((array) $this->option('article'))),
+        (bool) $this->option('force')
+    );
+
+    foreach ($summary['articles'] as $article) {
+        $this->line("Illustration generated: {$article->title} ({$article->featured_image})");
+    }
+
+    foreach ($summary['errors'] as $error) {
+        $this->warn("Article {$error['article_id']}: {$error['message']}");
+    }
+
+    $this->info("Image Agent complete: {$summary['created']} generated, {$summary['failed']} failed, {$summary['skipped']} skipped.");
+
+    return $summary['failed'] > 0 && $summary['created'] === 0
+        ? Command::FAILURE
+        : Command::SUCCESS;
+})->purpose('Generate labelled AI illustrations for Jimmy article drafts');
 
 Artisan::command('reverb:start-railway
     {--host= : The IP address the server should bind to}

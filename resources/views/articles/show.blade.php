@@ -1,6 +1,13 @@
 @extends('layouts.public')
 
-@section('title', $article->localizedTitle().' | Articles')
+@section('title', ($article->seo_title ?: $article->localizedTitle()).' | Articles')
+
+@push('head')
+    @if ($article->seo_description)
+        <meta name="description" content="{{ $article->seo_description }}">
+        <meta property="og:description" content="{{ $article->seo_description }}">
+    @endif
+@endpush
 
 @section('content')
     <section class="section detail-grid">
@@ -17,7 +24,20 @@
                     </span>
                 </div>
                 @if ($article->featured_image)
-                    <img src="{{ \Illuminate\Support\Facades\Storage::url($article->featured_image) }}" alt="" style="width:100%; height:280px; object-fit:cover; border-radius:12px; margin:0 0 1rem;">
+                    <figure style="margin:0 0 1rem;">
+                        <img src="{{ \Illuminate\Support\Facades\Storage::url($article->featured_image) }}" alt="" style="width:100%; height:280px; object-fit:cover; border-radius:12px;">
+                        @if ($article->featured_image_caption || $article->featured_image_credit || $article->featured_image_is_ai_generated)
+                            <figcaption class="muted" style="margin-top:0.5rem; font-size:0.9rem;">
+                                @if ($article->featured_image_is_ai_generated)
+                                    <strong>AI-generated illustration.</strong>
+                                @endif
+                                {{ $article->featured_image_caption }}
+                                @if ($article->featured_image_credit)
+                                    {{ $article->featured_image_caption ? ' ' : '' }}Credit: {{ $article->featured_image_credit }}
+                                @endif
+                            </figcaption>
+                        @endif
+                    </figure>
                 @endif
                 <h2>{{ $article->localizedTitle() }}</h2>
                 <div>

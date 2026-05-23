@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CivicFaultPhoto;
 use App\Models\CivicFaultReport;
 use App\Notifications\CivicFaultReportedNotification;
+use App\Services\AiContentAssistantService;
 use App\Services\CouncillorAssignmentService;
 use App\Support\Validation\UploadRules;
 use Illuminate\Http\Request;
@@ -21,6 +22,22 @@ class CivicFaultReportController extends Controller
             'categories' => CivicFaultReport::categories(),
             'severities' => CivicFaultReport::severities(),
         ]);
+    }
+
+    public function categorize(Request $request, AiContentAssistantService $assistant)
+    {
+        $validated = $request->validate([
+            'description' => ['required', 'string', 'max:500'],
+            'address_label' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $result = $assistant->suggestFaultCategory(
+            $validated['description'],
+            $validated['address_label'] ?? null,
+            $request->user(),
+        );
+
+        return response()->json($result);
     }
 
     public function store(Request $request, CouncillorAssignmentService $assignmentService)

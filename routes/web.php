@@ -1,6 +1,11 @@
 <?php
 
 use App\Http\Controllers\Admin\ArticleController as AdminArticleController;
+use App\Http\Controllers\Admin\ArticleBriefController as AdminArticleBriefController;
+use App\Http\Controllers\Admin\ArticleImageController as AdminArticleImageController;
+use App\Http\Controllers\Admin\AiAssistController as AdminAiAssistController;
+use App\Http\Controllers\Admin\AiOperationsController as AdminAiOperationsController;
+use App\Http\Controllers\Admin\AiSettingsController as AdminAiSettingsController;
 use App\Http\Controllers\Admin\CampaignController as AdminCampaignController;
 use App\Http\Controllers\Admin\PayoutRequestController as AdminPayoutRequestController;
 use App\Http\Controllers\Admin\WalletController as AdminWalletController;
@@ -43,6 +48,8 @@ use App\Http\Controllers\AccountInvoiceController;
 use App\Http\Controllers\AccountListingController;
 use App\Http\Controllers\AccountSubmissionController;
 use App\Http\Controllers\AccountEventController;
+use App\Http\Controllers\AccountAiAssistController;
+use App\Http\Controllers\AskLifeController;
 use App\Http\Controllers\DirectoryController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\HomeController;
@@ -93,6 +100,8 @@ Route::get('/articles/tags/{tag:slug}', [ArticleController::class, 'tag'])->name
 Route::get('/articles/locations/{locationNode:slug}', [ArticleController::class, 'location'])->name('articles.locations.show');
 Route::get('/articles/{article:slug}', [ArticleController::class, 'show'])->name('articles.show');
 Route::get('/search', [SearchController::class, 'index'])->name('search.index');
+Route::post('/ask-life', [AskLifeController::class, 'store'])->middleware('throttle:20,1')->name('ask-life.store');
+Route::post('/ask-life/speak', [AskLifeController::class, 'speak'])->middleware('throttle:12,1')->name('ask-life.speak');
 Route::get('/classifieds', [ClassifiedController::class, 'index'])->name('classifieds.index');
 Route::get('/classifieds/{classified:slug}', [ClassifiedController::class, 'show'])->name('classifieds.show');
 Route::get('/vouchers', [VoucherController::class, 'index'])->name('vouchers.index');
@@ -118,6 +127,7 @@ Route::get('/faults/data/faults', [CivicFaultDataController::class, 'faults'])->
 Route::get('/faults/data/councillors', [CivicFaultDataController::class, 'councillors'])->name('faults.data.councillors');
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/faults/report', [CivicFaultReportController::class, 'create'])->name('faults.report.create');
+    Route::post('/faults/report/categorize', [CivicFaultReportController::class, 'categorize'])->middleware('throttle:12,1')->name('faults.report.categorize');
     Route::post('/faults/report', [CivicFaultReportController::class, 'store'])->middleware('throttle:public-form')->name('faults.report.store');
 });
 
@@ -128,6 +138,8 @@ Route::middleware(['auth', 'role:admin'])->prefix('dev')->name('dev.')->group(fu
     Route::post('/translations/preview', [AdminTranslationController::class, 'preview'])->middleware('throttle:12,1')->name('translations.preview');
     Route::post('/translations/batch', [AdminTranslationController::class, 'batch'])->middleware('throttle:60,1')->name('translations.batch');
     Route::post('/translations/articles/{article:slug}', [AdminTranslationController::class, 'translateArticle'])->middleware('throttle:12,1')->name('translations.articles.translate');
+    Route::post('/ai/settings', [AdminAiSettingsController::class, 'save'])->middleware('throttle:6,1')->name('ai.settings.store');
+    Route::post('/ai/test', [AdminAiSettingsController::class, 'test'])->middleware('throttle:12,1')->name('ai.test');
     Route::post('/maps/key', [AdminMapIntegrationController::class, 'saveKey'])->middleware('throttle:6,1')->name('maps.key.store');
     Route::get('/transport', [TransportAdminSetupController::class, 'index'])->name('transport.setup');
     Route::post('/transport/managers', [TransportAdminSetupController::class, 'storeManager'])->name('transport.managers.store');
@@ -190,6 +202,7 @@ Route::put('/account/listings/{listing}/ad-campaigns/{adCampaign}', [AccountAdCa
 Route::delete('/account/listings/{listing}/ad-campaigns/{adCampaign}', [AccountAdCampaignController::class, 'destroy'])->middleware('auth')->name('account.listings.ad-campaigns.destroy');
 Route::get('/account/listings/{listing}/push-campaigns', [AccountPushCampaignController::class, 'index'])->middleware('auth')->name('account.listings.push-campaigns.index');
 Route::get('/account/listings/{listing}/push-campaigns/create', [AccountPushCampaignController::class, 'create'])->middleware('auth')->name('account.listings.push-campaigns.create');
+Route::post('/account/listings/{listing}/ai/push-copy', [AccountAiAssistController::class, 'pushCopy'])->middleware(['auth', 'throttle:12,1'])->name('account.listings.ai.push-copy');
 Route::post('/account/listings/{listing}/push-campaigns', [AccountPushCampaignController::class, 'store'])->middleware('auth')->name('account.listings.push-campaigns.store');
 Route::get('/account/listings/{listing}/push-campaigns/{pushCampaign}/edit', [AccountPushCampaignController::class, 'edit'])->middleware('auth')->name('account.listings.push-campaigns.edit');
 Route::put('/account/listings/{listing}/push-campaigns/{pushCampaign}', [AccountPushCampaignController::class, 'update'])->middleware('auth')->name('account.listings.push-campaigns.update');
@@ -197,6 +210,7 @@ Route::post('/account/listings/{listing}/push-campaigns/{pushCampaign}/dispatch'
 Route::delete('/account/listings/{listing}/push-campaigns/{pushCampaign}', [AccountPushCampaignController::class, 'destroy'])->middleware('auth')->name('account.listings.push-campaigns.destroy');
 Route::get('/account/listings/{listing}/events', [AccountEventController::class, 'index'])->middleware('auth')->name('account.listings.events.index');
 Route::get('/account/listings/{listing}/events/create', [AccountEventController::class, 'create'])->middleware('auth')->name('account.listings.events.create');
+Route::post('/account/listings/{listing}/ai/event-description', [AccountAiAssistController::class, 'eventDescription'])->middleware(['auth', 'throttle:12,1'])->name('account.listings.ai.event-description');
 Route::post('/account/listings/{listing}/events', [AccountEventController::class, 'store'])->middleware('auth')->name('account.listings.events.store');
 Route::get('/account/listings/{listing}/events/{event}/edit', [AccountEventController::class, 'edit'])->middleware('auth')->name('account.listings.events.edit');
 Route::put('/account/listings/{listing}/events/{event}', [AccountEventController::class, 'update'])->middleware('auth')->name('account.listings.events.update');
@@ -236,6 +250,7 @@ Route::middleware('auth')->scopeBindings()->group(function () {
     Route::get('/account/listings/{listing}/vouchers', [AccountVoucherController::class, 'index'])->name('account.listings.vouchers.index');
     Route::get('/account/listings/{listing}/vouchers/dashboard', [AccountVoucherController::class, 'dashboard'])->name('account.listings.vouchers.dashboard');
     Route::get('/account/listings/{listing}/vouchers/create', [AccountVoucherController::class, 'create'])->name('account.listings.vouchers.create');
+    Route::post('/account/listings/{listing}/ai/voucher-copy', [AccountAiAssistController::class, 'voucherCopy'])->middleware('throttle:12,1')->name('account.listings.ai.voucher-copy');
     Route::post('/account/listings/{listing}/vouchers', [AccountVoucherController::class, 'store'])->name('account.listings.vouchers.store');
     Route::get('/account/listings/{listing}/vouchers/{voucher}/edit', [AccountVoucherController::class, 'edit'])->name('account.listings.vouchers.edit');
     Route::put('/account/listings/{listing}/vouchers/{voucher}', [AccountVoucherController::class, 'update'])->name('account.listings.vouchers.update');
@@ -309,11 +324,29 @@ Route::middleware(['auth', 'role:admin,editor,staff,support'])->prefix('admin')-
     Route::get('/writer-payments/batches/{batch}/export', [AdminWriterPaymentController::class, 'export'])->middleware('role:admin,editor')->name('writer-payments.batches.export');
     Route::post('/writer-payments/batches/{batch}/mark-paid', [AdminWriterPaymentController::class, 'markPaid'])->middleware('role:admin')->name('writer-payments.batches.mark-paid');
     Route::resource('packages', AdminPackageController::class)->except('show', 'destroy')->middleware('role:admin');
+    Route::get('/ai-operations', [AdminAiOperationsController::class, 'index'])->middleware('role:admin,editor')->name('ai-operations.index');
+    Route::put('/ai-operations/budget', [AdminAiOperationsController::class, 'updateBudget'])->middleware('role:admin')->name('ai-operations.budget.update');
+    Route::put('/ai-operations/prompts/{featureKey}', [AdminAiOperationsController::class, 'updatePrompt'])->middleware('role:admin')->name('ai-operations.prompts.update');
+    Route::delete('/ai-operations/prompts/{featureKey}', [AdminAiOperationsController::class, 'resetPrompt'])->middleware('role:admin')->name('ai-operations.prompts.reset');
+    Route::post('/ai-operations/generations/{aiGeneration}/retry', [AdminAiOperationsController::class, 'retry'])->middleware(['role:admin', 'throttle:6,1'])->name('ai-operations.generations.retry');
+    Route::post('/ai/listing-description', [AdminAiAssistController::class, 'listingDescription'])->middleware('role:admin,editor,staff')->name('ai.listing-description');
+    Route::post('/ai/article-seo', [AdminAiAssistController::class, 'articleSeo'])->middleware('role:admin,editor')->name('ai.article-seo');
+    Route::post('/ai/articles/{article:slug}/translation', [AdminAiAssistController::class, 'articleTranslation'])->middleware('role:admin,editor')->name('ai.article-translation');
+    Route::post('/ai/event-description', [AdminAiAssistController::class, 'eventDescription'])->middleware('role:admin,editor,staff')->name('ai.event-description');
+    Route::post('/ai/ad-copy', [AdminAiAssistController::class, 'adCopy'])->middleware('role:admin,editor,staff')->name('ai.ad-copy');
+    Route::post('/ai/push-copy', [AdminAiAssistController::class, 'pushCopy'])->middleware('role:admin,editor,staff')->name('ai.push-copy');
+    Route::post('/ai/voucher-copy', [AdminAiAssistController::class, 'voucherCopy'])->middleware('role:admin,editor,staff')->name('ai.voucher-copy');
+    Route::get('/article-briefs', [AdminArticleBriefController::class, 'index'])->middleware('role:admin,editor')->name('article-briefs.index');
+    Route::put('/article-briefs/{articleBrief}', [AdminArticleBriefController::class, 'update'])->middleware('role:admin,editor')->name('article-briefs.update');
+    Route::post('/article-briefs/{articleBrief}/approve', [AdminArticleBriefController::class, 'approve'])->middleware('role:admin,editor')->name('article-briefs.approve');
+    Route::post('/article-briefs/{articleBrief}/reject', [AdminArticleBriefController::class, 'reject'])->middleware('role:admin,editor')->name('article-briefs.reject');
+    Route::post('/article-briefs/{articleBrief}/draft', [AdminArticleBriefController::class, 'draft'])->middleware(['role:admin,editor', 'throttle:6,1'])->name('article-briefs.draft');
     Route::post('/listings/bulk', [AdminListingController::class, 'bulk'])->middleware('role:admin,editor,staff')->name('listings.bulk');
     Route::resource('listings', AdminListingController::class)->except('show')->middleware('role:admin,editor,staff');
     Route::post('/events/bulk', [AdminEventController::class, 'bulk'])->middleware('role:admin,editor,staff')->name('events.bulk');
     Route::resource('events', AdminEventController::class)->except('show')->middleware('role:admin,editor,staff');
     Route::post('/articles/bulk', [AdminArticleController::class, 'bulk'])->middleware('role:admin,editor')->name('articles.bulk');
+    Route::post('/articles/{article:slug}/ai-image', [AdminArticleImageController::class, 'store'])->middleware(['role:admin,editor', 'throttle:6,1'])->name('articles.ai-image');
     Route::resource('articles', AdminArticleController::class)->except('show')->middleware('role:admin,editor');
     Route::get('/vouchers', [AdminVoucherController::class, 'index'])->middleware('role:admin,editor,staff')->name('vouchers.index');
     Route::get('/vouchers/create', [AdminVoucherController::class, 'create'])->middleware('role:admin,editor,staff')->name('vouchers.create');

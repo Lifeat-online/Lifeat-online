@@ -92,6 +92,16 @@
                         </div>
 
                         <div>
+                            @include('partials.ai-copy-assistant', [
+                                'endpoint' => route('admin.ai.voucher-copy'),
+                                'mode' => 'voucher',
+                                'heading' => 'AI Voucher Copy',
+                                'description' => 'Draft a clearer voucher title, description, terms, and redemption instruction from this offer.',
+                                'placeholder' => 'Example: 10% off first haircut, valid weekdays, first-time customers only.',
+                            ])
+                        </div>
+
+                        <div>
                             <label class="block text-sm font-semibold text-gray-700">Description</label>
                             <textarea name="description" rows="3" class="mt-1 w-full rounded-md border-gray-300">{{ old('description', $voucher->description) }}</textarea>
                             <x-input-error :messages="$errors->get('description')" class="mt-2" />

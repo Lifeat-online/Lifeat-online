@@ -82,6 +82,7 @@ class UploadReferenceIndex
     {
         return [
             'articles/featured',
+            'articles/ai-generated',
             'campaigns/creative',
             'classifieds',
             'events/featured',

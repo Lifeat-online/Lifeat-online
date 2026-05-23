@@ -52,6 +52,22 @@
                             <input class="w-full rounded-md border-gray-300" name="city" value="{{ old('city', $listing->city) }}">
                         </div>
                         <div>
+                            <label class="mb-1 block text-sm font-medium">Address</label>
+                            <input class="w-full rounded-md border-gray-300" name="address_line" value="{{ old('address_line', $listing->address_line) }}">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">Region</label>
+                            <input class="w-full rounded-md border-gray-300" name="region" value="{{ old('region', $listing->region) }}">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">Country</label>
+                            <input class="w-full rounded-md border-gray-300" name="country" value="{{ old('country', $listing->country ?: 'South Africa') }}">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">Postal Code</label>
+                            <input class="w-full rounded-md border-gray-300" name="postal_code" value="{{ old('postal_code', $listing->postal_code) }}">
+                        </div>
+                        <div>
                             <label class="mb-1 block text-sm font-medium">Status</label>
                             <select class="w-full rounded-md border-gray-300" name="status">
                                 <option value="draft" @selected(old('status', $listing->status ?: 'draft') === 'draft')>Draft</option>
@@ -123,13 +139,30 @@
                         </select>
                     </div>
 
+                    <div class="grid gap-6 rounded-lg border border-indigo-100 bg-indigo-50 p-4 lg:grid-cols-[0.7fr,1.3fr]" data-ai-listing-panel data-endpoint="{{ route('admin.ai.listing-description') }}" data-listing-id="{{ $listing->id }}">
+                        <div>
+                            <p class="text-sm font-semibold text-indigo-950">AI Listing Assistant</p>
+                            <p class="mt-2 text-sm text-indigo-900">Quality score: <strong>{{ $qualityScore['score'] ?? 0 }}/100</strong> - {{ $qualityScore['label'] ?? 'Incomplete' }}</p>
+                            @if (! empty($qualityScore['missing']))
+                                <p class="mt-2 text-xs text-indigo-900">Missing: {{ implode(', ', $qualityScore['missing']) }}</p>
+                            @endif
+                        </div>
+                        <div class="space-y-3">
+                            <textarea class="w-full rounded-md border-indigo-200 text-sm" rows="3" data-ai-listing-notes placeholder="Paste rough WhatsApp notes, owner comments, services, years in business, or anything staff captured."></textarea>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <button type="button" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-ai-listing-submit>Generate listing copy</button>
+                                <span class="text-sm text-indigo-900" data-ai-listing-status>Suggestions stay as draft until you save.</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div>
                         <label class="mb-1 block text-sm font-medium">Excerpt</label>
-                        <textarea class="w-full rounded-md border-gray-300" name="excerpt" rows="3">{{ old('excerpt', $listing->excerpt) }}</textarea>
+                        <textarea class="w-full rounded-md border-gray-300" name="excerpt" rows="3" data-ai-listing-excerpt>{{ old('excerpt', $listing->excerpt) }}</textarea>
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium">Description</label>
-                        <textarea class="w-full rounded-md border-gray-300" name="description" rows="8">{{ old('description', $listing->description) }}</textarea>
+                        <textarea class="w-full rounded-md border-gray-300" name="description" rows="8" data-ai-listing-description>{{ old('description', $listing->description) }}</textarea>
                     </div>
 
                     <label class="inline-flex items-center gap-2">
@@ -145,4 +178,79 @@
             </div>
         </div>
     </div>
+
+    <script>
+        (() => {
+            const panel = document.querySelector('[data-ai-listing-panel]');
+            if (!panel) return;
+
+            const button = panel.querySelector('[data-ai-listing-submit]');
+            const status = panel.querySelector('[data-ai-listing-status]');
+            const notes = panel.querySelector('[data-ai-listing-notes]');
+            const form = panel.closest('form');
+            const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+            const valuesFor = (name) => Array.from(form?.querySelectorAll(`[name="${name}"], [name="${name}[]"]`) || [])
+                .filter((field) => field instanceof HTMLSelectElement ? Array.from(field.selectedOptions).length > 0 : true)
+                .flatMap((field) => {
+                    if (field instanceof HTMLSelectElement && field.multiple) {
+                        return Array.from(field.selectedOptions).map((option) => option.value);
+                    }
+
+                    return field.value ? [field.value] : [];
+                });
+
+            button?.addEventListener('click', async () => {
+                button.disabled = true;
+                if (status) status.textContent = 'Generating listing copy...';
+
+                try {
+                    const response = await fetch(panel.dataset.endpoint, {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': token,
+                        },
+                        body: JSON.stringify({
+                            listing_id: panel.dataset.listingId || null,
+                            title: form?.querySelector('[name="title"]')?.value || '',
+                            rough_notes: notes?.value || '',
+                            excerpt: form?.querySelector('[name="excerpt"]')?.value || '',
+                            description: form?.querySelector('[name="description"]')?.value || '',
+                            phone: form?.querySelector('[name="phone"]')?.value || '',
+                            email: form?.querySelector('[name="email"]')?.value || '',
+                            website_url: form?.querySelector('[name="website_url"]')?.value || '',
+                            address_line: form?.querySelector('[name="address_line"]')?.value || '',
+                            city: form?.querySelector('[name="city"]')?.value || '',
+                            region: form?.querySelector('[name="region"]')?.value || '',
+                            category_ids: valuesFor('category_ids'),
+                        }),
+                    });
+                    const payload = await response.json().catch(() => ({}));
+                    const suggestion = payload.suggestion || {};
+
+                    if (response.ok && suggestion.excerpt) {
+                        const excerpt = form?.querySelector('[data-ai-listing-excerpt]');
+                        if (excerpt) excerpt.value = suggestion.excerpt;
+                    }
+
+                    if (response.ok && suggestion.description) {
+                        const description = form?.querySelector('[data-ai-listing-description]');
+                        if (description) description.value = suggestion.description;
+                    }
+
+                    if (notes && response.ok && suggestion.follow_up_message) {
+                        notes.value = suggestion.follow_up_message;
+                    }
+
+                    if (status) status.textContent = payload.message || `Request finished with status ${response.status}.`;
+                } catch (error) {
+                    if (status) status.textContent = error instanceof Error ? error.message : 'Unable to generate listing copy.';
+                } finally {
+                    button.disabled = false;
+                }
+            });
+        })();
+    </script>
 </x-app-layout>

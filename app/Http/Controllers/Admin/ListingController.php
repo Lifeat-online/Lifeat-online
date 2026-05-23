@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Listing;
+use App\Services\AiContentAssistantService;
 use App\Services\AuditLogService;
 use App\Support\Validation\UploadRules;
 use Illuminate\Contracts\View\View;
@@ -15,7 +16,7 @@ use Illuminate\Validation\Rule;
 
 class ListingController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, AiContentAssistantService $assistant)
     {
         $status = $request->string('status')->toString();
         $featured = $request->string('featured')->toString();
@@ -23,7 +24,7 @@ class ListingController extends Controller
         $sort = $request->string('sort')->toString() ?: 'newest';
 
         $query = Listing::query()
-            ->with('categories')
+            ->with(['categories', 'activeSubscription'])
             ->when($status !== '', fn ($q) => $q->where('status', $status))
             ->when($featured !== '', fn ($q) => $q->where('is_featured', $featured === 'yes'))
             ->when($search !== '', function ($q) use ($search) {
@@ -45,6 +46,9 @@ class ListingController extends Controller
         }, in_array($sort, ['oldest', 'title_asc'], true) ? 'asc' : 'desc');
 
         $listings = $query->paginate(15)->withQueryString();
+        $qualityScores = $listings->getCollection()
+            ->mapWithKeys(fn (Listing $listing): array => [$listing->id => $assistant->listingQualityScore($listing)])
+            ->all();
 
         if ($request->expectsJson()) {
             return response()->json($listings);
@@ -58,6 +62,7 @@ class ListingController extends Controller
                 'featured' => $featured,
                 'sort' => $sort,
             ],
+            'qualityScores' => $qualityScores,
         ]);
     }
 
@@ -72,12 +77,15 @@ class ListingController extends Controller
         return redirect()->route('admin.listings.edit', $listing);
     }
 
-    public function create(): View
+    public function create(AiContentAssistantService $assistant): View
     {
+        $listing = new Listing();
+
         return view('admin.listings.form', [
-            'listing' => new Listing(),
+            'listing' => $listing,
             'categories' => Category::where('type', 'listing')->orderBy('name')->get(),
             'selectedCategoryIds' => [],
+            'qualityScore' => $assistant->listingQualityScore($listing),
             'pageTitle' => 'Create Listing',
             'formAction' => route('admin.listings.store'),
             'formMethod' => 'POST',
@@ -104,14 +112,15 @@ class ListingController extends Controller
         return redirect()->route('admin.listings.edit', $listing)->with('status', 'Listing saved.');
     }
 
-    public function edit(Listing $listing): View
+    public function edit(Listing $listing, AiContentAssistantService $assistant): View
     {
-        $listing->load('categories');
+        $listing->load(['categories', 'activeSubscription']);
 
         return view('admin.listings.form', [
             'listing' => $listing,
             'categories' => Category::where('type', 'listing')->orderBy('name')->get(),
             'selectedCategoryIds' => $listing->categories->modelKeys(),
+            'qualityScore' => $assistant->listingQualityScore($listing),
             'pageTitle' => 'Edit Listing',
             'formAction' => route('admin.listings.update', $listing),
             'formMethod' => 'PUT',

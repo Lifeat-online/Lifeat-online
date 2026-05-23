@@ -133,6 +133,16 @@
                 </div>
 
                 <div style="grid-column:1 / -1;">
+                    @include('partials.ai-copy-assistant', [
+                        'endpoint' => route('account.listings.ai.push-copy', $listing),
+                        'mode' => 'push',
+                        'heading' => 'AI Push Copy',
+                        'description' => 'Draft a short campaign title, headline, and message from your listing and offer.',
+                        'placeholder' => 'Example: promote a weekend special, new service, event reminder, or limited offer.',
+                    ])
+                </div>
+
+                <div style="grid-column:1 / -1;">
                     <label for="message">Push message</label>
                     <textarea id="message" name="message" rows="6">{{ old('message', $campaign->message) }}</textarea>
                 </div>

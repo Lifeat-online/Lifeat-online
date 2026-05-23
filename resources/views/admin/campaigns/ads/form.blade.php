@@ -102,6 +102,16 @@
                 </div>
 
                 <div class="mt-5">
+                    @include('partials.ai-copy-assistant', [
+                        'endpoint' => route('admin.ai.ad-copy'),
+                        'mode' => 'ad',
+                        'heading' => 'AI Advert Copy',
+                        'description' => 'Draft a campaign title, headline, advert body, and call to action from this listing and offer.',
+                        'placeholder' => 'Example: winter tyre special, target Bethlehem drivers, friendly and direct.',
+                    ])
+                </div>
+
+                <div class="mt-5">
                     <label for="body" class="block text-sm font-medium text-gray-700">Creative copy</label>
                     <textarea id="body" name="body" rows="6" class="mt-1 block w-full rounded-md border-gray-300 text-sm">{{ old('body', $campaign->body) }}</textarea>
                 </div>

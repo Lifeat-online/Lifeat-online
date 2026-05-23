@@ -1,0 +1,90 @@
+<?php
+
+return [
+    'timeout' => env('LIFE_RESEARCH_TIMEOUT', 20),
+    'user_agent' => env('LIFE_RESEARCH_USER_AGENT', env('APP_NAME', 'Life@').' research collector'),
+    'default_locale' => env('LIFE_RESEARCH_LOCALE', 'en-ZA'),
+    'default_country' => env('LIFE_RESEARCH_COUNTRY', 'ZA'),
+    'default_limit' => env('LIFE_RESEARCH_LIMIT', 25),
+
+    'location_keywords' => [
+        'Bethlehem',
+        'Dihlabeng',
+        'Eastern Free State',
+        'Free State',
+        'Clarens',
+        'Harrismith',
+        'Reitz',
+        'Fouriesburg',
+        'Senekal',
+        'Ficksburg',
+        'Phuthaditjhaba',
+        'QwaQwa',
+    ],
+
+    'default_sources' => [
+        [
+            'name' => 'Google News: Bethlehem Free State',
+            'slug' => 'google-news-bethlehem-free-state',
+            'type' => 'google_news_rss',
+            'query' => 'Bethlehem Free State',
+            'metadata' => ['locations' => ['Bethlehem', 'Free State']],
+        ],
+        [
+            'name' => 'Google News: Dihlabeng',
+            'slug' => 'google-news-dihlabeng',
+            'type' => 'google_news_rss',
+            'query' => 'Dihlabeng',
+            'metadata' => ['locations' => ['Dihlabeng', 'Bethlehem']],
+        ],
+        [
+            'name' => 'Google News: Eastern Free State',
+            'slug' => 'google-news-eastern-free-state',
+            'type' => 'google_news_rss',
+            'query' => '"Eastern Free State" news',
+            'metadata' => ['locations' => ['Eastern Free State', 'Free State']],
+        ],
+        [
+            'name' => 'Google News: Caxton Bethlehem Express',
+            'slug' => 'google-news-caxton-bethlehem',
+            'type' => 'google_news_rss',
+            'query' => 'site:caxton.co.za Bethlehem Free State',
+            'metadata' => ['publisher_hint' => 'Caxton / Bethlehem Express'],
+        ],
+        [
+            'name' => 'Google News: OFM Eastern Free State',
+            'slug' => 'google-news-ofm-eastern-free-state',
+            'type' => 'google_news_rss',
+            'query' => 'site:ofm.co.za "Eastern Free State"',
+            'metadata' => ['publisher_hint' => 'OFM Radio'],
+        ],
+        [
+            'name' => 'Google News: Dihlabeng Municipality',
+            'slug' => 'google-news-dihlabeng-municipality',
+            'type' => 'google_news_rss',
+            'query' => 'Dihlabeng Local Municipality notices',
+            'metadata' => ['publisher_hint' => 'Dihlabeng Local Municipality'],
+        ],
+        [
+            'name' => 'Google News: DA Free State',
+            'slug' => 'google-news-da-free-state',
+            'type' => 'google_news_rss',
+            'query' => 'DA Free State press release Bethlehem Dihlabeng',
+            'metadata' => ['publisher_hint' => 'DA Free State'],
+        ],
+        [
+            'name' => 'Google News: SAPS Free State',
+            'slug' => 'google-news-saps-free-state',
+            'type' => 'google_news_rss',
+            'query' => 'SAPS Free State Bethlehem Dihlabeng',
+            'metadata' => ['publisher_hint' => 'SAPS Free State'],
+        ],
+        [
+            'name' => 'Google News: Free State Government Notices',
+            'slug' => 'google-news-free-state-government',
+            'type' => 'google_news_rss',
+            'query' => 'Free State provincial government notices Bethlehem',
+            'metadata' => ['publisher_hint' => 'Free State Government'],
+        ],
+    ],
+];

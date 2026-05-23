@@ -70,6 +70,17 @@
                 @if ($formMethod !== 'POST')
                     @method($formMethod)
                 @endif
+                @if ($event->exists)
+                    <input type="hidden" name="event_id" value="{{ $event->id }}">
+                @endif
+
+                @include('partials.ai-copy-assistant', [
+                    'mode' => 'event',
+                    'endpoint' => route('account.listings.ai.event-description', $listing),
+                    'heading' => 'AI Event Description Writer',
+                    'description' => 'Turn rough organiser notes into a clear local event draft before you save it.',
+                    'placeholder' => 'Add what is happening, who should attend, ticket or booking details, programme notes, and anything still missing.',
+                ])
 
                 <div>
                     <label for="title">Title</label>
