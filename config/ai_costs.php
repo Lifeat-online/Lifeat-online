@@ -58,6 +58,9 @@ return [
         'google' => [
             'default_per_image' => env('AI_COST_GOOGLE_IMAGE_PER_IMAGE', 0.04),
         ],
+        'nvidia' => [
+            'default_per_image' => env('AI_COST_NVIDIA_IMAGE_PER_IMAGE', 0.04),
+        ],
     ],
 
     'voice' => [

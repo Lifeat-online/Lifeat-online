@@ -246,6 +246,7 @@ Image options ranked by practical quality and cost:
 | --- | --- | --- | --- |
 | OpenAI image generation | Very good | provider/tier dependent | Yes |
 | Google Gemini image generation | Very good | provider/tier dependent | Yes |
+| NVIDIA NIM image generation | Very good | provider/model dependent | Yes |
 | Flux Pro via fal.ai | Excellent | about USD 0.05 per image | Yes |
 | Stable Diffusion self-hosted | Good | server cost only | Yes |
 | Ideogram | Good for text in images | free tier / paid plans | Yes |
@@ -254,7 +255,8 @@ For news articles, generated images should be illustrative/editorial-style image
 
 Image rules:
 - Label generated images as "AI-generated illustration".
-- Preferred testing provider is OpenRouter with a free image-capable model where possible. Preferred direct production providers are OpenAI image generation and Google Gemini image generation.
+- Preferred testing provider is OpenRouter with a free image-capable model where possible. Preferred direct production providers are OpenAI image generation and Google Gemini image generation, with NVIDIA NIM image endpoints available as a configurable direct-provider option when you want Flux/NIM-style generation.
+- NVIDIA image generation should keep its base URL editable because hosted NVIDIA endpoints are model-specific, while self-hosted Visual GenAI NIM deployments can expose `/v1/infer`.
 - Prefer real supplied photos, official media, or licensed/stock images when accuracy matters.
 - Generated prompt style should make the illustration nature clear, for example: "Editorial illustration of a community meeting in a small South African town, warm afternoon light, clearly illustrative news style."
 
@@ -299,7 +301,7 @@ Recommended build order:
 1. Start with the RSS/NewsAPI research collector and store raw items in the database. Validate that the local signal is good before adding AI. Implemented first with `research_sources`, `research_items`, default Google News RSS searches, configured RSS feed support, dedupe, and `life:research:collect`.
 2. Add the Editorial Agent to turn raw items into reviewable briefs. Build the admin Brief Review queue. Implemented with `article_briefs`, `life:editorial:brief`, and admin approve/reject/edit review controls.
 3. Add Jimmy with web fetch/search for approved briefs. Create article drafts only.
-4. Add image generation last. Implemented with `life:images:generate`, OpenRouter/OpenAI/Gemini image provider settings, article featured-image metadata, public "AI-generated illustration" labelling, and an editor-triggered Image Agent button on article drafts. Testing should use OpenRouter first and select a free image-capable model if one is available.
+4. Add image generation last. Implemented with `life:images:generate`, OpenRouter/OpenAI/Gemini/NVIDIA NIM image provider settings, article featured-image metadata, public "AI-generated illustration" labelling, and an editor-triggered Image Agent button on article drafts. Testing should use OpenRouter first and select a free image-capable model if one is available.
 
 ### Right Model Per Stage
 
@@ -327,8 +329,10 @@ Stage 3: Article Writing:
 Stage 4: Image Agent:
 - Testing primary: OpenRouter image generation with a free image-capable model where possible.
 - Production direct-provider primary: OpenAI image generation or Google Gemini image generation.
+- Production/direct-provider alternative: NVIDIA NIM image generation, especially if Life@ later wants a provider-managed or self-hosted Flux-style image path with editable model-specific endpoints.
 - Cost reason: image generation is usually priced per image or image-token tier, so model choice is more about quality, style consistency, safety controls, and API reliability than token economics.
 - Official pricing snapshot checked on 2026-05-23: OpenAI `gpt-image-1` pricing translates to roughly USD 0.02, USD 0.07, and USD 0.19 for low, medium, and high-quality square images; fal.ai exposes per-model unit pricing through its pricing API, so Flux endpoint pricing should be pulled live when estimating.
+- NVIDIA NIM image cost should be configured per selected endpoint/model with `AI_COST_NVIDIA_IMAGE_PER_IMAGE`; keep the planning placeholder in rand until the exact production model is chosen.
 - Practical estimate: keep the planning assumption around R0.75 per image for editorial illustrations unless the selected model/tier proves cheaper.
 
 Cost saver: prompt caching:

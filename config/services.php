@@ -207,6 +207,14 @@ return [
                 'size' => env('GEMINI_IMAGE_SIZE', '1024x1024'),
                 'type' => 'gemini_generate_content',
             ],
+            'nvidia' => [
+                'label' => 'NVIDIA NIM Images',
+                'key' => env('NVIDIA_API_KEY', env('NVIDIA_NIM_API_KEY')),
+                'model' => env('NVIDIA_IMAGE_MODEL', 'black-forest-labs/flux.1-dev'),
+                'base_url' => env('NVIDIA_IMAGE_BASE_URL', 'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev'),
+                'size' => env('NVIDIA_IMAGE_SIZE', '1024x1024'),
+                'type' => 'nvidia_nim_infer',
+            ],
         ],
     ],
 

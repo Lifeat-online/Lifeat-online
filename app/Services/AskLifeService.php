@@ -26,6 +26,11 @@ class AskLifeService
     public function answer(string $question, ?User $user = null): array
     {
         $question = trim($question);
+
+        if ($guided = $this->guidedAnswer($question)) {
+            return $guided;
+        }
+
         $sources = $this->sourcesForQuestion($question);
 
         if ($sources->isEmpty()) {
@@ -114,6 +119,76 @@ class AskLifeService
             ->merge($this->faultSources($terms))
             ->take(18)
             ->values();
+    }
+
+    private function guidedAnswer(string $question): ?array
+    {
+        if ($this->isBusinessOnboardingQuestion($question)) {
+            return $this->businessOnboardingAnswer($question);
+        }
+
+        return null;
+    }
+
+    private function businessOnboardingAnswer(string $question): array
+    {
+        $answer = 'Yes. Start on Add Listing: create or log in to your account, enter your business name and town, choose a staff-assisted or self-service directory package, then continue to checkout. Once the listing is active, you can add events, adverts, push campaigns, and vouchers from your account.';
+
+        return [
+            'ok' => true,
+            'source' => 'guided',
+            'answer' => $answer,
+            'locale' => $this->detectLocale($answer, $question),
+            'confidence' => 0.9,
+            'sources' => [
+                [
+                    'id' => 'guide:add-listing',
+                    'type' => 'start',
+                    'title' => 'Add your business listing',
+                    'summary' => 'Create a starter listing, choose a directory package, and continue to checkout.',
+                    'location' => null,
+                    'url' => route('add-listing.index'),
+                    'meta' => [
+                        'action' => 'Start listing',
+                    ],
+                ],
+                [
+                    'id' => 'guide:advertise',
+                    'type' => 'packages',
+                    'title' => 'Compare advertising and directory packages',
+                    'summary' => 'See directory, event, advert, push, and voucher options.',
+                    'location' => null,
+                    'url' => route('advertise.index'),
+                    'meta' => [
+                        'action' => 'Compare packages',
+                    ],
+                ],
+            ],
+            'follow_up_questions' => [
+                'Do you want staff-assisted setup or self-service?',
+                'Which town is your business in?',
+                'Do you also want adverts, events, push campaigns, or vouchers?',
+            ],
+            'search_url' => null,
+        ];
+    }
+
+    private function isBusinessOnboardingQuestion(string $question): bool
+    {
+        $normalized = ' '.mb_strtolower((string) preg_replace('/[^\pL\pN]+/u', ' ', $question)).' ';
+
+        $businessMarkers = [
+            ' my business ', ' our business ', ' business ', ' company ', ' shop ', ' store ',
+            ' besigheid ', ' onderneming ', ' winkel ',
+        ];
+        $actionMarkers = [
+            ' add ', ' adding ', ' list ', ' listing ', ' register ', ' submit ', ' advertise ', ' onboard ',
+            ' directory ', ' profile ', ' page ',
+            ' voeg ', ' lys ', ' registreer ', ' adverteer ', ' gids ', ' profiel ',
+        ];
+
+        return collect($businessMarkers)->contains(fn (string $marker): bool => str_contains($normalized, $marker))
+            && collect($actionMarkers)->contains(fn (string $marker): bool => str_contains($normalized, $marker));
     }
 
     private function listingSources(array $terms): Collection

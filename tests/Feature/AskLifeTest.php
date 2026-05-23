@@ -13,6 +13,27 @@ class AskLifeTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_ask_life_guides_business_directory_onboarding_without_ai_provider(): void
+    {
+        config([
+            'services.ai.provider' => 'openrouter',
+            'services.ai.providers.openrouter.key' => '',
+        ]);
+
+        $this->postJson(route('ask-life.store'), [
+            'question' => 'Can you assist me adding my business to your directory?',
+        ])
+            ->assertOk()
+            ->assertJsonPath('source', 'guided')
+            ->assertJsonPath('sources.0.id', 'guide:add-listing')
+            ->assertJsonPath('sources.0.url', route('add-listing.index'))
+            ->assertJsonPath('sources.1.id', 'guide:advertise')
+            ->assertJsonPath('search_url', null)
+            ->assertSee('Start on Add Listing', false);
+
+        Http::assertNothingSent();
+    }
+
     public function test_ask_life_returns_local_sources_without_ai_provider(): void
     {
         config([

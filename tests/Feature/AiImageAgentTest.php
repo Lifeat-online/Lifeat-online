@@ -96,6 +96,35 @@ class AiImageAgentTest extends TestCase
         Storage::disk('public')->assertExists($article->featured_image);
     }
 
+    public function test_image_agent_supports_nvidia_nim_image_provider(): void
+    {
+        Storage::fake('public');
+        $this->configureNvidiaImages();
+
+        $article = $this->jimmyDraftArticle([
+            'title' => 'Harrismith community meeting',
+            'slug' => 'harrismith-community-meeting',
+        ]);
+        $this->fakeNvidiaImage();
+
+        $this->artisan('life:images:generate --limit=5')
+            ->expectsOutputToContain('Illustration generated: Harrismith community meeting')
+            ->assertExitCode(0);
+
+        $article->refresh();
+
+        $this->assertSame('nvidia', $article->featured_image_provider);
+        $this->assertSame('black-forest-labs/flux.1-dev', $article->featured_image_model);
+        $this->assertTrue($article->featured_image_is_ai_generated);
+        Storage::disk('public')->assertExists($article->featured_image);
+
+        Http::assertSent(fn ($request): bool => $request->hasHeader('Authorization', 'Bearer nvapi-test')
+            && $request->url() === 'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev'
+            && $request['width'] === 1024
+            && $request['height'] === 1024
+            && $request['samples'] === 1);
+    }
+
     public function test_admin_can_generate_article_image_from_article_editor(): void
     {
         Storage::fake('public');
@@ -209,6 +238,18 @@ class AiImageAgentTest extends TestCase
         ]);
     }
 
+    private function configureNvidiaImages(): void
+    {
+        config([
+            'services.ai_image.provider' => 'nvidia',
+            'services.ai_image.providers.nvidia.key' => 'nvapi-test',
+            'services.ai_image.providers.nvidia.model' => 'black-forest-labs/flux.1-dev',
+            'services.ai_image.providers.nvidia.base_url' => 'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev',
+            'services.ai_image.providers.nvidia.size' => '1024x1024',
+            'services.ai_image.providers.nvidia.type' => 'nvidia_nim_infer',
+        ]);
+    }
+
     private function fakeOpenAiImage(): void
     {
         Http::fake([
@@ -257,6 +298,20 @@ class AiImageAgentTest extends TestCase
                                 ],
                             ],
                         ],
+                    ],
+                ],
+            ]),
+        ]);
+    }
+
+    private function fakeNvidiaImage(): void
+    {
+        Http::fake([
+            'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev' => Http::response([
+                'artifacts' => [
+                    [
+                        'base64' => base64_encode('fake-nvidia-png-bytes'),
+                        'mime_type' => 'image/png',
                     ],
                 ],
             ]),

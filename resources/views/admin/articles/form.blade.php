@@ -146,7 +146,7 @@
                                         </label>
                                         <div class="flex flex-wrap items-center gap-3">
                                             <button type="button" class="rounded-md bg-fuchsia-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-ai-image-submit>Generate illustration</button>
-                                            <span class="text-sm text-fuchsia-900" data-ai-image-status>Uses the configured OpenAI/Gemini image provider.</span>
+                                            <span class="text-sm text-fuchsia-900" data-ai-image-status>Uses the configured image provider.</span>
                                         </div>
                                         @if ($article->featured_image_prompt)
                                             <p class="rounded-md bg-white p-3 text-xs text-fuchsia-900"><strong>Prompt seed:</strong> {{ $article->featured_image_prompt }}</p>

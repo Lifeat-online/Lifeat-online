@@ -312,6 +312,7 @@ class AiImageService
         return match ($type) {
             'openrouter_chat_image' => $this->generateWithOpenRouter($provider, $model, $prompt),
             'gemini_generate_content' => $this->generateWithGemini($provider, $model, $prompt),
+            'nvidia_nim_infer' => $this->generateWithNvidiaNim($provider, $model, $prompt),
             default => $this->generateWithOpenAiImages($provider, $model, $prompt),
         };
     }
@@ -427,6 +428,44 @@ class AiImageService
         throw new RuntimeException($this->providerLabel($provider).' did not return inline image data.');
     }
 
+    private function generateWithNvidiaNim(string $provider, string $model, string $prompt): array
+    {
+        $dimensions = $this->imageDimensions($this->size($provider));
+
+        $response = Http::withToken($this->apiKey($provider))
+            ->acceptJson()
+            ->asJson()
+            ->timeout($this->timeout())
+            ->post($this->nvidiaNimEndpoint($provider), [
+                'prompt' => $prompt,
+                'mode' => 'base',
+                'width' => $dimensions['width'],
+                'height' => $dimensions['height'],
+                'samples' => 1,
+            ]);
+
+        $this->throwIfFailed($response, $provider);
+
+        $image = $this->extractImageFromPayload((array) $response->json(), [
+            'artifacts.0.base64',
+            'artifacts.0.b64_json',
+            'artifacts.0.image',
+            'data.0.b64_json',
+            'data.0.url',
+            'images.0',
+            'output.0',
+            'image',
+            'b64_json',
+            'choices.0.message.images.0.image_url.url',
+        ]);
+
+        if ($image !== null) {
+            return $image;
+        }
+
+        throw new RuntimeException($this->providerLabel($provider).' did not return generated image data.');
+    }
+
     private function promptForArticle(Article $article): string
     {
         $storedPrompt = trim((string) $article->featured_image_prompt);
@@ -499,6 +538,89 @@ class AiImageService
         }
 
         return $bytes;
+    }
+
+    private function nvidiaNimEndpoint(string $provider): string
+    {
+        $baseUrl = $this->baseUrl($provider);
+
+        if (Str::contains($baseUrl, '/genai/') || Str::endsWith($baseUrl, '/infer')) {
+            return $baseUrl;
+        }
+
+        return $baseUrl.'/infer';
+    }
+
+    private function imageDimensions(string $size): array
+    {
+        if (preg_match('/(\d+)\s*x\s*(\d+)/i', $size, $matches)) {
+            return [
+                'width' => max(256, (int) $matches[1]),
+                'height' => max(256, (int) $matches[2]),
+            ];
+        }
+
+        return ['width' => 1024, 'height' => 1024];
+    }
+
+    private function extractImageFromPayload(array $payload, array $paths): ?array
+    {
+        foreach ($paths as $path) {
+            $image = $this->normaliseImageValue(data_get($payload, $path));
+
+            if ($image !== null) {
+                return $image;
+            }
+        }
+
+        return null;
+    }
+
+    private function normaliseImageValue(mixed $value): ?array
+    {
+        if (is_array($value)) {
+            $mimeType = (string) ($value['mime_type'] ?? $value['mimeType'] ?? 'image/png');
+
+            foreach (['base64', 'b64_json', 'image', 'url'] as $key) {
+                $image = is_string($value[$key] ?? null)
+                    ? $this->normaliseImageString((string) $value[$key], $mimeType)
+                    : $this->normaliseImageValue($value[$key] ?? null);
+
+                if ($image !== null) {
+                    return $image;
+                }
+            }
+
+            return null;
+        }
+
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return $this->normaliseImageString($value);
+    }
+
+    private function normaliseImageString(string $value, string $mimeType = 'image/png'): ?array
+    {
+        $value = trim($value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (Str::startsWith($value, 'data:image/')) {
+            return [
+                'bytes' => $this->decodeBase64($value),
+                'mime_type' => $this->mimeTypeFromDataUrl($value),
+            ];
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_URL)) {
+            return $this->downloadImage($value);
+        }
+
+        return ['bytes' => $this->decodeBase64($value), 'mime_type' => $mimeType ?: 'image/png'];
     }
 
     private function createEditorNote(Article $article, ?User $user): void
