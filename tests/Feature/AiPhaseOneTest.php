@@ -3,6 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\AiGeneration;
+use App\Models\ArticleBrief;
+use App\Models\Category;
+use App\Models\ResearchItem;
+use App\Models\ResearchSource;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -86,7 +90,10 @@ class AiPhaseOneTest extends TestCase
             ->assertSee('NVIDIA Speech NIM')
             ->assertSee('NVIDIA Speech NIM testing expects a hosted or local endpoint', false)
             ->assertSee(route('ask-life.speak'), false)
-            ->assertSee('data-voice-test', false);
+            ->assertSee('data-voice-test', false)
+            ->assertSee('AI Writer Process')
+            ->assertSee(route('dev.ai.writer.process'), false)
+            ->assertSee('data-ai-writer-process', false);
     }
 
     public function test_listing_description_endpoint_returns_ai_suggestion_and_logs_generation(): void
@@ -134,6 +141,91 @@ class AiPhaseOneTest extends TestCase
             'model' => 'openai/gpt-oss-120b',
             'status' => AiGeneration::STATUS_DRAFT,
         ]);
+    }
+
+    public function test_dev_owner_can_run_ai_writer_process_with_saved_nvidia_provider(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
+
+        Setting::create(['key' => 'ai.provider', 'value' => 'nvidia', 'type' => 'string', 'group' => 'ai']);
+        Setting::create(['key' => 'ai.nvidia_api_key', 'value' => 'nvapi-test-key', 'type' => 'secret', 'group' => 'ai']);
+        Setting::create(['key' => 'ai.nvidia_model', 'value' => 'meta/llama-3.1-70b-instruct', 'type' => 'string', 'group' => 'ai']);
+        Setting::create(['key' => 'ai.nvidia_base_url', 'value' => 'https://integrate.api.nvidia.com/v1', 'type' => 'string', 'group' => 'ai']);
+
+        $category = Category::create([
+            'type' => 'article',
+            'name' => 'Local News',
+            'slug' => 'local-news',
+        ]);
+        $source = ResearchSource::create([
+            'name' => 'Google News: Bethlehem',
+            'slug' => 'google-news-bethlehem',
+            'type' => ResearchSource::TYPE_GOOGLE_NEWS_RSS,
+            'query' => 'Bethlehem Free State',
+            'is_active' => true,
+        ]);
+        $item = ResearchItem::create([
+            'research_source_id' => $source->id,
+            'source_name' => 'Example News',
+            'source_type' => ResearchSource::TYPE_GOOGLE_NEWS_RSS,
+            'source_url' => 'https://example.com/bethlehem-water-repairs',
+            'title' => 'Bethlehem water repairs affect residents',
+            'summary' => 'Residents in Bethlehem are affected by water repair work this week.',
+            'published_at' => now(),
+            'fetched_at' => now(),
+            'detected_locations' => ['Bethlehem', 'Free State'],
+            'fingerprint' => hash('sha256', 'https://example.com/bethlehem-water-repairs'),
+            'status' => ResearchItem::STATUS_NEW,
+        ]);
+
+        Http::fake([
+            'https://integrate.api.nvidia.com/v1/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => json_encode([
+                            'title' => 'Bethlehem water repair work needs local context',
+                            'angle' => 'Explain where residents are affected and what timelines have been confirmed.',
+                            'source_urls' => ['https://example.com/bethlehem-water-repairs'],
+                            'category' => 'local-news',
+                            'suggested_tags' => ['Bethlehem', 'Water'],
+                            'locality_score' => 95,
+                            'newsworthiness_score' => 82,
+                            'confidence_score' => 78,
+                            'duplicate_risk' => 12,
+                            'editorial_notes' => 'Confirm the municipal repair timeline before Jimmy writes.',
+                            'recommendation' => 'review',
+                        ]),
+                    ],
+                ]],
+            ]),
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson(route('dev.ai.writer.process'), [
+                'action' => 'brief',
+                'limit' => 1,
+            ])
+            ->assertOk()
+            ->assertJsonPath('summaries.brief.created', 1)
+            ->assertJsonPath('status.pending_review_briefs', 1)
+            ->assertJsonPath('status.new_research_items', 0);
+
+        $this->assertDatabaseHas('article_briefs', [
+            'research_item_id' => $item->id,
+            'suggested_category_id' => $category->id,
+            'title' => 'Bethlehem water repair work needs local context',
+            'status' => ArticleBrief::STATUS_PENDING_REVIEW,
+        ]);
+        $this->assertDatabaseHas('ai_generations', [
+            'feature_key' => 'editorial_brief',
+            'provider' => 'nvidia',
+            'model' => 'meta/llama-3.1-70b-instruct',
+        ]);
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://integrate.api.nvidia.com/v1/chat/completions'
+            && $request->hasHeader('Authorization', 'Bearer nvapi-test-key'));
     }
 
     public function test_dev_owner_can_save_nvidia_speech_nim_voice_settings(): void

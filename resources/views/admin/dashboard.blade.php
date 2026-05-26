@@ -80,6 +80,14 @@
             ['label' => 'Finance Console', 'href' => route('admin.finance.index')],
             ['label' => 'Integrations', 'href' => route('admin.integrations.index')],
         ];
+        $devAiWriterCards = [
+            ['label' => 'Sources', 'key' => 'active_sources'],
+            ['label' => 'New Research', 'key' => 'new_research_items'],
+            ['label' => 'Brief Review', 'key' => 'pending_review_briefs'],
+            ['label' => 'Approved Briefs', 'key' => 'approved_briefs'],
+            ['label' => 'Drafted Briefs', 'key' => 'drafted_briefs'],
+            ['label' => 'Missing Images', 'key' => 'drafts_missing_images'],
+        ];
     @endphp
 
     <div class="py-12">
@@ -267,6 +275,67 @@
                                 <p><strong>English:</strong> {{ $devVoiceStatus['english_model'] ?: '-' }}</p>
                                 <p><strong>Afrikaans:</strong> {{ $devVoiceStatus['afrikaans_model'] ?: '-' }}</p>
                             </div>
+                        </div>
+                    </div>
+
+                    <div class="rounded-lg bg-white p-6 shadow-sm" data-ai-writer-process data-endpoint="{{ route('dev.ai.writer.process') }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">AI Writer Process</h3>
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <a href="{{ route('admin.article-briefs.index') }}" class="rounded-md bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700">Brief Review</a>
+                                    <a href="{{ route('admin.ai-operations.index') }}" class="rounded-md bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700">AI Operations</a>
+                                </div>
+                            </div>
+                            <div class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-gray-600">
+                                <p><strong>Text:</strong> {{ $devAiStatus['provider_label'] ?? 'OpenRouter' }} / {{ $devAiStatus['model'] ?: '-' }}</p>
+                                <p><strong>Images:</strong> {{ $devAiImageStatus['provider_label'] ?? 'OpenRouter Images' }} / {{ $devAiImageStatus['model'] ?: '-' }}</p>
+                                <p><strong>Latest:</strong>
+                                    @if ($devAiWriterStatus['latest_generation'] ?? null)
+                                        {{ $devAiWriterStatus['latest_generation']['feature_key'] }} / {{ $devAiWriterStatus['latest_generation']['status'] }} / {{ $devAiWriterStatus['latest_generation']['provider'] }}
+                                    @else
+                                        No AI writer runs yet
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+                            @foreach ($devAiWriterCards as $card)
+                                <div class="rounded-lg bg-slate-50 p-4">
+                                    <p class="text-xs font-medium uppercase text-gray-500">{{ $card['label'] }}</p>
+                                    <p class="mt-2 text-2xl font-semibold text-gray-900" data-ai-writer-count="{{ $card['key'] }}">{{ $devAiWriterStatus[$card['key']] ?? 0 }}</p>
+                                </div>
+                            @endforeach
+                        </div>
+
+                        <div class="mt-5 grid gap-4 lg:grid-cols-[10rem,1fr,auto] lg:items-end">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Limit</label>
+                                <input class="w-full rounded-md border-gray-300 text-sm" type="number" min="1" max="10" value="3" data-ai-writer-limit>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Source slug</label>
+                                <input class="w-full rounded-md border-gray-300 text-sm" data-ai-writer-source placeholder="optional">
+                            </div>
+                            <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                <input type="checkbox" class="rounded border-gray-300 text-indigo-600" data-ai-writer-seed>
+                                <span>Seed sources</span>
+                            </label>
+                        </div>
+
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            <button type="button" class="rounded-md bg-slate-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-ai-writer-action="collect">Collect</button>
+                            <button type="button" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-ai-writer-action="brief">Brief</button>
+                            <button type="button" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-ai-writer-action="write">Write</button>
+                            <button type="button" class="rounded-md bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-ai-writer-action="images">Images</button>
+                            <button type="button" class="rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" data-ai-writer-action="all">Run pipeline</button>
+                        </div>
+
+                        <div class="mt-4 rounded-lg bg-gray-950 p-4 text-sm text-gray-100">
+                            <p class="font-medium" data-ai-writer-status>Idle</p>
+                            <pre class="mt-3 max-h-80 overflow-auto whitespace-pre-wrap text-xs leading-5" data-ai-writer-output>{}</pre>
                         </div>
                     </div>
 
@@ -1034,6 +1103,95 @@
             document.addEventListener('visibilitychange', handleMetricVisibilityChange);
             document.addEventListener('dashboard-tab:changed', handleMetricTabChange);
             window.addEventListener('pagehide', stopMetricPolling);
+
+            const aiWriterProcess = document.querySelector('[data-ai-writer-process]');
+            if (aiWriterProcess) {
+                const endpoint = aiWriterProcess.getAttribute('data-endpoint');
+                const token = aiWriterProcess.querySelector('input[name="_token"]')?.value;
+                const buttons = Array.from(aiWriterProcess.querySelectorAll('[data-ai-writer-action]'));
+                const limit = aiWriterProcess.querySelector('[data-ai-writer-limit]');
+                const source = aiWriterProcess.querySelector('[data-ai-writer-source]');
+                const seed = aiWriterProcess.querySelector('[data-ai-writer-seed]');
+                const status = aiWriterProcess.querySelector('[data-ai-writer-status]');
+                const output = aiWriterProcess.querySelector('[data-ai-writer-output]');
+
+                const setWriterBusy = (busy) => {
+                    buttons.forEach((button) => {
+                        button.disabled = busy;
+                    });
+                };
+
+                const renderWriterStatus = (payload) => {
+                    Object.entries(payload?.status || {}).forEach(([key, value]) => {
+                        const el = aiWriterProcess.querySelector(`[data-ai-writer-count="${key}"]`);
+                        if (el) el.textContent = value;
+                    });
+                };
+
+                const writerSummaryText = (payload) => {
+                    const summaries = payload?.summaries || {};
+                    const lines = [payload?.message || 'AI writer process finished.'];
+
+                    Object.entries(summaries).forEach(([stage, summary]) => {
+                        lines.push('');
+                        lines.push(stage.toUpperCase());
+                        Object.entries(summary || {}).forEach(([key, value]) => {
+                            if (Array.isArray(value)) {
+                                lines.push(`${key}: ${JSON.stringify(value, null, 2)}`);
+                                return;
+                            }
+
+                            if (value && typeof value === 'object') {
+                                lines.push(`${key}: ${JSON.stringify(value, null, 2)}`);
+                                return;
+                            }
+
+                            lines.push(`${key}: ${value}`);
+                        });
+                    });
+
+                    return lines.join('\n');
+                };
+
+                buttons.forEach((button) => {
+                    button.addEventListener('click', async () => {
+                        const action = button.getAttribute('data-ai-writer-action') || 'all';
+                        setWriterBusy(true);
+                        if (status) status.textContent = `Running ${action}...`;
+
+                        try {
+                            const response = await fetch(endpoint, {
+                                method: 'POST',
+                                headers: {
+                                    Accept: 'application/json',
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': token || '',
+                                },
+                                body: JSON.stringify({
+                                    action,
+                                    limit: Number(limit?.value || 3),
+                                    source: source?.value || '',
+                                    seed_sources: Boolean(seed?.checked),
+                                }),
+                            });
+                            const payload = await response.json().catch(() => ({}));
+                            renderWriterStatus(payload);
+
+                            if (!response.ok || !payload.ok) {
+                                throw new Error(payload.message || `AI writer process failed with status ${response.status}.`);
+                            }
+
+                            if (status) status.textContent = payload.message || 'AI writer process finished.';
+                            if (output) output.textContent = writerSummaryText(payload);
+                        } catch (error) {
+                            if (status) status.textContent = error instanceof Error ? error.message : 'Unable to run AI writer process.';
+                            if (output) output.textContent = error instanceof Error ? error.message : 'Unable to run AI writer process.';
+                        } finally {
+                            setWriterBusy(false);
+                        }
+                    });
+                });
+            }
 
             const voiceTest = document.querySelector('[data-voice-test]');
             if (voiceTest) {

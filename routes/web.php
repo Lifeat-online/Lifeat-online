@@ -140,6 +140,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('dev')->name('dev.')->group(fu
     Route::post('/translations/articles/{article:slug}', [AdminTranslationController::class, 'translateArticle'])->middleware('throttle:12,1')->name('translations.articles.translate');
     Route::post('/ai/settings', [AdminAiSettingsController::class, 'save'])->middleware('throttle:6,1')->name('ai.settings.store');
     Route::post('/ai/test', [AdminAiSettingsController::class, 'test'])->middleware('throttle:12,1')->name('ai.test');
+    Route::post('/ai/writer-process', [AdminAiSettingsController::class, 'writerProcess'])->middleware('throttle:12,1')->name('ai.writer.process');
     Route::post('/maps/key', [AdminMapIntegrationController::class, 'saveKey'])->middleware('throttle:6,1')->name('maps.key.store');
     Route::get('/transport', [TransportAdminSetupController::class, 'index'])->name('transport.setup');
     Route::post('/transport/managers', [TransportAdminSetupController::class, 'storeManager'])->name('transport.managers.store');

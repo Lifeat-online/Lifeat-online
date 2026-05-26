@@ -3,14 +3,22 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Article;
+use App\Models\ArticleBrief;
+use App\Models\ResearchItem;
+use App\Models\ResearchSource;
 use App\Models\Setting;
 use App\Services\AiGatewayService;
 use App\Services\AiImageService;
+use App\Services\EditorialBriefService;
 use App\Services\VoiceGatewayService;
+use App\Services\JimmyWritingService;
+use App\Services\Research\ResearchCollectorService;
 use App\Support\Ai\AiPromptCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 
 class AiSettingsController extends Controller
@@ -228,6 +236,56 @@ class AiSettingsController extends Controller
         return back()->with('status', $message);
     }
 
+    public function writerProcess(
+        Request $request,
+        ResearchCollectorService $collector,
+        EditorialBriefService $briefs,
+        JimmyWritingService $jimmy,
+        AiImageService $images,
+    ): JsonResponse {
+        $this->ensureDevOwner($request);
+
+        $validated = $request->validate([
+            'action' => ['required', 'string', Rule::in(['collect', 'brief', 'write', 'images', 'all'])],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'source' => ['nullable', 'string', 'max:500'],
+            'seed_sources' => ['nullable', 'boolean'],
+        ]);
+
+        $action = $validated['action'];
+        $limit = (int) ($validated['limit'] ?? 3);
+        $sourceSlugs = $this->sourceSlugs((string) ($validated['source'] ?? ''));
+        $summaries = [];
+
+        if (in_array($action, ['collect', 'all'], true) && (($validated['seed_sources'] ?? false) || ResearchSource::query()->count() === 0)) {
+            $summaries['seed'] = $collector->seedDefaultSources();
+        }
+
+        if (in_array($action, ['collect', 'all'], true)) {
+            $summaries['collect'] = $this->summarizeCollector($collector->collect($sourceSlugs, $limit));
+        }
+
+        if (in_array($action, ['brief', 'all'], true)) {
+            $summaries['brief'] = $this->summarizeAiBatch($briefs->generatePending($limit, $request->user()));
+        }
+
+        if (in_array($action, ['write', 'all'], true)) {
+            $summaries['write'] = $this->summarizeAiBatch($jimmy->draftApproved($limit, $request->user()));
+        }
+
+        if (in_array($action, ['images', 'all'], true)) {
+            $summaries['images'] = $this->summarizeAiBatch($images->generatePending($limit, $request->user()));
+        }
+
+        return response()->json([
+            'ok' => true,
+            'message' => $this->writerProcessMessage($action, $summaries),
+            'action' => $action,
+            'summaries' => $summaries,
+            'status' => $this->writerProcessStatus(),
+        ]);
+    }
+
     private function setSetting(Request $request, string $key, string $value, string $type): void
     {
         Setting::updateOrCreate(
@@ -246,5 +304,96 @@ class AiSettingsController extends Controller
         if (strtolower((string) $request->user()?->email) !== 'jameskoen78@gmail.com') {
             abort(403);
         }
+    }
+
+    private function sourceSlugs(string $source): array
+    {
+        return collect(preg_split('/[\s,]+/', $source) ?: [])
+            ->map(fn (string $value): string => trim($value))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function summarizeCollector(array $summary): array
+    {
+        return Arr::only($summary, [
+            'sources',
+            'parsed',
+            'created',
+            'duplicates',
+            'skipped',
+            'failed',
+            'dry_run',
+            'source_results',
+        ]);
+    }
+
+    private function summarizeAiBatch(array $summary): array
+    {
+        return [
+            'processed' => (int) ($summary['processed'] ?? 0),
+            'created' => (int) ($summary['created'] ?? 0),
+            'failed' => (int) ($summary['failed'] ?? 0),
+            'skipped' => (int) ($summary['skipped'] ?? 0),
+            'errors' => collect($summary['errors'] ?? [])
+                ->map(fn (array $error): array => [
+                    'id' => $error['brief_id'] ?? $error['article_id'] ?? $error['item_id'] ?? null,
+                    'message' => (string) ($error['message'] ?? 'AI process failed.'),
+                ])
+                ->values()
+                ->all(),
+            'items' => collect($summary['articles'] ?? [])
+                ->map(fn (Article $article): array => [
+                    'id' => $article->id,
+                    'title' => $article->title,
+                    'slug' => $article->slug,
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    private function writerProcessStatus(): array
+    {
+        return [
+            'active_sources' => ResearchSource::query()->active()->count(),
+            'new_research_items' => ResearchItem::query()->where('status', ResearchItem::STATUS_NEW)->count(),
+            'briefed_research_items' => ResearchItem::query()->where('status', ResearchItem::STATUS_BRIEFED)->count(),
+            'pending_review_briefs' => ArticleBrief::query()->where('status', ArticleBrief::STATUS_PENDING_REVIEW)->count(),
+            'approved_briefs' => ArticleBrief::query()->where('status', ArticleBrief::STATUS_APPROVED)->whereDoesntHave('article')->count(),
+            'drafted_briefs' => ArticleBrief::query()->where('status', ArticleBrief::STATUS_DRAFTED)->count(),
+            'drafts_missing_images' => Article::query()
+                ->whereNotNull('article_brief_id')
+                ->whereNull('featured_image')
+                ->whereIn('status', ['draft', 'pending_review', 'revision_requested'])
+                ->count(),
+        ];
+    }
+
+    private function writerProcessMessage(string $action, array $summaries): string
+    {
+        $parts = [];
+
+        if (isset($summaries['collect'])) {
+            $parts[] = "research {$summaries['collect']['created']} new";
+        }
+
+        if (isset($summaries['brief'])) {
+            $parts[] = "briefs {$summaries['brief']['created']} created";
+        }
+
+        if (isset($summaries['write'])) {
+            $parts[] = "drafts {$summaries['write']['created']} written";
+        }
+
+        if (isset($summaries['images'])) {
+            $parts[] = "images {$summaries['images']['created']} generated";
+        }
+
+        return $parts === []
+            ? ucfirst($action).' run completed.'
+            : 'AI writer process completed: '.implode(', ', $parts).'.';
     }
 }

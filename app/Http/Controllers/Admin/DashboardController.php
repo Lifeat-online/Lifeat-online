@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdCampaign;
+use App\Models\AiGeneration;
+use App\Models\ArticleBrief;
 use App\Models\ContentTranslation;
 use App\Models\PayoutRequest;
 use App\Models\Article;
@@ -16,6 +18,8 @@ use App\Models\Permission;
 use App\Models\PaymentRefund;
 use App\Models\PushCampaign;
 use App\Models\Role;
+use App\Models\ResearchItem;
+use App\Models\ResearchSource;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Models\WriterApplication;
@@ -178,6 +182,7 @@ class DashboardController extends Controller
             'devAiStatus' => $ai->status(),
             'devAiImageStatus' => $images->status(),
             'devVoiceStatus' => $voice->status(),
+            'devAiWriterStatus' => $this->aiWriterStatus(),
             'devTranslationStatus' => $this->translationStatus($translations, $translationBatch),
             'devMapStatus' => $this->mapStatus($maps),
             'devRoleCards' => $roles,
@@ -268,6 +273,17 @@ class DashboardController extends Controller
                 'masked_key' => '',
                 'providers' => [],
             ],
+            'devAiWriterStatus' => [
+                'active_sources' => 0,
+                'new_research_items' => 0,
+                'briefed_research_items' => 0,
+                'pending_review_briefs' => 0,
+                'approved_briefs' => 0,
+                'drafted_briefs' => 0,
+                'drafts_missing_images' => 0,
+                'failed_generations' => 0,
+                'latest_generation' => null,
+            ],
             'devTranslationStatus' => [
                 'supported_locales' => collect(config('localization.supported'))->keys()->all(),
                 'target_locales' => [],
@@ -355,6 +371,38 @@ class DashboardController extends Controller
             'configured' => $maps->configured(),
             'source' => $maps->apiKeySource(),
             'masked_key' => $maps->maskedApiKey(),
+        ];
+    }
+
+    private function aiWriterStatus(): array
+    {
+        $latestGeneration = AiGeneration::query()
+            ->whereIn('feature_key', ['editorial_brief', 'jimmy_article_draft', 'article_image'])
+            ->latest()
+            ->first();
+
+        return [
+            'active_sources' => ResearchSource::query()->active()->count(),
+            'new_research_items' => ResearchItem::query()->where('status', ResearchItem::STATUS_NEW)->count(),
+            'briefed_research_items' => ResearchItem::query()->where('status', ResearchItem::STATUS_BRIEFED)->count(),
+            'pending_review_briefs' => ArticleBrief::query()->where('status', ArticleBrief::STATUS_PENDING_REVIEW)->count(),
+            'approved_briefs' => ArticleBrief::query()->where('status', ArticleBrief::STATUS_APPROVED)->whereDoesntHave('article')->count(),
+            'drafted_briefs' => ArticleBrief::query()->where('status', ArticleBrief::STATUS_DRAFTED)->count(),
+            'drafts_missing_images' => Article::query()
+                ->whereNotNull('article_brief_id')
+                ->whereNull('featured_image')
+                ->whereIn('status', ['draft', 'pending_review', 'revision_requested'])
+                ->count(),
+            'failed_generations' => AiGeneration::query()
+                ->whereIn('feature_key', ['editorial_brief', 'jimmy_article_draft', 'article_image'])
+                ->where('status', AiGeneration::STATUS_FAILED)
+                ->count(),
+            'latest_generation' => $latestGeneration ? [
+                'feature_key' => $latestGeneration->feature_key,
+                'provider' => $latestGeneration->provider,
+                'status' => $latestGeneration->status,
+                'created_at' => optional($latestGeneration->created_at)->diffForHumans(),
+            ] : null,
         ];
     }
 
