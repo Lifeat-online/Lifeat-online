@@ -354,6 +354,12 @@
                         </div>
 
                         <div class="mt-6 max-w-md">
+                            <label class="mb-1 block text-sm font-medium text-gray-700">Fallback provider order</label>
+                            <input class="w-full rounded-md border-gray-300 text-sm" name="fallback_providers" value="{{ implode(', ', $devAiStatus['fallback_providers'] ?? []) }}" placeholder="openrouter, google, openai">
+                            <p class="mt-1 text-xs text-gray-500">Used after the active text provider and its fallback models fail.</p>
+                        </div>
+
+                        <div class="mt-6 max-w-md">
                             <label class="mb-1 block text-sm font-medium text-gray-700">Active image provider</label>
                             <select class="w-full rounded-md border-gray-300" name="image_provider">
                                 @foreach (($devAiImageStatus['providers'] ?? []) as $provider)
@@ -387,6 +393,10 @@
                                         <div>
                                             <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Model / deployment</label>
                                             <input class="w-full rounded-md border-gray-300 text-sm" name="models[{{ $provider['key'] }}]" value="{{ $provider['model'] }}">
+                                        </div>
+                                        <div>
+                                            <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Fallback models</label>
+                                            <input class="w-full rounded-md border-gray-300 text-sm" name="fallback_models[{{ $provider['key'] }}]" value="{{ implode(', ', $provider['fallback_models'] ?? []) }}" placeholder="model-one, model-two">
                                         </div>
                                         <div>
                                             <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Base URL / endpoint</label>

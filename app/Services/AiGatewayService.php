@@ -29,6 +29,7 @@ class AiGatewayService
                 'label' => (string) ($config['label'] ?? Str::headline($key)),
                 'type' => (string) ($config['type'] ?? 'openai_compatible'),
                 'model' => $this->model($key),
+                'fallback_models' => $this->fallbackModels($key),
                 'configured' => $this->configured($key),
                 'source' => $this->apiKeySource($key),
                 'masked_key' => $this->maskedApiKey($key),
@@ -49,6 +50,7 @@ class AiGatewayService
             'source' => $this->apiKeySource(),
             'masked_key' => $this->maskedApiKey(),
             'providers' => $this->providers(),
+            'fallback_providers' => $this->fallbackProviders($this->provider()),
         ];
     }
 
@@ -71,6 +73,25 @@ class AiGatewayService
         $provider ??= $this->provider();
 
         return (string) (Setting::getValue("ai.{$provider}_model") ?: config("services.ai.providers.{$provider}.model", ''));
+    }
+
+    public function fallbackModels(?string $provider = null): array
+    {
+        $provider ??= $this->provider();
+
+        $setting = Setting::query()
+            ->where('key', "ai.{$provider}_fallback_models")
+            ->value('value');
+
+        if ($setting !== null) {
+            return $this->csvList((string) $setting);
+        }
+
+        $models = config("services.ai.providers.{$provider}.fallback_models", []);
+
+        return is_array($models)
+            ? $this->normaliseList($models)
+            : $this->csvList((string) $models);
     }
 
     public function baseUrl(?string $provider = null): string
@@ -140,12 +161,227 @@ class AiGatewayService
         ?User $user = null,
         ?string $outputLanguage = null,
     ): array {
-        $provider = $this->provider();
-        $model = $this->model($provider);
+        $primaryProvider = $this->provider();
+        $primaryModel = $this->model($primaryProvider);
         $encodedInput = $this->encode($input);
         $inputTokens = $this->estimateTokens($systemPrompt.' '.$encodedInput);
 
-        $generation = AiGeneration::create([
+        if (! $this->configured($primaryProvider)) {
+            $generation = $this->createGenerationRecord(
+                $featureKey,
+                $promptVersion,
+                $input,
+                $encodedInput,
+                $inputTokens,
+                $source,
+                $user,
+                $outputLanguage,
+                $primaryProvider,
+                $primaryModel,
+            );
+            $message = "{$this->providerLabel($primaryProvider)} is not configured.";
+            $generation->update([
+                'status' => AiGeneration::STATUS_FAILED,
+                'error_message' => $message,
+            ]);
+
+            return ['ok' => false, 'message' => $message, 'generation' => $generation];
+        }
+
+        if ($message = $this->budget->blockReason($featureKey)) {
+            $generation = $this->createGenerationRecord(
+                $featureKey,
+                $promptVersion,
+                $input,
+                $encodedInput,
+                $inputTokens,
+                $source,
+                $user,
+                $outputLanguage,
+                $primaryProvider,
+                $primaryModel,
+            );
+            $generation->update([
+                'status' => AiGeneration::STATUS_FAILED,
+                'error_message' => $message,
+            ]);
+
+            return ['ok' => false, 'message' => $message, 'generation' => $generation->fresh()];
+        }
+
+        $failures = [];
+        $lastGeneration = null;
+        $primaryAttempt = [
+            'provider' => $primaryProvider,
+            'model' => $primaryModel,
+        ];
+
+        foreach ($this->textProviderAttempts($primaryProvider) as $attempt) {
+            $provider = $attempt['provider'];
+            $model = $attempt['model'];
+            $generation = $this->createGenerationRecord(
+                $featureKey,
+                $promptVersion,
+                $input,
+                $encodedInput,
+                $inputTokens,
+                $source,
+                $user,
+                $outputLanguage,
+                $provider,
+                $model,
+            );
+            $lastGeneration = $generation;
+
+            try {
+                $responseText = $this->send($provider, $model, $systemPrompt, $input);
+                $payload = $this->decodeJsonResponse($responseText);
+
+                if (! is_array($payload)) {
+                    $message = 'AI provider returned text, but not valid JSON.';
+                    $outputTokens = $this->estimateTokens($responseText);
+
+                    $generation->update([
+                        'status' => AiGeneration::STATUS_FAILED,
+                        'error_message' => $message.' Preview: '.Str::limit(trim($responseText), 220),
+                        'token_output_estimate' => $outputTokens,
+                        'cost_estimate' => $this->costs->estimateText($provider, $model, $inputTokens, $outputTokens),
+                    ]);
+
+                    $failures[] = [
+                        'provider' => $provider,
+                        'model' => $model,
+                        'label' => $this->providerLabel($provider),
+                        'message' => $message,
+                    ];
+
+                    continue;
+                }
+
+                $outputTokens = $this->estimateTokens($this->encode($payload));
+
+                $generation->update([
+                    'output_payload' => $payload,
+                    'token_output_estimate' => $outputTokens,
+                    'cost_estimate' => $this->costs->estimateText($provider, $model, $inputTokens, $outputTokens),
+                ]);
+
+                return [
+                    'ok' => true,
+                    'message' => $this->successMessage($primaryAttempt, $attempt, $failures),
+                    'payload' => $payload,
+                    'generation' => $generation->fresh(),
+                ];
+            } catch (Throwable $exception) {
+                $message = $this->friendlyTextError($provider, $model, $exception);
+
+                Log::warning('AI generation failed.', [
+                    'feature' => $featureKey,
+                    'provider' => $provider,
+                    'model' => $model,
+                    'message' => $message,
+                ]);
+
+                $generation->update([
+                    'status' => AiGeneration::STATUS_FAILED,
+                    'error_message' => Str::limit($message, 500, ''),
+                ]);
+
+                $failures[] = [
+                    'provider' => $provider,
+                    'model' => $model,
+                    'label' => $this->providerLabel($provider),
+                    'message' => $message,
+                ];
+
+                if (! $this->shouldTryFallback($exception)) {
+                    break;
+                }
+            }
+        }
+
+        return [
+            'ok' => false,
+            'message' => $this->failureMessage($failures),
+            'generation' => $lastGeneration?->fresh(),
+            'failures' => $failures,
+        ];
+    }
+
+    private function textProviderAttempts(string $primaryProvider): array
+    {
+        $primaryModel = $this->model($primaryProvider);
+        $attempts = [];
+        $seen = [];
+        $addAttempt = function (string $provider, string $model, ?array $fallbackFrom = null) use (&$attempts, &$seen): void {
+            $model = trim($model);
+            $key = $provider.'|'.Str::lower($model);
+
+            if ($model === '' || isset($seen[$key])) {
+                return;
+            }
+
+            $seen[$key] = true;
+            $attempts[] = [
+                'provider' => $provider,
+                'model' => $model,
+                'fallback_from' => $fallbackFrom,
+            ];
+        };
+
+        $addAttempt($primaryProvider, $primaryModel);
+
+        foreach ($this->fallbackModels($primaryProvider) as $fallbackModel) {
+            $addAttempt($primaryProvider, $fallbackModel, [
+                'provider' => $primaryProvider,
+                'model' => $primaryModel,
+            ]);
+        }
+
+        foreach ($this->fallbackProviders($primaryProvider) as $provider) {
+            if (! array_key_exists($provider, (array) config('services.ai.providers', [])) || ! $this->configured($provider)) {
+                continue;
+            }
+
+            $addAttempt($provider, $this->model($provider), [
+                'provider' => $primaryProvider,
+                'model' => $primaryModel,
+            ]);
+        }
+
+        return $attempts;
+    }
+
+    private function fallbackProviders(string $primaryProvider): array
+    {
+        $setting = Setting::query()
+            ->where('key', 'ai.fallback_providers')
+            ->value('value');
+        $providers = $setting !== null
+            ? $this->csvList((string) $setting)
+            : $this->normaliseList((array) config('services.ai.fallback_providers', []));
+
+        return collect($providers)
+            ->map(fn (string $provider): string => trim($provider))
+            ->filter(fn (string $provider): bool => $provider !== '' && $provider !== $primaryProvider)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function createGenerationRecord(
+        string $featureKey,
+        string $promptVersion,
+        array $input,
+        string $encodedInput,
+        int $inputTokens,
+        ?Model $source,
+        ?User $user,
+        ?string $outputLanguage,
+        string $provider,
+        string $model,
+    ): AiGeneration {
+        return AiGeneration::create([
             'feature_key' => $featureKey,
             'source_type' => $source ? get_class($source) : null,
             'source_id' => $source?->getKey(),
@@ -161,75 +397,87 @@ class AiGatewayService
             'token_input_estimate' => $inputTokens,
             'cost_estimate' => 0,
         ]);
+    }
 
-        if (! $this->configured($provider)) {
-            $message = "{$this->providerLabel($provider)} is not configured.";
-            $generation->update([
-                'status' => AiGeneration::STATUS_FAILED,
-                'error_message' => $message,
-            ]);
-
-            return ['ok' => false, 'message' => $message, 'generation' => $generation];
+    private function successMessage(array $primaryAttempt, array $successfulAttempt, array $failures): string
+    {
+        if ($failures === []) {
+            return 'AI suggestion generated.';
         }
 
-        if ($message = $this->budget->blockReason($featureKey)) {
-            $generation->update([
-                'status' => AiGeneration::STATUS_FAILED,
-                'error_message' => $message,
-            ]);
-
-            return ['ok' => false, 'message' => $message, 'generation' => $generation->fresh()];
+        if ($successfulAttempt['provider'] === $primaryAttempt['provider']) {
+            return 'AI suggestion generated with '.$this->providerLabel($successfulAttempt['provider']).' model '.$successfulAttempt['model'].' after '.$primaryAttempt['model'].' was unavailable.';
         }
 
-        try {
-            $responseText = $this->send($provider, $model, $systemPrompt, $input);
-            $payload = $this->decodeJsonResponse($responseText);
+        return 'AI suggestion generated with '.$this->providerLabel($successfulAttempt['provider']).' after '.$this->providerLabel($primaryAttempt['provider']).' was unavailable.';
+    }
 
-            if (! is_array($payload)) {
-                $message = 'AI provider returned text, but not valid JSON.';
-                $outputTokens = $this->estimateTokens($responseText);
+    private function friendlyTextError(string $provider, string $model, Throwable $exception): string
+    {
+        $message = trim($exception->getMessage());
+        $label = $this->providerLabel($provider);
+        $lowerMessage = Str::lower($message);
 
-                $generation->update([
-                    'status' => AiGeneration::STATUS_FAILED,
-                    'error_message' => $message.' Preview: '.Str::limit(trim($responseText), 220),
-                    'token_output_estimate' => $outputTokens,
-                    'cost_estimate' => $this->costs->estimateText($provider, $model, $inputTokens, $outputTokens),
-                ]);
-
-                return ['ok' => false, 'message' => $message, 'generation' => $generation];
-            }
-
-            $outputTokens = $this->estimateTokens($this->encode($payload));
-
-            $generation->update([
-                'output_payload' => $payload,
-                'token_output_estimate' => $outputTokens,
-                'cost_estimate' => $this->costs->estimateText($provider, $model, $inputTokens, $outputTokens),
-            ]);
-
-            return [
-                'ok' => true,
-                'message' => 'AI suggestion generated.',
-                'payload' => $payload,
-                'generation' => $generation->fresh(),
-            ];
-        } catch (Throwable $exception) {
-            $message = $exception->getMessage();
-
-            Log::warning('AI generation failed.', [
-                'feature' => $featureKey,
-                'provider' => $provider,
-                'model' => $model,
-                'message' => $message,
-            ]);
-
-            $generation->update([
-                'status' => AiGeneration::STATUS_FAILED,
-                'error_message' => $message,
-            ]);
-
-            return ['ok' => false, 'message' => $message, 'generation' => $generation->fresh()];
+        if (Str::contains($lowerMessage, ['curl error 28', 'timed out', 'timeout'])) {
+            return "{$label} model {$model} timed out after {$this->timeout()} seconds.";
         }
+
+        if ($message === '') {
+            return "{$label} model {$model} failed without an error message.";
+        }
+
+        if (Str::contains($message, $label)) {
+            return $message;
+        }
+
+        return "{$label} model {$model}: {$message}";
+    }
+
+    private function shouldTryFallback(Throwable $exception): bool
+    {
+        $message = Str::lower($exception->getMessage());
+
+        if (Str::contains($message, ['returned 401', 'returned 403', 'unauthorized', 'forbidden', 'invalid api key'])) {
+            return false;
+        }
+
+        if (
+            Str::contains($message, ['returned 400', 'returned 404'])
+            && Str::contains($message, ['model', 'not found', 'does not exist', 'unsupported'])
+        ) {
+            return true;
+        }
+
+        return Str::contains($message, [
+            'curl error 28',
+            'timed out',
+            'timeout',
+            'connection',
+            'returned 408',
+            'returned 409',
+            'returned 422',
+            'returned 429',
+            'returned 5',
+            'bad gateway',
+            'upstream request failed',
+        ]);
+    }
+
+    private function failureMessage(array $failures): string
+    {
+        if ($failures === []) {
+            return 'AI generation failed.';
+        }
+
+        if (count($failures) === 1) {
+            return $failures[0]['message'];
+        }
+
+        $summary = collect($failures)
+            ->map(fn (array $failure): string => $failure['label'].' '.$failure['model'].': '.$failure['message'])
+            ->implode(' | ');
+
+        return 'AI generation failed after '.count($failures).' attempts. '.$summary;
     }
 
     private function send(string $provider, string $model, string $systemPrompt, array $input): string
@@ -425,6 +673,26 @@ class AiGatewayService
             ?: $response->body();
 
         throw new \RuntimeException($this->providerLabel($provider).' returned '.$response->status().': '.Str::limit(trim((string) $message), 300));
+    }
+
+    private function csvList(string $value): array
+    {
+        return collect(preg_split('/[\r\n,]+/', $value) ?: [])
+            ->map(fn (string $item): string => trim($item))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function normaliseList(array $values): array
+    {
+        return collect($values)
+            ->map(fn (mixed $item): string => trim((string) $item))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function decodeJsonResponse(string $message): ?array

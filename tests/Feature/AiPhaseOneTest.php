@@ -27,6 +27,7 @@ class AiPhaseOneTest extends TestCase
         $this->actingAs($admin)
             ->postJson(route('dev.ai.settings.store'), [
                 'provider' => 'nvidia',
+                'fallback_providers' => "openrouter\ngoogle,openai",
                 'keys' => [
                     'nvidia' => 'nvapi-test-key',
                     'openrouter' => 'sk-or-test-key',
@@ -44,6 +45,9 @@ class AiPhaseOneTest extends TestCase
                     'together' => 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
                     'fireworks' => 'accounts/fireworks/models/llama-v3p1-70b-instruct',
                     'huggingface' => 'meta-llama/Llama-3.1-8B-Instruct',
+                ],
+                'fallback_models' => [
+                    'nvidia' => "meta/llama-3.1-70b-instruct\nmistralai/mistral-nemo-12b-instruct",
                 ],
                 'base_urls' => [
                     'nvidia' => 'https://integrate.api.nvidia.com/v1',
@@ -64,11 +68,15 @@ class AiPhaseOneTest extends TestCase
             ->assertOk()
             ->assertJsonPath('status.provider', 'nvidia')
             ->assertJsonPath('status.configured', true)
+            ->assertJsonPath('status.fallback_providers.0', 'openrouter')
+            ->assertJsonPath('status.fallback_providers.1', 'google')
             ->assertJsonPath('voice_status.configured', true);
 
         $this->assertSame('nvidia', Setting::getValue('ai.provider'));
+        $this->assertSame('openrouter,google,openai', Setting::getValue('ai.fallback_providers'));
         $this->assertSame('nvapi-test-key', Setting::getValue('ai.nvidia_api_key'));
         $this->assertSame('meta/llama-3.1-70b-instruct', Setting::getValue('ai.nvidia_model'));
+        $this->assertSame('meta/llama-3.1-70b-instruct,mistralai/mistral-nemo-12b-instruct', Setting::getValue('ai.nvidia_fallback_models'));
         $this->assertSame('sk-or-test-key', Setting::getValue('ai.openrouter_api_key'));
         $this->assertSame('sk-deepseek-test-key', Setting::getValue('ai.deepseek_api_key'));
         $this->assertSame('sonar-pro', Setting::getValue('ai.perplexity_model'));

@@ -60,6 +60,7 @@ return [
         'timeout' => env('AI_TIMEOUT', 90),
         'max_tokens' => env('AI_MAX_TOKENS', 2048),
         'temperature' => env('AI_TEMPERATURE', 0.2),
+        'fallback_providers' => array_values(array_filter(array_map('trim', explode(',', env('AI_FALLBACK_PROVIDERS', 'openrouter,google,openai'))))),
         'providers' => [
             'openrouter' => [
                 'label' => 'OpenRouter',
@@ -122,6 +123,7 @@ return [
                 'label' => 'NVIDIA NIM',
                 'key' => env('NVIDIA_API_KEY', env('NVIDIA_NIM_API_KEY')),
                 'model' => env('NVIDIA_AI_MODEL', 'meta/llama-3.1-70b-instruct'),
+                'fallback_models' => array_values(array_filter(array_map('trim', explode(',', env('NVIDIA_AI_FALLBACK_MODELS', 'meta/llama-3.1-70b-instruct,mistralai/mistral-nemo-12b-instruct'))))),
                 'base_url' => env('NVIDIA_BASE_URL', 'https://integrate.api.nvidia.com/v1'),
                 'type' => 'openai_compatible',
             ],

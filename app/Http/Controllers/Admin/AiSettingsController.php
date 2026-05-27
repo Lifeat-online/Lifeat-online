@@ -35,10 +35,13 @@ class AiSettingsController extends Controller
             'provider' => ['required', 'string', Rule::in($providers)],
             'image_provider' => ['nullable', 'string', Rule::in($imageProviders)],
             'voice_provider' => ['nullable', 'string', Rule::in($voiceProviders)],
+            'fallback_providers' => ['nullable', 'string', 'max:1000'],
             'keys' => ['nullable', 'array'],
             'keys.*' => ['nullable', 'string', 'max:1000'],
             'models' => ['nullable', 'array'],
             'models.*' => ['nullable', 'string', 'max:255'],
+            'fallback_models' => ['nullable', 'array'],
+            'fallback_models.*' => ['nullable', 'string', 'max:1000'],
             'base_urls' => ['nullable', 'array'],
             'base_urls.*' => ['nullable', 'string', 'max:500'],
             'image_keys' => ['nullable', 'array'],
@@ -73,6 +76,9 @@ class AiSettingsController extends Controller
         ]);
 
         $this->setSetting($request, 'ai.provider', $validated['provider'], 'string');
+        if (array_key_exists('fallback_providers', $validated)) {
+            $this->setSetting($request, 'ai.fallback_providers', $this->normaliseCsvSetting((string) $validated['fallback_providers']), 'string');
+        }
         if (filled($validated['image_provider'] ?? null)) {
             $this->setSetting($request, 'ai_image.provider', $validated['image_provider'], 'string');
         }
@@ -83,6 +89,7 @@ class AiSettingsController extends Controller
         foreach ($providers as $provider) {
             $key = trim((string) data_get($validated, "keys.{$provider}", ''));
             $model = trim((string) data_get($validated, "models.{$provider}", ''));
+            $fallbackModels = trim((string) data_get($validated, "fallback_models.{$provider}", ''));
             $baseUrl = trim((string) data_get($validated, "base_urls.{$provider}", ''));
 
             if ($key !== '') {
@@ -91,6 +98,10 @@ class AiSettingsController extends Controller
 
             if ($model !== '') {
                 $this->setSetting($request, "ai.{$provider}_model", $model, 'string');
+            }
+
+            if (array_key_exists($provider, (array) ($validated['fallback_models'] ?? []))) {
+                $this->setSetting($request, "ai.{$provider}_fallback_models", $this->normaliseCsvSetting($fallbackModels), 'string');
             }
 
             if ($baseUrl !== '') {

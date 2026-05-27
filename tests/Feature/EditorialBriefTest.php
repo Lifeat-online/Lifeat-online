@@ -9,6 +9,7 @@ use App\Models\ResearchItem;
 use App\Models\ResearchSource;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -88,6 +89,104 @@ class EditorialBriefTest extends TestCase
         $brief = ArticleBrief::firstOrFail();
         $this->assertSame(['Bethlehem', 'Water', 'Dihlabeng'], $brief->suggested_tags);
         $this->assertSame(['https://example.com/bethlehem-water-repairs'], $brief->source_urls);
+    }
+
+    public function test_editorial_brief_falls_back_to_nvidia_text_model_after_timeout(): void
+    {
+        config([
+            'services.ai.provider' => 'nvidia',
+            'services.ai.timeout' => 90,
+            'services.ai.fallback_providers' => ['openrouter'],
+            'services.ai.providers.nvidia.key' => 'nvapi-test',
+            'services.ai.providers.nvidia.model' => 'mistralai/mistral-large-3-675b-instruct-2512',
+            'services.ai.providers.nvidia.fallback_models' => ['meta/llama-3.1-70b-instruct'],
+            'services.ai.providers.nvidia.base_url' => 'https://integrate.api.nvidia.com/v1',
+            'services.ai.providers.openrouter.key' => 'sk-or-test',
+            'services.ai.providers.openrouter.model' => 'openai/gpt-oss-120b',
+        ]);
+
+        $category = Category::create([
+            'type' => 'article',
+            'name' => 'Local News',
+            'slug' => 'local-news',
+        ]);
+        $source = ResearchSource::create([
+            'name' => 'Google News: Bethlehem',
+            'slug' => 'google-news-bethlehem',
+            'type' => ResearchSource::TYPE_GOOGLE_NEWS_RSS,
+            'query' => 'Bethlehem Free State',
+            'is_active' => true,
+        ]);
+        $item = ResearchItem::create([
+            'research_source_id' => $source->id,
+            'source_name' => 'Example News',
+            'source_type' => ResearchSource::TYPE_GOOGLE_NEWS_RSS,
+            'source_url' => 'https://example.com/dihlabeng-weighbridge',
+            'title' => 'Dihlabeng weighbridge repair calls intensify',
+            'summary' => 'Residents and businesses want urgent repairs to the Dihlabeng weighbridge.',
+            'published_at' => now(),
+            'fetched_at' => now(),
+            'detected_locations' => ['Dihlabeng', 'Free State'],
+            'fingerprint' => hash('sha256', 'https://example.com/dihlabeng-weighbridge'),
+            'status' => ResearchItem::STATUS_NEW,
+        ]);
+        $models = [];
+
+        Http::fake(function ($request) use (&$models) {
+            $model = (string) $request['model'];
+            $models[] = $model;
+
+            if ($model === 'mistralai/mistral-large-3-675b-instruct-2512') {
+                throw new ConnectionException('cURL error 28: Operation timed out after 90001 milliseconds with 0 bytes received');
+            }
+
+            return Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => json_encode([
+                            'title' => 'Dihlabeng weighbridge repairs need urgent local scrutiny',
+                            'angle' => 'Explain the repair concern, affected road users, and what still needs confirmation.',
+                            'source_urls' => ['https://example.com/dihlabeng-weighbridge'],
+                            'category' => 'local-news',
+                            'suggested_tags' => ['Dihlabeng', 'Weighbridge'],
+                            'locality_score' => 92,
+                            'newsworthiness_score' => 81,
+                            'confidence_score' => 76,
+                            'duplicate_risk' => 8,
+                            'editorial_notes' => 'Ask the municipality for a repair timeline before publication.',
+                            'recommendation' => 'review',
+                        ]),
+                    ],
+                ]],
+            ]);
+        });
+
+        $this->artisan('life:editorial:brief --limit=1')
+            ->expectsOutputToContain('Editorial briefs complete: 1 created, 0 failed, 0 skipped.')
+            ->assertExitCode(0);
+
+        $this->assertSame([
+            'mistralai/mistral-large-3-675b-instruct-2512',
+            'meta/llama-3.1-70b-instruct',
+        ], $models);
+        $this->assertDatabaseHas('article_briefs', [
+            'research_item_id' => $item->id,
+            'suggested_category_id' => $category->id,
+            'title' => 'Dihlabeng weighbridge repairs need urgent local scrutiny',
+            'status' => ArticleBrief::STATUS_PENDING_REVIEW,
+        ]);
+        $this->assertDatabaseHas('ai_generations', [
+            'feature_key' => 'editorial_brief',
+            'provider' => 'nvidia',
+            'model' => 'mistralai/mistral-large-3-675b-instruct-2512',
+            'status' => AiGeneration::STATUS_FAILED,
+        ]);
+        $this->assertDatabaseHas('ai_generations', [
+            'feature_key' => 'editorial_brief',
+            'provider' => 'nvidia',
+            'model' => 'meta/llama-3.1-70b-instruct',
+            'status' => AiGeneration::STATUS_DRAFT,
+        ]);
     }
 
     public function test_admin_can_review_edit_approve_and_reject_article_briefs(): void
