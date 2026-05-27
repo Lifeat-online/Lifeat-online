@@ -195,6 +195,7 @@ class AiImageService
 
     public function generateForArticle(Article $article, ?User $user = null, bool $force = false): array
     {
+        $this->extendExecutionWindow();
         $article->loadMissing(['brief', 'categories', 'tags']);
 
         if ($article->featured_image && ! $force) {
@@ -753,6 +754,14 @@ class AiImageService
     private function timeout(): int
     {
         return max(15, (int) config('services.ai_image.timeout', 120));
+    }
+
+    private function extendExecutionWindow(): void
+    {
+        $seconds = $this->timeout() + 30;
+
+        @ini_set('max_execution_time', (string) $seconds);
+        @set_time_limit($seconds);
     }
 
     private function encode(mixed $value): string
