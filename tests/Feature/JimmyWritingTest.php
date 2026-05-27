@@ -98,6 +98,47 @@ class JimmyWritingTest extends TestCase
         $this->assertSame('draft', $article->status);
     }
 
+    public function test_approving_brief_immediately_starts_jimmy_and_creates_translation(): void
+    {
+        $this->configureOpenRouter();
+
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        $category = Category::create([
+            'type' => 'article',
+            'name' => 'Community',
+            'slug' => 'community',
+        ]);
+        $brief = $this->approvedBrief($admin, $category, [
+            'status' => ArticleBrief::STATUS_PENDING_REVIEW,
+            'reviewed_by' => null,
+            'reviewed_at' => null,
+        ]);
+
+        $this->fakeJimmyResponses();
+
+        $response = $this->actingAs($admin)
+            ->post(route('admin.article-briefs.approve', $brief));
+
+        $article = Article::query()->where('article_brief_id', $brief->id)->firstOrFail();
+
+        $response
+            ->assertRedirect(route('admin.articles.edit', $article))
+            ->assertSessionHas('status', 'Article brief approved. Jimmy draft article created.');
+
+        $brief->refresh();
+        $this->assertSame(ArticleBrief::STATUS_DRAFTED, $brief->status);
+        $this->assertSame($admin->id, $brief->reviewed_by);
+        $this->assertNotNull($brief->reviewed_at);
+        $this->assertSame('draft', $article->status);
+
+        $this->assertDatabaseHas('content_translations', [
+            'translatable_type' => Article::class,
+            'translatable_id' => $article->id,
+            'locale' => 'af',
+            'provider' => 'openrouter',
+        ]);
+    }
+
     public function test_jimmy_does_not_draft_pending_briefs(): void
     {
         $this->configureOpenRouter();

@@ -9,6 +9,7 @@
         $currentTranslations = $article->exists
             ? ($article->relationLoaded('contentTranslations') ? $article->contentTranslations : $article->contentTranslations()->get())
             : collect();
+        $featuredImageUrl = $article->featured_image ? '/media/'.ltrim($article->featured_image, '/') : null;
     @endphp
 
     <div class="py-12">
@@ -112,24 +113,23 @@
                             <label class="mb-1 block text-sm font-medium">Featured Image</label>
                             <input class="w-full rounded-md border-gray-300" type="file" name="featured_image_upload" accept="image/*">
                         </div>
-                        @if ($article->featured_image)
-                            <img src="{{ Storage::url($article->featured_image) }}" alt="" class="h-40 rounded-md border object-cover">
-                            @if ($article->featured_image_is_ai_generated)
-                                <p class="text-sm font-semibold text-indigo-700">AI-generated illustration</p>
-                            @endif
-                            <label class="inline-flex items-center gap-2 text-sm">
+                        <div class="{{ $featuredImageUrl ? '' : 'hidden' }} space-y-2" data-featured-image-preview>
+                            <img src="{{ $featuredImageUrl ?: '' }}" alt="" class="h-40 max-w-full rounded-md border object-cover" data-featured-image-img>
+                            <p class="hidden rounded-md bg-red-50 p-3 text-sm text-red-700" data-featured-image-error>Generated image file could not be loaded from storage.</p>
+                            <p class="{{ $article->featured_image_is_ai_generated ? '' : 'hidden' }} text-sm font-semibold text-indigo-700" data-featured-image-label>AI-generated illustration</p>
+                            <label class="inline-flex items-center gap-2 text-sm" data-featured-image-remove>
                                 <input type="checkbox" name="remove_featured_image" value="1">
                                 <span>Remove featured image</span>
                             </label>
-                        @endif
+                        </div>
                         <div class="grid gap-4 md:grid-cols-2">
                             <div>
                                 <label class="mb-1 block text-sm font-medium">Image caption</label>
-                                <input class="w-full rounded-md border-gray-300" name="featured_image_caption" value="{{ old('featured_image_caption', $article->featured_image_caption) }}">
+                                <input class="w-full rounded-md border-gray-300" name="featured_image_caption" value="{{ old('featured_image_caption', $article->featured_image_caption) }}" data-featured-image-caption>
                             </div>
                             <div>
                                 <label class="mb-1 block text-sm font-medium">Image credit</label>
-                                <input class="w-full rounded-md border-gray-300" name="featured_image_credit" value="{{ old('featured_image_credit', $article->featured_image_credit) }}">
+                                <input class="w-full rounded-md border-gray-300" name="featured_image_credit" value="{{ old('featured_image_credit', $article->featured_image_credit) }}" data-featured-image-credit>
                             </div>
                         </div>
                         @if ($article->exists)
@@ -421,6 +421,39 @@
                 const force = panel.querySelector('[data-ai-image-force]');
                 const status = panel.querySelector('[data-ai-image-status]');
                 const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+                const preview = document.querySelector('[data-featured-image-preview]');
+                const image = document.querySelector('[data-featured-image-img]');
+                const imageError = document.querySelector('[data-featured-image-error]');
+                const label = document.querySelector('[data-featured-image-label]');
+                const caption = document.querySelector('[data-featured-image-caption]');
+                const credit = document.querySelector('[data-featured-image-credit]');
+
+                const showImageError = () => {
+                    image?.classList.add('hidden');
+                    imageError?.classList.remove('hidden');
+                };
+
+                const showImage = (imageUrl) => {
+                    if (!preview || !image || !imageUrl) return false;
+
+                    const separator = imageUrl.includes('?') ? '&' : '?';
+                    preview.classList.remove('hidden');
+                    imageError?.classList.add('hidden');
+                    image.classList.remove('hidden');
+                    image.src = `${imageUrl}${separator}v=${Date.now()}`;
+                    label?.classList.remove('hidden');
+
+                    return true;
+                };
+
+                image?.addEventListener('error', showImageError);
+                image?.addEventListener('load', () => {
+                    image.classList.remove('hidden');
+                    imageError?.classList.add('hidden');
+                });
+                if (image?.getAttribute('src') && image.complete && image.naturalWidth === 0) {
+                    showImageError();
+                }
 
                 button?.addEventListener('click', async () => {
                     button.disabled = true;
@@ -442,7 +475,20 @@
                             throw new Error(payload.message || 'Image generation failed.');
                         }
 
-                        if (status) status.textContent = payload.message || 'Image Agent illustration generated. Refresh to review it.';
+                        const article = payload.article || {};
+                        const fallbackImageUrl = article.featured_image
+                            ? `/media/${String(article.featured_image).replace(/^\/+/, '')}`
+                            : '';
+                        const previewUpdated = showImage(payload.image_url || fallbackImageUrl);
+
+                        if (caption && article.featured_image_caption) caption.value = article.featured_image_caption;
+                        if (credit && article.featured_image_credit) credit.value = article.featured_image_credit;
+
+                        if (status) {
+                            status.textContent = previewUpdated
+                                ? (payload.message || 'Image Agent illustration generated.')
+                                : (payload.message || 'Image Agent illustration generated. Refresh to review it.');
+                        }
                     } catch (error) {
                         if (status) status.textContent = error instanceof Error ? error.message : 'Unable to generate illustration.';
                     } finally {

@@ -16,6 +16,7 @@ fi
 php artisan view:clear
 php artisan route:clear
 php artisan config:clear
+php artisan storage:link --force
 php artisan migrate --force
 
 if command -v frankenphp >/dev/null 2>&1; then

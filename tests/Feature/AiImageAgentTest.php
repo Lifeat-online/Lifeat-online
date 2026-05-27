@@ -134,18 +134,59 @@ class AiImageAgentTest extends TestCase
         $article = $this->jimmyDraftArticle();
         $this->fakeOpenAiImage();
 
-        $this->actingAs($admin)
+        $response = $this->actingAs($admin)
             ->postJson(route('admin.articles.ai-image', $article), [
                 'force' => false,
             ])
             ->assertOk()
             ->assertJsonPath('ok', true)
-            ->assertJsonPath('message', 'Image Agent illustration generated.');
+            ->assertJsonPath('message', 'Image Agent illustration generated.')
+            ->assertJsonStructure(['image_url']);
+
+        $this->assertStringStartsWith('/media/articles/ai-generated/', $response->json('image_url'));
 
         $article->refresh();
 
         $this->assertTrue($article->featured_image_is_ai_generated);
         Storage::disk('public')->assertExists($article->featured_image);
+    }
+
+    public function test_admin_image_endpoint_returns_actionable_error_when_provider_bytes_are_not_an_image(): void
+    {
+        Storage::fake('public');
+        $this->configureOpenAiImages();
+
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        $article = $this->jimmyDraftArticle();
+
+        Http::fake([
+            'https://api.openai.com/v1/images/generations' => Http::response([
+                'data' => [
+                    ['b64_json' => base64_encode('not-image-bytes')],
+                ],
+            ]),
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson(route('admin.articles.ai-image', $article), [
+                'force' => false,
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('ok', false)
+            ->assertJsonPath('message', 'OpenAI Images returned data, but it was not a displayable image.');
+
+        $this->assertNull($article->fresh()->featured_image);
+    }
+
+    public function test_public_storage_fallback_route_serves_generated_article_images(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('articles/ai-generated/example.png', $this->pngBytes());
+
+        $response = $this->get('/media/articles/ai-generated/example.png');
+
+        $response->assertOk();
+        $this->assertStringContainsString('image/png', (string) $response->baseResponse->headers->get('content-type'));
     }
 
     private function jimmyDraftArticle(array $overrides = []): Article
@@ -255,7 +296,7 @@ class AiImageAgentTest extends TestCase
         Http::fake([
             'https://api.openai.com/v1/images/generations' => Http::response([
                 'data' => [
-                    ['b64_json' => base64_encode('fake-png-bytes')],
+                    ['b64_json' => base64_encode($this->pngBytes())],
                 ],
             ]),
         ]);
@@ -271,7 +312,7 @@ class AiImageAgentTest extends TestCase
                             'images' => [
                                 [
                                     'image_url' => [
-                                        'url' => 'data:image/png;base64,'.base64_encode('fake-openrouter-png-bytes'),
+                                        'url' => 'data:image/png;base64,'.base64_encode($this->pngBytes()),
                                     ],
                                 ],
                             ],
@@ -293,7 +334,7 @@ class AiImageAgentTest extends TestCase
                                 [
                                     'inlineData' => [
                                         'mimeType' => 'image/png',
-                                        'data' => base64_encode('fake-gemini-png-bytes'),
+                                        'data' => base64_encode($this->pngBytes()),
                                     ],
                                 ],
                             ],
@@ -310,11 +351,16 @@ class AiImageAgentTest extends TestCase
             'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev' => Http::response([
                 'artifacts' => [
                     [
-                        'base64' => base64_encode('fake-nvidia-png-bytes'),
+                        'base64' => base64_encode($this->pngBytes()),
                         'mime_type' => 'image/png',
                     ],
                 ],
             ]),
         ]);
+    }
+
+    private function pngBytes(): string
+    {
+        return base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=');
     }
 }

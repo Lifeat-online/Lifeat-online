@@ -62,6 +62,7 @@ use App\Http\Controllers\AccountVoucherController;
 use App\Http\Controllers\AccountVoucherRedemptionController;
 use App\Http\Controllers\StaffVoucherRedemptionController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PublicStorageController;
 use App\Http\Controllers\WriterApplicationController;
 use App\Http\Controllers\Transport\DriverOfferController as TransportDriverOfferController;
 use App\Http\Controllers\Transport\DriverDutyController as TransportDriverDutyController;
@@ -87,6 +88,9 @@ use App\Http\Controllers\LocaleController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
+Route::get('/media/{path}', [PublicStorageController::class, 'show'])
+    ->where('path', '.*')
+    ->name('public-storage.show');
 Route::post('/locale/{locale}', LocaleController::class)->name('locale.switch');
 Route::post('/__bootstrap/admin', [AdminBootstrapController::class, 'store'])->middleware(['throttle:6,1'])->name('bootstrap.admin');
 Route::get('/directory', [DirectoryController::class, 'index'])->name('directory.index');

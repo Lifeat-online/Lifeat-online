@@ -448,7 +448,7 @@
             <div class="lead-grid">
                 <article class="card">
                     @if ($leadArticle->featured_image)
-                        <img class="feature-media" src="{{ \Illuminate\Support\Facades\Storage::url($leadArticle->featured_image) }}" alt="{{ $leadArticle->localizedTitle() }}" decoding="async" fetchpriority="high">
+                        <img class="feature-media" src="{{ '/media/'.ltrim($leadArticle->featured_image, '/') }}" alt="{{ $leadArticle->localizedTitle() }}" decoding="async" fetchpriority="high">
                     @else
                         <div class="media-fallback" aria-hidden="true"></div>
                     @endif

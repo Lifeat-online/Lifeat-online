@@ -202,6 +202,7 @@ class AiImageService
                 'ok' => true,
                 'skipped' => true,
                 'message' => 'Article already has a featured image.',
+                'image_url' => $this->publicImageUrl($article->featured_image),
                 'article' => $article,
             ];
         }
@@ -252,8 +253,9 @@ class AiImageService
         }
 
         try {
-            $image = $this->generateImageBytes($provider, $model, $prompt);
+            $image = $this->validatedImage($this->generateImageBytes($provider, $model, $prompt));
             $path = $this->storeArticleImage($article, $image['bytes'], $image['mime_type']);
+            $imageUrl = $this->publicImageUrl($path);
 
             if ($force && $article->featured_image && $article->featured_image !== $path) {
                 Storage::disk('public')->delete($article->featured_image);
@@ -273,6 +275,7 @@ class AiImageService
                 'status' => AiGeneration::STATUS_ACCEPTED,
                 'output_payload' => [
                     'path' => $path,
+                    'url' => $imageUrl,
                     'mime_type' => $image['mime_type'],
                     'provider' => $provider,
                     'model' => $model,
@@ -288,6 +291,7 @@ class AiImageService
             return [
                 'ok' => true,
                 'message' => 'Image Agent illustration generated.',
+                'image_url' => $imageUrl,
                 'article' => $article->fresh(['brief', 'categories', 'tags']),
                 'generation' => $generation->fresh(),
             ];
@@ -447,9 +451,12 @@ class AiImageService
         $this->throwIfFailed($response, $provider);
 
         $image = $this->extractImageFromPayload((array) $response->json(), [
+            'artifacts.0',
             'artifacts.0.base64',
             'artifacts.0.b64_json',
             'artifacts.0.image',
+            'artifacts.0.url',
+            'data.0',
             'data.0.b64_json',
             'data.0.url',
             'images.0',
@@ -497,6 +504,54 @@ class AiImageService
         return Str::limit(trim($prompt)."\n\nSafety rules: Create an illustrative editorial image only. Do not depict identifiable real people, real victims, real officials, accidents, crime scenes, municipal events, or exact news photography. Do not include logos, readable text, watermarks, or fake documentary/photojournalism framing. The image must be suitable to label as \"AI-generated illustration\".", 3600, '');
     }
 
+    private function validatedImage(array $image): array
+    {
+        $bytes = (string) ($image['bytes'] ?? '');
+        $mimeType = $this->detectImageMime($bytes);
+
+        if ($mimeType === '') {
+            throw new RuntimeException($this->providerLabel().' returned data, but it was not a displayable image.');
+        }
+
+        return [
+            'bytes' => $bytes,
+            'mime_type' => $mimeType,
+        ];
+    }
+
+    private function detectImageMime(string $bytes): string
+    {
+        if ($bytes === '') {
+            return '';
+        }
+
+        if (function_exists('getimagesizefromstring')) {
+            $details = @getimagesizefromstring($bytes);
+
+            if (is_array($details) && isset($details['mime']) && Str::startsWith((string) $details['mime'], 'image/')) {
+                return (string) $details['mime'];
+            }
+        }
+
+        if (Str::startsWith($bytes, "\x89PNG\r\n\x1A\n")) {
+            return 'image/png';
+        }
+
+        if (Str::startsWith($bytes, "\xFF\xD8\xFF")) {
+            return 'image/jpeg';
+        }
+
+        if (Str::startsWith($bytes, 'GIF87a') || Str::startsWith($bytes, 'GIF89a')) {
+            return 'image/gif';
+        }
+
+        if (Str::startsWith($bytes, 'RIFF') && substr($bytes, 8, 4) === 'WEBP') {
+            return 'image/webp';
+        }
+
+        return '';
+    }
+
     private function storeArticleImage(Article $article, string $bytes, string $mimeType): string
     {
         $extension = match (strtolower($mimeType)) {
@@ -506,9 +561,19 @@ class AiImageService
         };
 
         $path = 'articles/ai-generated/'.($article->id ?: 'draft').'-'.Str::slug(Str::limit($article->title, 48, '')).'-'.now()->format('YmdHis').'.'.$extension;
-        Storage::disk('public')->put($path, $bytes);
+        $disk = Storage::disk('public');
+        $directory = dirname($path);
+
+        if ((! $disk->exists($directory) && ! $disk->makeDirectory($directory)) || ! $disk->put($path, $bytes) || ! $disk->exists($path)) {
+            throw new RuntimeException('Image Agent generated an image, but storage could not save it.');
+        }
 
         return $path;
+    }
+
+    private function publicImageUrl(string $path): string
+    {
+        return '/media/'.ltrim($path, '/');
     }
 
     private function downloadImage(string $url): array

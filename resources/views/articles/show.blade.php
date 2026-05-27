@@ -25,7 +25,7 @@
                 </div>
                 @if ($article->featured_image)
                     <figure style="margin:0 0 1rem;">
-                        <img src="{{ \Illuminate\Support\Facades\Storage::url($article->featured_image) }}" alt="" style="width:100%; height:280px; object-fit:cover; border-radius:12px;">
+                        <img src="{{ '/media/'.ltrim($article->featured_image, '/') }}" alt="" style="width:100%; height:280px; object-fit:cover; border-radius:12px;">
                         @if ($article->featured_image_caption || $article->featured_image_credit || $article->featured_image_is_ai_generated)
                             <figcaption class="muted" style="margin-top:0.5rem; font-size:0.9rem;">
                                 @if ($article->featured_image_is_ai_generated)

@@ -69,7 +69,7 @@ class ArticleBriefController extends Controller
             ->with('status', 'Article brief updated.');
     }
 
-    public function approve(Request $request, ArticleBrief $articleBrief): RedirectResponse
+    public function approve(Request $request, ArticleBrief $articleBrief, JimmyWritingService $jimmy): RedirectResponse
     {
         $articleBrief->update([
             'status' => ArticleBrief::STATUS_APPROVED,
@@ -78,9 +78,30 @@ class ArticleBriefController extends Controller
             'reviewed_at' => now(),
         ]);
 
+        $result = $jimmy->draftFromBrief($articleBrief->refresh(), $request->user());
+
+        if (! ($result['ok'] ?? false)) {
+            return redirect()
+                ->route('admin.article-briefs.index', $this->preservedFilters($request))
+                ->with('status', 'Article brief approved for Jimmy.')
+                ->withErrors([
+                    'jimmy' => 'Article brief approved, but Jimmy could not create a draft immediately: '.($result['message'] ?? 'Provider unavailable.'),
+                ]);
+        }
+
+        if (($result['article'] ?? null) !== null) {
+            $message = ($result['skipped'] ?? false)
+                ? ($result['message'] ?? 'This brief already has an article draft.')
+                : 'Article brief approved. Jimmy draft article created.';
+
+            return redirect()
+                ->route('admin.articles.edit', $result['article'])
+                ->with('status', $message);
+        }
+
         return redirect()
             ->route('admin.article-briefs.index', $this->preservedFilters($request))
-            ->with('status', 'Article brief approved for Jimmy.');
+            ->with('status', $result['message'] ?? 'Article brief approved for Jimmy.');
     }
 
     public function reject(Request $request, ArticleBrief $articleBrief): RedirectResponse
