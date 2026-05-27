@@ -424,6 +424,10 @@
                                                 <input class="w-full rounded-md border-gray-300 text-sm" name="image_models[{{ $provider['key'] }}]" value="{{ $provider['model'] }}">
                                             </div>
                                             <div>
+                                                <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Fallback models</label>
+                                                <input class="w-full rounded-md border-gray-300 text-sm" name="image_fallback_models[{{ $provider['key'] }}]" value="{{ implode(', ', $provider['fallback_models'] ?? []) }}" placeholder="model-one, model-two">
+                                            </div>
+                                            <div>
                                                 <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Base URL / endpoint</label>
                                                 <input class="w-full rounded-md border-gray-300 text-sm" name="image_base_urls[{{ $provider['key'] }}]" value="{{ $provider['base_url'] }}">
                                             </div>

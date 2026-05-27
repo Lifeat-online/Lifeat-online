@@ -45,6 +45,8 @@ class AiSettingsController extends Controller
             'image_keys.*' => ['nullable', 'string', 'max:1000'],
             'image_models' => ['nullable', 'array'],
             'image_models.*' => ['nullable', 'string', 'max:255'],
+            'image_fallback_models' => ['nullable', 'array'],
+            'image_fallback_models.*' => ['nullable', 'string', 'max:1000'],
             'image_base_urls' => ['nullable', 'array'],
             'image_base_urls.*' => ['nullable', 'string', 'max:500'],
             'image_sizes' => ['nullable', 'array'],
@@ -99,6 +101,7 @@ class AiSettingsController extends Controller
         foreach ($imageProviders as $provider) {
             $key = trim((string) data_get($validated, "image_keys.{$provider}", ''));
             $model = trim((string) data_get($validated, "image_models.{$provider}", ''));
+            $fallbackModels = trim((string) data_get($validated, "image_fallback_models.{$provider}", ''));
             $baseUrl = trim((string) data_get($validated, "image_base_urls.{$provider}", ''));
             $size = trim((string) data_get($validated, "image_sizes.{$provider}", ''));
 
@@ -108,6 +111,10 @@ class AiSettingsController extends Controller
 
             if ($model !== '') {
                 $this->setSetting($request, "ai_image.{$provider}_model", $model, 'string');
+            }
+
+            if (array_key_exists($provider, (array) ($validated['image_fallback_models'] ?? []))) {
+                $this->setSetting($request, "ai_image.{$provider}_fallback_models", $this->normaliseCsvSetting($fallbackModels), 'string');
             }
 
             if ($baseUrl !== '') {
@@ -297,6 +304,15 @@ class AiSettingsController extends Controller
                 'updated_by_user_id' => $request->user()?->id,
             ]
         );
+    }
+
+    private function normaliseCsvSetting(string $value): string
+    {
+        return collect(preg_split('/[\r\n,]+/', $value) ?: [])
+            ->map(fn (string $item): string => trim($item))
+            ->filter()
+            ->unique()
+            ->implode(',');
     }
 
     private function ensureDevOwner(Request $request): void

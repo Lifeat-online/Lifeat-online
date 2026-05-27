@@ -30,6 +30,7 @@ class AiImageService
                 'label' => (string) ($config['label'] ?? Str::headline($key)),
                 'type' => (string) ($config['type'] ?? 'openai_images'),
                 'model' => $this->model($key),
+                'fallback_models' => $this->fallbackModels($key),
                 'base_url' => $this->baseUrl($key),
                 'size' => $this->size($key),
                 'configured' => $this->configured($key),
@@ -97,6 +98,25 @@ class AiImageService
             Setting::getValue("ai_image.{$provider}_size")
             ?: config("services.ai_image.providers.{$provider}.size", '1024x1024')
         );
+    }
+
+    public function fallbackModels(?string $provider = null): array
+    {
+        $provider ??= $this->provider();
+
+        $setting = Setting::query()
+            ->where('key', "ai_image.{$provider}_fallback_models")
+            ->value('value');
+
+        if ($setting !== null) {
+            return $this->csvList((string) $setting);
+        }
+
+        $models = config("services.ai_image.providers.{$provider}.fallback_models", []);
+
+        return is_array($models)
+            ? $this->normaliseList($models)
+            : $this->csvList((string) $models);
     }
 
     public function configured(?string $provider = null): bool
@@ -212,19 +232,188 @@ class AiImageService
             return ['ok' => false, 'message' => "{$this->providerLabel()} is not configured for image generation."];
         }
 
-        $provider = $this->provider();
-        $model = $this->model($provider);
+        $primaryProvider = $this->provider();
         $prompt = $this->promptForArticle($article);
-        $input = [
-            'article_id' => $article->id,
-            'article_title' => $article->title,
-            'prompt' => $prompt,
-            'provider' => $provider,
-            'model' => $model,
-            'size' => $this->size($provider),
+
+        if ($message = $this->budget->blockReason('article_image')) {
+            return [
+                'ok' => false,
+                'message' => $message,
+            ];
+        }
+
+        $failures = [];
+        $lastGeneration = null;
+
+        $primaryAttempt = [
+            'provider' => $primaryProvider,
+            'model' => $this->model($primaryProvider),
         ];
 
-        $generation = AiGeneration::create([
+        foreach ($this->imageProviderAttempts($primaryProvider) as $attempt) {
+            $provider = $attempt['provider'];
+            $model = $attempt['model'];
+            $input = $this->imageGenerationInput($article, $prompt, $provider, $model, $attempt);
+            $generation = $this->createGenerationRecord($article, $user, $provider, $model, $prompt, $input);
+            $lastGeneration = $generation;
+
+            try {
+                $image = $this->validatedImage($this->generateImageBytes($provider, $model, $prompt), $provider);
+                $path = $this->storeArticleImage($article, $image['bytes'], $image['mime_type']);
+                $imageUrl = $this->publicImageUrl($path);
+
+                if ($force && $article->featured_image && $article->featured_image !== $path) {
+                    Storage::disk('public')->delete($article->featured_image);
+                }
+
+                $article->update([
+                    'featured_image' => $path,
+                    'featured_image_caption' => 'AI-generated illustration for this article.',
+                    'featured_image_credit' => 'AI-generated illustration via '.$this->providerLabel($provider),
+                    'featured_image_is_ai_generated' => true,
+                    'featured_image_prompt' => $prompt,
+                    'featured_image_provider' => $provider,
+                    'featured_image_model' => $model,
+                ]);
+
+                $generation->update([
+                    'status' => AiGeneration::STATUS_ACCEPTED,
+                    'output_payload' => [
+                        'path' => $path,
+                        'url' => $imageUrl,
+                        'fallback_from' => $attempt['fallback_from'] ?? null,
+                        'mime_type' => $image['mime_type'],
+                        'provider' => $provider,
+                        'model' => $model,
+                        'label' => 'AI-generated illustration',
+                    ],
+                    'reviewed_by' => $user?->id,
+                    'reviewed_at' => now(),
+                    'cost_estimate' => $this->costs->estimateImage($provider, $model),
+                ]);
+
+                $this->createEditorNote($article->fresh(), $user);
+
+                return [
+                    'ok' => true,
+                    'message' => $this->successMessage($primaryAttempt, $attempt, $failures),
+                    'image_url' => $imageUrl,
+                    'article' => $article->fresh(['brief', 'categories', 'tags']),
+                    'generation' => $generation->fresh(),
+                ];
+            } catch (Throwable $exception) {
+                $message = $this->friendlyImageError($provider, $model, $exception);
+
+                $generation->update([
+                    'status' => AiGeneration::STATUS_FAILED,
+                    'error_message' => Str::limit($message, 500, ''),
+                ]);
+
+                $failures[] = [
+                    'provider' => $provider,
+                    'model' => $model,
+                    'label' => $this->providerLabel($provider),
+                    'message' => $message,
+                ];
+
+                if (! $this->shouldTryFallback($exception)) {
+                    break;
+                }
+            }
+        }
+
+        return [
+            'ok' => false,
+            'message' => $this->failureMessage($failures),
+            'generation' => $lastGeneration?->fresh(),
+            'failures' => $failures,
+        ];
+    }
+
+    private function generateImageBytes(string $provider, string $model, string $prompt): array
+    {
+        $type = (string) config("services.ai_image.providers.{$provider}.type", 'openai_images');
+
+        return match ($type) {
+            'openrouter_chat_image' => $this->generateWithOpenRouter($provider, $model, $prompt),
+            'gemini_generate_content' => $this->generateWithGemini($provider, $model, $prompt),
+            'nvidia_nim_infer' => $this->generateWithNvidiaNim($provider, $model, $prompt),
+            default => $this->generateWithOpenAiImages($provider, $model, $prompt),
+        };
+    }
+
+    private function imageProviderAttempts(string $primaryProvider): array
+    {
+        $primaryModel = $this->model($primaryProvider);
+        $attempts = [];
+        $seen = [];
+        $addAttempt = function (string $provider, string $model, ?array $fallbackFrom = null) use (&$attempts, &$seen): void {
+            $model = trim($model);
+            $key = $provider.'|'.Str::lower($model);
+
+            if ($model === '' || isset($seen[$key])) {
+                return;
+            }
+
+            $seen[$key] = true;
+            $attempts[] = [
+                'provider' => $provider,
+                'model' => $model,
+                'fallback_from' => $fallbackFrom,
+            ];
+        };
+
+        $addAttempt($primaryProvider, $primaryModel);
+
+        foreach ($this->fallbackModels($primaryProvider) as $fallbackModel) {
+            $addAttempt($primaryProvider, $fallbackModel, [
+                'provider' => $primaryProvider,
+                'model' => $primaryModel,
+            ]);
+        }
+
+        foreach ($this->fallbackProviders($primaryProvider) as $provider) {
+            if (! array_key_exists($provider, (array) config('services.ai_image.providers', [])) || ! $this->configured($provider)) {
+                continue;
+            }
+
+            $addAttempt($provider, $this->model($provider), [
+                'provider' => $primaryProvider,
+                'model' => $primaryModel,
+            ]);
+        }
+
+        return $attempts;
+    }
+
+    private function fallbackProviders(string $primaryProvider): array
+    {
+        return collect((array) config('services.ai_image.fallback_providers', []))
+            ->map(fn (string $provider): string => trim($provider))
+            ->filter(fn (string $provider): bool => $provider !== '' && $provider !== $primaryProvider)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function imageGenerationInput(Article $article, string $prompt, string $provider, string $model, array $attempt): array
+    {
+        return [
+            'article_id' => $article->id,
+            'article_title' => $article->title,
+            'article_slug' => $article->slug,
+            'prompt' => $prompt,
+            'provider' => $provider,
+            'provider_label' => $this->providerLabel($provider),
+            'model' => $model,
+            'size' => $this->size($provider),
+            'fallback_from' => $attempt['fallback_from'] ?? null,
+        ];
+    }
+
+    private function createGenerationRecord(Article $article, ?User $user, string $provider, string $model, string $prompt, array $input): AiGeneration
+    {
+        return AiGeneration::create([
             'feature_key' => 'article_image',
             'source_type' => Article::class,
             'source_id' => $article->id,
@@ -239,87 +428,78 @@ class AiImageService
             'status' => AiGeneration::STATUS_DRAFT,
             'cost_estimate' => 0,
         ]);
-
-        if ($message = $this->budget->blockReason('article_image')) {
-            $generation->update([
-                'status' => AiGeneration::STATUS_FAILED,
-                'error_message' => $message,
-            ]);
-
-            return [
-                'ok' => false,
-                'message' => $message,
-                'generation' => $generation->fresh(),
-            ];
-        }
-
-        try {
-            $image = $this->validatedImage($this->generateImageBytes($provider, $model, $prompt));
-            $path = $this->storeArticleImage($article, $image['bytes'], $image['mime_type']);
-            $imageUrl = $this->publicImageUrl($path);
-
-            if ($force && $article->featured_image && $article->featured_image !== $path) {
-                Storage::disk('public')->delete($article->featured_image);
-            }
-
-            $article->update([
-                'featured_image' => $path,
-                'featured_image_caption' => 'AI-generated illustration for this article.',
-                'featured_image_credit' => 'AI-generated illustration via '.$this->providerLabel($provider),
-                'featured_image_is_ai_generated' => true,
-                'featured_image_prompt' => $prompt,
-                'featured_image_provider' => $provider,
-                'featured_image_model' => $model,
-            ]);
-
-            $generation->update([
-                'status' => AiGeneration::STATUS_ACCEPTED,
-                'output_payload' => [
-                    'path' => $path,
-                    'url' => $imageUrl,
-                    'mime_type' => $image['mime_type'],
-                    'provider' => $provider,
-                    'model' => $model,
-                    'label' => 'AI-generated illustration',
-                ],
-                'reviewed_by' => $user?->id,
-                'reviewed_at' => now(),
-                'cost_estimate' => $this->costs->estimateImage($provider, $model),
-            ]);
-
-            $this->createEditorNote($article->fresh(), $user);
-
-            return [
-                'ok' => true,
-                'message' => 'Image Agent illustration generated.',
-                'image_url' => $imageUrl,
-                'article' => $article->fresh(['brief', 'categories', 'tags']),
-                'generation' => $generation->fresh(),
-            ];
-        } catch (Throwable $exception) {
-            $generation->update([
-                'status' => AiGeneration::STATUS_FAILED,
-                'error_message' => Str::limit($exception->getMessage(), 500, ''),
-            ]);
-
-            return [
-                'ok' => false,
-                'message' => $exception->getMessage(),
-                'generation' => $generation->fresh(),
-            ];
-        }
     }
 
-    private function generateImageBytes(string $provider, string $model, string $prompt): array
+    private function successMessage(array $primaryAttempt, array $successfulAttempt, array $failures): string
     {
-        $type = (string) config("services.ai_image.providers.{$provider}.type", 'openai_images');
+        if ($failures === []) {
+            return 'Image Agent illustration generated.';
+        }
 
-        return match ($type) {
-            'openrouter_chat_image' => $this->generateWithOpenRouter($provider, $model, $prompt),
-            'gemini_generate_content' => $this->generateWithGemini($provider, $model, $prompt),
-            'nvidia_nim_infer' => $this->generateWithNvidiaNim($provider, $model, $prompt),
-            default => $this->generateWithOpenAiImages($provider, $model, $prompt),
-        };
+        if ($successfulAttempt['provider'] === $primaryAttempt['provider']) {
+            return 'Image Agent illustration generated with '.$this->providerLabel($successfulAttempt['provider']).' model '.$successfulAttempt['model'].' after '.$primaryAttempt['model'].' was unavailable.';
+        }
+
+        return 'Image Agent illustration generated with '.$this->providerLabel($successfulAttempt['provider']).' after '.$this->providerLabel($primaryAttempt['provider']).' was unavailable.';
+    }
+
+    private function friendlyImageError(string $provider, string $model, Throwable $exception): string
+    {
+        $message = trim($exception->getMessage());
+        $label = $this->providerLabel($provider);
+        $lowerMessage = Str::lower($message);
+
+        if (Str::contains($lowerMessage, ['curl error 28', 'timed out', 'timeout'])) {
+            return "{$label} model {$model} timed out after {$this->timeout()} seconds.";
+        }
+
+        if ($message === '') {
+            return "{$label} model {$model} failed without an error message.";
+        }
+
+        if (Str::contains($message, $label)) {
+            return $message;
+        }
+
+        return "{$label} model {$model}: {$message}";
+    }
+
+    private function shouldTryFallback(Throwable $exception): bool
+    {
+        $message = Str::lower($exception->getMessage());
+
+        if (Str::contains($message, ['returned 401', 'returned 403', 'unauthorized', 'forbidden', 'invalid api key'])) {
+            return false;
+        }
+
+        return Str::contains($message, [
+            'curl error 28',
+            'timed out',
+            'timeout',
+            'connection',
+            'returned 422',
+            'returned 429',
+            'returned 5',
+            'did not return',
+            'not a displayable image',
+        ]);
+    }
+
+    private function failureMessage(array $failures): string
+    {
+        if ($failures === []) {
+            return 'Image generation failed.';
+        }
+
+        if (count($failures) === 1) {
+            return $failures[0]['message'];
+        }
+
+        $summary = collect($failures)
+            ->map(fn (array $failure): string => $failure['label'].' '.$failure['model'].': '.$failure['message'])
+            ->implode(' | ');
+
+        return 'Image generation failed after '.count($failures).' attempts. '.$summary;
     }
 
     private function generateWithOpenRouter(string $provider, string $model, string $prompt): array
@@ -441,13 +621,7 @@ class AiImageService
             ->acceptJson()
             ->asJson()
             ->timeout($this->timeout())
-            ->post($this->nvidiaNimEndpoint($provider), [
-                'prompt' => $prompt,
-                'mode' => 'base',
-                'width' => $dimensions['width'],
-                'height' => $dimensions['height'],
-                'samples' => 1,
-            ]);
+            ->post($this->nvidiaNimEndpoint($provider, $model), $this->nvidiaNimPayload($model, $prompt, $dimensions));
 
         $this->throwIfFailed($response, $provider);
 
@@ -505,13 +679,13 @@ class AiImageService
         return Str::limit(trim($prompt)."\n\nSafety rules: Create an illustrative editorial image only. Do not depict identifiable real people, real victims, real officials, accidents, crime scenes, municipal events, or exact news photography. Do not include logos, readable text, watermarks, or fake documentary/photojournalism framing. The image must be suitable to label as \"AI-generated illustration\".", 3600, '');
     }
 
-    private function validatedImage(array $image): array
+    private function validatedImage(array $image, ?string $provider = null): array
     {
         $bytes = (string) ($image['bytes'] ?? '');
         $mimeType = $this->detectImageMime($bytes);
 
         if ($mimeType === '') {
-            throw new RuntimeException($this->providerLabel().' returned data, but it was not a displayable image.');
+            throw new RuntimeException($this->providerLabel($provider).' returned data, but it was not a displayable image.');
         }
 
         return [
@@ -606,15 +780,41 @@ class AiImageService
         return $bytes;
     }
 
-    private function nvidiaNimEndpoint(string $provider): string
+    private function nvidiaNimEndpoint(string $provider, string $model): string
     {
         $baseUrl = $this->baseUrl($provider);
 
-        if (Str::contains($baseUrl, '/genai/') || Str::endsWith($baseUrl, '/infer')) {
+        if (Str::contains($baseUrl, '/genai/')) {
+            return (string) preg_replace('#/genai/.+$#', '/genai/'.ltrim($model, '/'), $baseUrl);
+        }
+
+        if (Str::endsWith($baseUrl, '/infer')) {
             return $baseUrl;
         }
 
         return $baseUrl.'/infer';
+    }
+
+    private function nvidiaNimPayload(string $model, string $prompt, array $dimensions): array
+    {
+        if (Str::contains(Str::lower($model), 'stable-diffusion-xl')) {
+            return [
+                'text_prompts' => [
+                    ['text' => $prompt],
+                ],
+                'width' => $dimensions['width'],
+                'height' => $dimensions['height'],
+                'samples' => 1,
+            ];
+        }
+
+        return [
+            'prompt' => $prompt,
+            'mode' => 'base',
+            'width' => $dimensions['width'],
+            'height' => $dimensions['height'],
+            'samples' => 1,
+        ];
     }
 
     private function imageDimensions(string $size): array
@@ -762,6 +962,21 @@ class AiImageService
 
         @ini_set('max_execution_time', (string) $seconds);
         @set_time_limit($seconds);
+    }
+
+    private function csvList(string $value): array
+    {
+        return $this->normaliseList(preg_split('/[\r\n,]+/', $value) ?: []);
+    }
+
+    private function normaliseList(array $values): array
+    {
+        return collect($values)
+            ->map(fn (mixed $value): string => trim((string) $value))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function encode(mixed $value): string

@@ -10,6 +10,7 @@ use App\Models\ResearchItem;
 use App\Models\ResearchSource;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -123,6 +124,61 @@ class AiImageAgentTest extends TestCase
             && $request['width'] === 1024
             && $request['height'] === 1024
             && $request['samples'] === 1);
+    }
+
+    public function test_image_agent_tries_nvidia_fallback_model_before_other_image_provider(): void
+    {
+        Storage::fake('public');
+        $this->configureNvidiaImages();
+        config([
+            'services.ai_image.fallback_providers' => ['openrouter'],
+            'services.ai_image.providers.nvidia.fallback_models' => ['black-forest-labs/flux.1-schnell'],
+            'services.ai_image.providers.openrouter.key' => 'sk-or-test',
+            'services.ai_image.providers.openrouter.model' => 'google/gemini-2.5-flash-image',
+            'services.ai_image.providers.openrouter.base_url' => 'https://openrouter.ai/api/v1',
+        ]);
+
+        $article = $this->jimmyDraftArticle([
+            'title' => 'Ficksburg library upgrade',
+            'slug' => 'ficksburg-library-upgrade',
+        ]);
+        $urls = [];
+
+        Http::fake(function ($request) use (&$urls) {
+            $urls[] = $request->url();
+
+            if ($request->url() === 'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev') {
+                throw new ConnectionException('cURL error 28: Operation timed out after 120000 milliseconds with 0 bytes received');
+            }
+
+            if ($request->url() === 'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-schnell') {
+                return Http::response([
+                    'artifacts' => [
+                        [
+                            'base64' => base64_encode($this->pngBytes()),
+                            'mime_type' => 'image/png',
+                        ],
+                    ],
+                ]);
+            }
+
+            return Http::response(['error' => 'Provider fallback should not be called.'], 500);
+        });
+
+        $result = app(\App\Services\AiImageService::class)->generateForArticle($article);
+
+        $this->assertTrue($result['ok']);
+        $this->assertStringContainsString('black-forest-labs/flux.1-schnell', $result['message']);
+        $this->assertSame([
+            'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev',
+            'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-schnell',
+        ], $urls);
+
+        $article->refresh();
+
+        $this->assertSame('nvidia', $article->featured_image_provider);
+        $this->assertSame('black-forest-labs/flux.1-schnell', $article->featured_image_model);
+        Storage::disk('public')->assertExists($article->featured_image);
     }
 
     public function test_admin_can_generate_article_image_from_article_editor(): void
@@ -250,6 +306,7 @@ class AiImageAgentTest extends TestCase
     {
         config([
             'services.ai_image.provider' => 'openai',
+            'services.ai_image.fallback_providers' => [],
             'services.ai_image.providers.openai.key' => 'sk-openai-test',
             'services.ai_image.providers.openai.model' => 'gpt-image-1',
             'services.ai_image.providers.openai.base_url' => 'https://api.openai.com/v1',
@@ -261,6 +318,7 @@ class AiImageAgentTest extends TestCase
     {
         config([
             'services.ai_image.provider' => 'openrouter',
+            'services.ai_image.fallback_providers' => [],
             'services.ai_image.providers.openrouter.key' => 'sk-or-test',
             'services.ai_image.providers.openrouter.model' => 'google/gemini-2.5-flash-image',
             'services.ai_image.providers.openrouter.base_url' => 'https://openrouter.ai/api/v1',
@@ -272,6 +330,7 @@ class AiImageAgentTest extends TestCase
     {
         config([
             'services.ai_image.provider' => 'google',
+            'services.ai_image.fallback_providers' => [],
             'services.ai_image.providers.google.key' => 'gemini-test',
             'services.ai_image.providers.google.model' => 'gemini-2.5-flash-image',
             'services.ai_image.providers.google.base_url' => 'https://generativelanguage.googleapis.com/v1beta',
@@ -283,6 +342,7 @@ class AiImageAgentTest extends TestCase
     {
         config([
             'services.ai_image.provider' => 'nvidia',
+            'services.ai_image.fallback_providers' => [],
             'services.ai_image.providers.nvidia.key' => 'nvapi-test',
             'services.ai_image.providers.nvidia.model' => 'black-forest-labs/flux.1-dev',
             'services.ai_image.providers.nvidia.base_url' => 'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev',

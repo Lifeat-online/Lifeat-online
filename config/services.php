@@ -182,6 +182,7 @@ return [
     'ai_image' => [
         'provider' => env('AI_IMAGE_PROVIDER', 'openrouter'),
         'timeout' => env('AI_IMAGE_TIMEOUT', 120),
+        'fallback_providers' => array_values(array_filter(array_map('trim', explode(',', env('AI_IMAGE_FALLBACK_PROVIDERS', 'openrouter,google,openai'))))),
         'providers' => [
             'openrouter' => [
                 'label' => 'OpenRouter Images',
@@ -211,6 +212,7 @@ return [
                 'label' => 'NVIDIA NIM Images',
                 'key' => env('NVIDIA_API_KEY', env('NVIDIA_NIM_API_KEY')),
                 'model' => env('NVIDIA_IMAGE_MODEL', 'black-forest-labs/flux.1-dev'),
+                'fallback_models' => array_values(array_filter(array_map('trim', explode(',', env('NVIDIA_IMAGE_FALLBACK_MODELS', 'black-forest-labs/flux.1-schnell,stabilityai/stable-diffusion-xl'))))),
                 'base_url' => env('NVIDIA_IMAGE_BASE_URL', 'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev'),
                 'size' => env('NVIDIA_IMAGE_SIZE', '1024x1024'),
                 'type' => 'nvidia_nim_infer',
