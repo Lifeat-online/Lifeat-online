@@ -215,8 +215,10 @@ class AiGatewayService
             'provider' => $primaryProvider,
             'model' => $primaryModel,
         ];
+        $attempts = $this->textProviderAttempts($primaryProvider);
+        $this->extendExecutionWindow(count($attempts));
 
-        foreach ($this->textProviderAttempts($primaryProvider) as $attempt) {
+        foreach ($attempts as $attempt) {
             $provider = $attempt['provider'];
             $model = $attempt['model'];
             $generation = $this->createGenerationRecord(
@@ -419,7 +421,7 @@ class AiGatewayService
         $lowerMessage = Str::lower($message);
 
         if (Str::contains($lowerMessage, ['curl error 28', 'timed out', 'timeout'])) {
-            return "{$label} model {$model} timed out after {$this->timeout()} seconds.";
+            return "{$label} model {$model} timed out after {$this->requestTimeout()} seconds.";
         }
 
         if ($message === '') {
@@ -497,7 +499,8 @@ class AiGatewayService
     {
         $request = Http::acceptJson()
             ->asJson()
-            ->timeout($this->timeout())
+            ->connectTimeout($this->connectTimeout())
+            ->timeout($this->requestTimeout())
             ->withHeaders($this->openAiCompatibleHeaders($provider));
 
         $apiKey = $this->apiKey($provider);
@@ -522,7 +525,8 @@ class AiGatewayService
         $response = $request
             ->acceptJson()
             ->asJson()
-            ->timeout($this->timeout())
+            ->connectTimeout($this->connectTimeout())
+            ->timeout($this->requestTimeout())
             ->post($this->baseUrl($provider).'/chat/completions', $payload);
 
         $this->throwIfFailed($response, $provider);
@@ -538,7 +542,8 @@ class AiGatewayService
         ])
             ->acceptJson()
             ->asJson()
-            ->timeout($this->timeout())
+            ->connectTimeout($this->connectTimeout())
+            ->timeout($this->requestTimeout())
             ->post($this->baseUrl($provider).'/messages', [
                 'model' => $model,
                 'system' => $systemPrompt."\nReturn only one valid JSON object.",
@@ -561,7 +566,8 @@ class AiGatewayService
         ])
             ->acceptJson()
             ->asJson()
-            ->timeout($this->timeout())
+            ->connectTimeout($this->connectTimeout())
+            ->timeout($this->requestTimeout())
             ->post($this->baseUrl($provider).'/models/'.$model.':generateContent', [
                 'systemInstruction' => [
                     'parts' => [
@@ -597,7 +603,8 @@ class AiGatewayService
         $response = Http::withHeaders(['api-key' => $this->apiKey($provider)])
             ->acceptJson()
             ->asJson()
-            ->timeout($this->timeout())
+            ->connectTimeout($this->connectTimeout())
+            ->timeout($this->requestTimeout())
             ->post($url, [
                 'messages' => [
                     ['role' => 'system', 'content' => $systemPrompt."\nReturn only one valid JSON object."],
@@ -618,7 +625,8 @@ class AiGatewayService
         $response = Http::withToken($this->apiKey($provider))
             ->acceptJson()
             ->asJson()
-            ->timeout($this->timeout())
+            ->connectTimeout($this->connectTimeout())
+            ->timeout($this->requestTimeout())
             ->post($this->baseUrl($provider).'/chat', [
                 'model' => $model,
                 'temperature' => $this->temperature(),
@@ -778,6 +786,30 @@ class AiGatewayService
     private function timeout(): int
     {
         return max(5, (int) config('services.ai.timeout', 90));
+    }
+
+    private function requestTimeout(): int
+    {
+        $timeout = config('services.ai.attempt_timeout');
+
+        if ($timeout === null || $timeout === '') {
+            $timeout = min($this->timeout(), 25);
+        }
+
+        return max(5, (int) $timeout);
+    }
+
+    private function connectTimeout(): int
+    {
+        return min(10, $this->requestTimeout());
+    }
+
+    private function extendExecutionWindow(int $attemptCount): void
+    {
+        $seconds = min(300, max(60, ($this->requestTimeout() * max(1, $attemptCount)) + 30));
+
+        @ini_set('max_execution_time', (string) $seconds);
+        @set_time_limit($seconds);
     }
 
     private function maxTokens(): int

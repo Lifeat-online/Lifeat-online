@@ -58,6 +58,7 @@ return [
     'ai' => [
         'provider' => env('AI_PROVIDER', 'openrouter'),
         'timeout' => env('AI_TIMEOUT', 90),
+        'attempt_timeout' => env('AI_ATTEMPT_TIMEOUT', min((int) env('AI_TIMEOUT', 90), 25)),
         'max_tokens' => env('AI_MAX_TOKENS', 2048),
         'temperature' => env('AI_TEMPERATURE', 0.2),
         'fallback_providers' => array_values(array_filter(array_map('trim', explode(',', env('AI_FALLBACK_PROVIDERS', 'openrouter,google,openai'))))),
