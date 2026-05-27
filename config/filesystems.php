@@ -39,9 +39,15 @@ return [
         ],
 
         'public' => [
-            'driver' => 'local',
+            'driver' => env('PUBLIC_DISK_DRIVER', env('PUBLIC_STORAGE_DRIVER', 'local')),
             'root' => storage_path('app/public'),
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
+            'key' => env('PUBLIC_AWS_ACCESS_KEY_ID', env('AWS_ACCESS_KEY_ID', env('S3_ACCESS_KEY_ID'))),
+            'secret' => env('PUBLIC_AWS_SECRET_ACCESS_KEY', env('AWS_SECRET_ACCESS_KEY', env('S3_SECRET_ACCESS_KEY'))),
+            'region' => env('PUBLIC_AWS_DEFAULT_REGION', env('AWS_DEFAULT_REGION', env('S3_REGION', 'auto'))),
+            'bucket' => env('PUBLIC_AWS_BUCKET', env('AWS_BUCKET', env('S3_BUCKET'))),
+            'url' => env('PUBLIC_STORAGE_URL') ?: rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
+            'endpoint' => env('PUBLIC_AWS_ENDPOINT', env('AWS_ENDPOINT', env('S3_ENDPOINT', env('AWS_ENDPOINT_URL_S3')))),
+            'use_path_style_endpoint' => env('PUBLIC_AWS_USE_PATH_STYLE_ENDPOINT', env('AWS_USE_PATH_STYLE_ENDPOINT', true)),
             'visibility' => 'public',
             'throw' => false,
             'report' => false,
