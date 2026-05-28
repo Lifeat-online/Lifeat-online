@@ -14,9 +14,16 @@ class AskLifeController extends Controller
     {
         $validated = $request->validate([
             'question' => ['required', 'string', 'min:3', 'max:500'],
+            'history' => ['nullable', 'array', 'max:20'],
+            'history.*.role' => ['required', 'string', Rule::in(['user', 'assistant'])],
+            'history.*.content' => ['required', 'string', 'max:1000'],
         ]);
 
-        return response()->json($askLife->answer($validated['question'], $request->user()));
+        return response()->json($askLife->answer(
+            $validated['question'],
+            $request->user(),
+            $validated['history'] ?? [],
+        ));
     }
 
     public function speak(Request $request, VoiceGatewayService $voice): JsonResponse

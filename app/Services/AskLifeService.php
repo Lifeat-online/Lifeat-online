@@ -23,7 +23,7 @@ class AskLifeService
     ) {
     }
 
-    public function answer(string $question, ?User $user = null): array
+    public function answer(string $question, ?User $user = null, array $history = []): array
     {
         $question = trim($question);
 
@@ -31,7 +31,7 @@ class AskLifeService
             return $guided;
         }
 
-        $sources = $this->sourcesForQuestion($question);
+        $sources = $this->sourcesForQuestion($question, $user);
 
         if ($sources->isEmpty()) {
             $answer = 'I could not find a direct Life@ match yet. Try a more specific town, business type, event name, article topic, voucher, classified item, or fault category.';
@@ -66,6 +66,7 @@ class AskLifeService
                     'question' => $question,
                     'sources' => $sources->values()->all(),
                     'schema' => $prompt['schema'],
+                    'conversation_history' => $this->formatHistory($history),
                 ],
                 null,
                 $user,
@@ -102,25 +103,38 @@ class AskLifeService
         }
     }
 
-    public function sourcesForQuestion(string $question): Collection
+    public function sourcesForQuestion(string $question, ?User $user = null): Collection
     {
         $terms = $this->terms($question);
         $dynamicSources = collect();
 
         if ($terms !== []) {
             $dynamicSources = collect()
-                ->merge($this->listingSources($terms))
-                ->merge($this->eventSources($terms))
-                ->merge($this->articleSources($terms))
-                ->merge($this->voucherSources($terms))
-                ->merge($this->classifiedSources($terms))
-                ->merge($this->faultSources($terms));
+                ->merge($this->listingSources($terms, $user))
+                ->merge($this->eventSources($terms, $user))
+                ->merge($this->articleSources($terms, $user))
+                ->merge($this->voucherSources($terms, $user))
+                ->merge($this->classifiedSources($terms, $user))
+                ->merge($this->faultSources($terms, $user));
         }
 
         return $dynamicSources
             ->merge($this->platformGuideSources($question, $terms))
             ->take(18)
             ->values();
+    }
+
+    private function formatHistory(array $history): array
+    {
+        return collect($history)
+            ->filter(fn (array $turn): bool => isset($turn['role'], $turn['content']) && filled($turn['content']))
+            ->take(16)
+            ->map(fn (array $turn): array => [
+                'role' => $turn['role'] === 'user' ? 'user' : 'assistant',
+                'content' => Str::limit(trim((string) $turn['content']), 500),
+            ])
+            ->values()
+            ->all();
     }
 
     private function guidedAnswer(string $question): ?array
@@ -193,10 +207,24 @@ class AskLifeService
             && collect($actionMarkers)->contains(fn (string $marker): bool => str_contains($normalized, $marker));
     }
 
-    private function listingSources(array $terms): Collection
+    private function listingSources(array $terms, ?User $user = null): Collection
     {
-        return Listing::with('categories')
-            ->published()
+        $query = Listing::with('categories');
+
+        // Public users: only published listings
+        if (! $user || ! $user->hasRole('admin', 'editor', 'staff')) {
+            $query->published();
+        }
+        // Staff users: published + their own drafts/pending
+        elseif ($user->hasRole('staff') && ! $user->hasRole('admin', 'editor')) {
+            $query->where(function (Builder $q) use ($user) {
+                $q->published()
+                    ->orWhere('user_id', $user->id);
+            });
+        }
+        // Admin/Editor: see everything (no scope applied)
+
+        return $query
             ->where(function (Builder $query) use ($terms) {
                 $this->applyTermSearch($query, ['title', 'excerpt', 'description', 'city', 'region'], $terms);
                 $query->orWhereHas('categories', fn (Builder $category) => $this->applyTermSearch($category, ['name'], $terms));
@@ -220,10 +248,24 @@ class AskLifeService
             ]);
     }
 
-    private function eventSources(array $terms): Collection
+    private function eventSources(array $terms, ?User $user = null): Collection
     {
-        return Event::with(['categories', 'listing'])
-            ->published()
+        $query = Event::with(['categories', 'listing']);
+
+        // Public users: only published events
+        if (! $user || ! $user->hasRole('admin', 'editor', 'staff')) {
+            $query->published();
+        }
+        // Staff users: published + their own listings' events
+        elseif ($user->hasRole('staff') && ! $user->hasRole('admin', 'editor')) {
+            $query->where(function (Builder $q) use ($user) {
+                $q->published()
+                    ->orWhereHas('listing', fn (Builder $listing) => $listing->where('user_id', $user->id));
+            });
+        }
+        // Admin/Editor: see everything
+
+        return $query
             ->where(function (Builder $query) use ($terms) {
                 $this->applyTermSearch($query, ['title', 'excerpt', 'description', 'venue_name', 'city', 'region'], $terms);
                 $query->orWhereHas('categories', fn (Builder $category) => $this->applyTermSearch($category, ['name'], $terms));
@@ -246,10 +288,24 @@ class AskLifeService
             ]);
     }
 
-    private function articleSources(array $terms): Collection
+    private function articleSources(array $terms, ?User $user = null): Collection
     {
-        return Article::with(['author', 'categories'])
-            ->published()
+        $query = Article::with(['author', 'categories']);
+
+        // Public users: only published articles
+        if (! $user || ! $user->hasRole('admin', 'editor', 'staff', 'writer')) {
+            $query->published();
+        }
+        // Writers: published + their own drafts
+        elseif ($user->hasRole('writer') && ! $user->hasRole('admin', 'editor', 'staff')) {
+            $query->where(function (Builder $q) use ($user) {
+                $q->published()
+                    ->orWhere('author_id', $user->id);
+            });
+        }
+        // Admin/Editor/Staff: see everything
+
+        return $query
             ->where(function (Builder $query) use ($terms) {
                 $this->applyTermSearch($query, ['title', 'excerpt', 'body'], $terms);
                 $query->orWhereHas('categories', fn (Builder $category) => $this->applyTermSearch($category, ['name'], $terms));
@@ -272,11 +328,28 @@ class AskLifeService
             ]);
     }
 
-    private function voucherSources(array $terms): Collection
+    private function voucherSources(array $terms, ?User $user = null): Collection
     {
-        return Voucher::with('listing')
-            ->active()
-            ->whereHas('listing', fn (Builder $listing) => $listing->published())
+        $query = Voucher::with('listing');
+
+        // Public users: only active vouchers with published listings
+        if (! $user || ! $user->hasRole('admin', 'editor', 'staff')) {
+            $query->active()
+                ->whereHas('listing', fn (Builder $listing) => $listing->published());
+        }
+        // Staff users: active vouchers for published listings + all vouchers for their own listings
+        elseif ($user->hasRole('staff') && ! $user->hasRole('admin', 'editor')) {
+            $query->where(function (Builder $q) use ($user) {
+                $q->where(function (Builder $public) {
+                    $public->active()
+                        ->whereHas('listing', fn (Builder $listing) => $listing->published());
+                })
+                ->orWhereHas('listing', fn (Builder $listing) => $listing->where('user_id', $user->id));
+            });
+        }
+        // Admin/Editor: see everything (no scope)
+
+        return $query
             ->where(function (Builder $query) use ($terms) {
                 $this->applyTermSearch($query, ['title', 'description', 'terms'], $terms);
                 $query->orWhereHas('listing', fn (Builder $listing) => $this->applyTermSearch($listing, ['title', 'city', 'region'], $terms));
@@ -299,10 +372,24 @@ class AskLifeService
             ]);
     }
 
-    private function classifiedSources(array $terms): Collection
+    private function classifiedSources(array $terms, ?User $user = null): Collection
     {
-        return Classified::query()
-            ->where('status', Classified::STATUS_PUBLISHED)
+        $query = Classified::query();
+
+        // Public users: only published classifieds
+        if (! $user || ! $user->hasRole('admin', 'editor', 'staff')) {
+            $query->where('status', Classified::STATUS_PUBLISHED);
+        }
+        // Staff users: published + their own
+        elseif ($user->hasRole('staff') && ! $user->hasRole('admin', 'editor')) {
+            $query->where(function (Builder $q) use ($user) {
+                $q->where('status', Classified::STATUS_PUBLISHED)
+                    ->orWhere('user_id', $user->id);
+            });
+        }
+        // Admin/Editor: see everything
+
+        return $query
             ->where(function (Builder $query) use ($terms) {
                 $this->applyTermSearch($query, ['title', 'description', 'city', 'region'], $terms);
             })
@@ -322,10 +409,17 @@ class AskLifeService
             ]);
     }
 
-    private function faultSources(array $terms): Collection
+    private function faultSources(array $terms, ?User $user = null): Collection
     {
-        return CivicFaultReport::query()
-            ->where('is_approved', true)
+        $query = CivicFaultReport::query();
+
+        // Public users: only approved faults
+        if (! $user || ! $user->hasRole('admin', 'editor', 'councillor')) {
+            $query->where('is_approved', true);
+        }
+        // Admin/Editor/Councillor: see all faults (including unapproved)
+
+        return $query
             ->where(function (Builder $query) use ($terms) {
                 $this->applyTermSearch($query, ['category', 'severity', 'status', 'address_label', 'description'], $terms);
             })
