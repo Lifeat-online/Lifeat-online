@@ -42,7 +42,11 @@
             <div class="transport-actions">
                 <a class="button" href="{{ route('transport.requests.create') }}">Request taxi or delivery</a>
                 <a class="button-link" href="{{ route('transport.driver.duty') }}">Driver clock-in</a>
-                <a class="button-link" href="{{ route('transport.manager.dashboard') }}">Manager tools</a>
+                @auth
+                    @if (auth()->user()->hasRole('transport_manager', 'admin', 'dev'))
+                        <a class="button-link" href="{{ route('transport.manager.dashboard') }}">Manager tools</a>
+                    @endif
+                @endauth
             </div>
         </article>
         <aside class="card">

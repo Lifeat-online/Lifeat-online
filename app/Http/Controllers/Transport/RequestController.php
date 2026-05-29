@@ -123,7 +123,7 @@ class RequestController extends Controller
 
     public function show(Request $request, TransportRequest $transportRequest): View
     {
-        abort_unless($transportRequest->user_id === $request->user()->id || $request->user()->hasRole('transport_manager', 'admin', 'support'), 403);
+        abort_unless($transportRequest->user_id === $request->user()->id || $request->user()->hasRole('transport_manager', 'admin', 'support', 'dev'), 403);
 
         $transportRequest->load([
             'acceptedDriver.user',

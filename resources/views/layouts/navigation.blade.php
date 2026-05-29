@@ -41,7 +41,7 @@
                             {{ __('Councillors') }}
                         </x-nav-link>
                     @endif
-                    @if (Auth::user()->hasRole('admin'))
+                    @if (Auth::user()->hasRole('admin', 'dev'))
                         <x-nav-link :href="route('dev.transport.setup')" :active="request()->routeIs('dev.transport.*')">
                             {{ __('Transport Setup') }}
                         </x-nav-link>
@@ -55,7 +55,7 @@
                             {{ __('Push') }}
                         </x-nav-link>
                     @endif
-                    @if (Auth::user()->hasRole('transport_manager', 'admin'))
+                    @if (Auth::user()->hasRole('transport_manager', 'admin', 'dev'))
                         <x-nav-link :href="route('transport.manager.dashboard')" :active="request()->routeIs('transport.manager.*')">
                             {{ __('Transport') }}
                         </x-nav-link>
@@ -174,7 +174,7 @@
                     {{ __('Councillors') }}
                 </x-responsive-nav-link>
             @endif
-            @if (Auth::user()->hasRole('admin'))
+            @if (Auth::user()->hasRole('admin', 'dev'))
                 <x-responsive-nav-link :href="route('dev.transport.setup')" :active="request()->routeIs('dev.transport.*')">
                     {{ __('Transport Setup') }}
                 </x-responsive-nav-link>
@@ -188,7 +188,7 @@
                     {{ __('Push') }}
                 </x-responsive-nav-link>
             @endif
-            @if (Auth::user()->hasRole('transport_manager', 'admin'))
+            @if (Auth::user()->hasRole('transport_manager', 'admin', 'dev'))
                 <x-responsive-nav-link :href="route('transport.manager.dashboard')" :active="request()->routeIs('transport.manager.*')">
                     {{ __('Transport') }}
                 </x-responsive-nav-link>

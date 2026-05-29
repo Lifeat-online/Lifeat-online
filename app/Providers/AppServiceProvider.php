@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Models\Listing;
+use App\Events\MallOrderPaid;
+use App\Listeners\SendMallOrderPaidEmails;
 use App\Models\NotificationLog;
 use App\Models\Order;
 use App\Models\PayoutRequest;
@@ -19,6 +21,7 @@ use App\Policies\SubscriptionPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -44,6 +47,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Payment::class, PaymentPolicy::class);
         Gate::policy(StaffWallet::class, StaffWalletPolicy::class);
         Gate::policy(Subscription::class, SubscriptionPolicy::class);
+
+        Event::listen(MallOrderPaid::class, SendMallOrderPaidEmails::class);
 
         $this->configureRateLimiters();
 

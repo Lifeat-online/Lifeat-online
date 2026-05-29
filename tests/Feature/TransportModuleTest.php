@@ -146,6 +146,61 @@ class TransportModuleTest extends TestCase
         ]);
     }
 
+    public function test_transport_setup_can_grant_manager_access_to_existing_user_without_replacing_primary_role(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $existing = User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'existing.admin@example.com',
+            'phone' => '0811111111',
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('dev.transport.managers.store'), [
+                'name' => 'Existing Admin',
+                'email' => $existing->email,
+                'phone' => '0822222222',
+            ])
+            ->assertRedirect(route('dev.transport.setup'))
+            ->assertSessionHas('status', 'Transport manager access granted.');
+
+        $existing->refresh();
+
+        $this->assertSame('super_admin', $existing->role);
+        $this->assertSame('Existing Admin', $existing->name);
+        $this->assertSame('0822222222', $existing->phone);
+        $this->assertTrue($existing->hasRole('transport_manager'));
+
+        $this->actingAs($admin)
+            ->get(route('dev.transport.setup'))
+            ->assertOk()
+            ->assertSee('existing.admin@example.com');
+    }
+
+    public function test_dev_owner_can_create_driver_without_transport_manager_primary_role(): void
+    {
+        $devOwner = User::factory()->create([
+            'role' => 'member',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
+
+        $this->actingAs($devOwner)
+            ->post(route('transport.manager.drivers.store'), [
+                'name' => 'Dev Saved Driver',
+                'email' => 'dev.saved.driver@example.com',
+                'phone' => '0830000000',
+                'status' => 'approved',
+                'can_transport_parcels' => '1',
+            ])
+            ->assertRedirect(route('transport.manager.dashboard'));
+
+        $driver = TransportDriver::with('user')->firstOrFail();
+
+        $this->assertSame($devOwner->id, $driver->manager_user_id);
+        $this->assertSame('Dev Saved Driver', $driver->user->name);
+        $this->assertTrue($driver->isApproved());
+    }
+
     public function test_transport_manager_can_create_driver_and_vehicle(): void
     {
         $manager = User::factory()->create(['role' => 'transport_manager']);

@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Middleware\EnsureTransportDriverOnDuty;
+use App\Http\Middleware\EnsureMallAdmin;
+use App\Http\Middleware\EnsureMallVendorIsActive;
 use App\Http\Middleware\EnsureUserHasRole;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TranslateInterface;
@@ -33,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('life:editorial:brief --limit=10')->hourlyAt(20);
         $schedule->command('life:jimmy:write --limit=3')->hourlyAt(30);
         $schedule->command('life:images:generate --limit=3')->hourlyAt(40);
+        $schedule->command('mall:orders:cancel-abandoned --hours=2')->hourlyAt(50);
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
@@ -40,7 +43,12 @@ return Application::configure(basePath: dirname(__DIR__))
             SetLocale::class,
             TranslateInterface::class,
         ]);
+        $middleware->validateCsrfTokens(except: [
+            'mall/payment/itn',
+        ]);
         $middleware->alias([
+            'mall.admin' => EnsureMallAdmin::class,
+            'mall.vendor' => EnsureMallVendorIsActive::class,
             'role' => EnsureUserHasRole::class,
             'transport.on_duty' => EnsureTransportDriverOnDuty::class,
         ]);

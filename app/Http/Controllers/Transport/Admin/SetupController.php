@@ -24,7 +24,7 @@ class SetupController extends Controller
     {
         return view('transport.admin.setup', [
             'counts' => [
-                'managers' => User::query()->where('role', 'transport_manager')->count(),
+                'managers' => $this->managerUsersQuery()->count(),
                 'drivers' => TransportDriver::count(),
                 'approvedDrivers' => TransportDriver::where('status', TransportDriver::STATUS_APPROVED)->count(),
                 'vehicles' => TransportVehicle::count(),
@@ -39,8 +39,7 @@ class SetupController extends Controller
                 ])->count(),
             ],
             'settings' => $this->settings(),
-            'managers' => User::query()
-                ->where('role', 'transport_manager')
+            'managers' => $this->managerUsersQuery()
                 ->latest()
                 ->limit(12)
                 ->get(),
@@ -67,18 +66,28 @@ class SetupController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'email' => ['required', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $password = Str::password(14);
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'] ?? null,
-            'password' => Hash::make($password),
-            'role' => 'transport_manager',
-        ]);
+        $user = User::where('email', $validated['email'])->first();
+        $password = null;
+
+        if ($user) {
+            $user->fill([
+                'name' => $validated['name'],
+                'phone' => $validated['phone'] ?? $user->phone,
+            ])->save();
+        } else {
+            $password = Str::password(14);
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'phone' => $validated['phone'] ?? null,
+                'password' => Hash::make($password),
+                'role' => 'transport_manager',
+            ]);
+        }
 
         $role = Role::firstOrCreate(
             ['slug' => 'transport_manager'],
@@ -86,11 +95,16 @@ class SetupController extends Controller
         );
         $user->roles()->syncWithoutDetaching([$role->id]);
 
-        return redirect()
+        $redirect = redirect()
             ->route('dev.transport.setup')
-            ->with('status', 'Transport manager created.')
-            ->with('temporary_password', $password)
+            ->with('status', $password ? 'Transport manager created.' : 'Transport manager access granted.')
             ->with('manager_email', $user->email);
+
+        if ($password) {
+            $redirect->with('temporary_password', $password);
+        }
+
+        return $redirect;
     }
 
     public function updateSettings(Request $request): RedirectResponse
@@ -135,6 +149,13 @@ class SetupController extends Controller
                 $field => Setting::getValue($definition['key'], $definition['default']),
             ])
             ->all();
+    }
+
+    private function managerUsersQuery()
+    {
+        return User::query()
+            ->where('role', 'transport_manager')
+            ->orWhereHas('roles', fn ($query) => $query->where('slug', 'transport_manager'));
     }
 
     private function settingDefinitions(): array

@@ -21,7 +21,12 @@ class DatabaseSeeder extends Seeder
             ArticleCategorySeeder::class,
             ArticleTagSeeder::class,
             LocationNodeSeeder::class,
+            MallStoreCategorySeeder::class,
         ]);
+
+        if ((bool) env('MALL_SEED_DEMO', false)) {
+            $this->call(MallDemoSeeder::class);
+        }
 
         User::factory()->create([
             'name' => 'Test User',

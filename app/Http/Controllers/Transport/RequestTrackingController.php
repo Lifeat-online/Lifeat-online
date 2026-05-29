@@ -96,7 +96,7 @@ class RequestTrackingController extends Controller
         abort_unless(
             $transportRequest->user_id === $user->id
             || ($driver && $transportRequest->accepted_transport_driver_id === $driver->id)
-            || $user->hasRole('transport_manager', 'admin', 'support'),
+            || $user->hasRole('transport_manager', 'admin', 'support', 'dev'),
             403,
         );
     }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Models\MallCart;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,6 +28,16 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
 
         $request->session()->regenerate();
+
+        $mallCartSessionKey = config('mall.guest_cart_session_key', 'mall_cart_token');
+
+        if ($request->session()->has($mallCartSessionKey)) {
+            MallCart::mergeGuestCarts(
+                (string) $request->session()->get($mallCartSessionKey),
+                (int) $request->user()->id
+            );
+            $request->session()->forget($mallCartSessionKey);
+        }
 
         return redirect()->intended(route('dashboard', absolute: false));
     }

@@ -35,6 +35,7 @@
         $navLinks = [
             ['label' => 'Home', 'icon' => 'sparkles', 'url' => route('home'), 'active' => request()->routeIs('home')],
             ['label' => 'Directory', 'icon' => 'building', 'url' => route('directory.index'), 'active' => request()->routeIs('directory.*')],
+            ['label' => 'Mall', 'icon' => 'building', 'url' => route('mall.index'), 'active' => request()->routeIs('mall.*')],
             ['label' => 'Vouchers', 'icon' => 'ticket', 'url' => route('vouchers.index'), 'active' => request()->routeIs('vouchers.*')],
             ['label' => 'Events', 'icon' => 'calendar', 'url' => route('events.index'), 'active' => request()->routeIs('events.*')],
             ['label' => 'Articles', 'icon' => 'newspaper', 'url' => route('articles.index'), 'active' => request()->routeIs('articles.*')],
@@ -66,6 +67,22 @@
                 $pushCrumb('Directory', route('directory.index'));
                 $listing = request()->route('listing');
                 $pushCrumb($listing?->localizedValue('title') ?: 'Listing', null);
+                break;
+            case 'mall.index':
+                $pushCrumb('Mall', route('mall.index'));
+                break;
+            case 'mall.stores.window':
+            case 'mall.stores.index':
+            case 'mall.stores.products.show':
+            case 'mall.cart.show':
+            case 'mall.checkout.show':
+            case 'mall.checkout.return':
+            case 'mall.checkout.cancel':
+                $pushCrumb('Mall', route('mall.index'));
+                $mallStore = request()->route('store');
+                if ($mallStore) {
+                    $pushCrumb($mallStore->name, route('mall.stores.window', $mallStore));
+                }
                 break;
             case 'vouchers.index':
                 $pushCrumb('Vouchers', route('vouchers.index'));
