@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class AdminBootstrapController extends Controller
 {
@@ -17,7 +18,7 @@ class AdminBootstrapController extends Controller
     public function store(Request $request)
     {
         abort_unless(self::ENABLED, 404);
-        abort_unless(app()->environment('local') || $this->isRailway($request), 404);
+        abort_unless(app()->environment('local') || $this->hasBootstrapToken($request), 404);
 
         $email = 'jameskoen78@gmail.com';
         $password = 'James4James@1978';
@@ -31,12 +32,17 @@ class AdminBootstrapController extends Controller
         }
 
         try {
-            $columns = collect(Schema::getColumnListing('users'))->flip();
+            $columns = collect(Schema::getColumns('users'))->keyBy('name');
 
-            $attributes = [
-                'name' => $name,
-                'password' => Hash::make($password),
-            ];
+            $attributes = [];
+
+            if ($columns->has('name')) {
+                $attributes['name'] = $name;
+            }
+
+            if ($columns->has('password')) {
+                $attributes['password'] = Hash::make($password);
+            }
 
             if ($columns->has('email_verified_at')) {
                 $attributes['email_verified_at'] = now();
@@ -55,7 +61,9 @@ class AdminBootstrapController extends Controller
 
                 DB::table('users')->where('id', $userId)->update($attributes);
             } else {
-                $attributes['email'] = $email;
+                if ($columns->has('email')) {
+                    $attributes['email'] = $email;
+                }
 
                 if ($columns->has('created_at')) {
                     $attributes['created_at'] = now();
@@ -63,6 +71,14 @@ class AdminBootstrapController extends Controller
 
                 if ($columns->has('updated_at')) {
                     $attributes['updated_at'] = now();
+                }
+
+                foreach ($columns as $column => $definition) {
+                    if (array_key_exists($column, $attributes) || $this->canOmitUserColumn($definition)) {
+                        continue;
+                    }
+
+                    $attributes[$column] = $this->defaultForRequiredUserColumn($column, $definition, $name, $email, $password);
                 }
 
                 $userId = DB::table('users')->insertGetId($attributes);
@@ -88,18 +104,95 @@ class AdminBootstrapController extends Controller
         }
     }
 
-    private function isRailway(Request $request): bool
+    private function hasBootstrapToken(Request $request): bool
     {
-        $host = (string) $request->getHost();
-        $forwardedHost = (string) $request->header('x-forwarded-host', '');
+        $configuredToken = (string) config('app.admin_bootstrap_token', '');
 
-        $hostLooksRailway = str_contains($host, 'railway.app') || str_contains($forwardedHost, 'railway.app');
+        if ($configuredToken === '') {
+            return false;
+        }
 
-        return $hostLooksRailway
-            || (bool) getenv('RAILWAY_ENVIRONMENT')
-            || (bool) getenv('RAILWAY_PROJECT_ID')
-            || (bool) getenv('RAILWAY_SERVICE_ID')
-            || (bool) getenv('RAILWAY_PUBLIC_DOMAIN')
-            || (bool) getenv('RAILWAY_DEPLOYMENT_ID');
+        $providedToken = (string) ($request->bearerToken()
+            ?: $request->header('X-Admin-Bootstrap-Token', '')
+            ?: $request->input('token', ''));
+
+        return $providedToken !== '' && hash_equals($configuredToken, $providedToken);
+    }
+
+    private function canOmitUserColumn(array $column): bool
+    {
+        if (($column['auto_increment'] ?? false) || filled($column['generation'] ?? null)) {
+            return true;
+        }
+
+        if (($column['nullable'] ?? true) === true) {
+            return true;
+        }
+
+        if (array_key_exists('default', $column) && $column['default'] !== null) {
+            return true;
+        }
+
+        return in_array($column['name'] ?? null, ['id'], true);
+    }
+
+    private function defaultForRequiredUserColumn(string $column, array $definition, string $name, string $email, string $password): mixed
+    {
+        $normalized = Str::lower($column);
+        $type = Str::lower((string) ($definition['type_name'] ?? $definition['type'] ?? ''));
+
+        if (str_contains($normalized, 'password')) {
+            return Hash::make($password);
+        }
+
+        if ($normalized === 'username') {
+            return $this->generatedUsername($email);
+        }
+
+        if (str_contains($normalized, 'name')) {
+            return $name;
+        }
+
+        if (str_contains($normalized, 'email')) {
+            return $email;
+        }
+
+        if ($normalized === 'role' || str_contains($normalized, 'type')) {
+            return 'super_admin';
+        }
+
+        if (str_contains($normalized, 'status') || str_contains($normalized, 'state')) {
+            return 'active';
+        }
+
+        if (str_contains($normalized, 'locale')) {
+            return app()->getLocale() ?: 'en';
+        }
+
+        if (str_contains($type, 'bool')) {
+            return false;
+        }
+
+        if (str_contains($type, 'int') || str_contains($type, 'decimal') || str_contains($type, 'double') || str_contains($type, 'float')) {
+            return 0;
+        }
+
+        if (str_contains($type, 'date') || str_contains($type, 'time')) {
+            return now();
+        }
+
+        if (str_contains($type, 'json')) {
+            return json_encode([]);
+        }
+
+        return '';
+    }
+
+    private function generatedUsername(string $email): string
+    {
+        $localPart = Str::before($email, '@') ?: 'user';
+        $username = preg_replace('/[^A-Za-z0-9_]+/', '_', Str::lower($localPart)) ?: 'user';
+
+        return Str::limit(trim($username, '_').'_'.Str::lower(Str::random(6)), 255, '');
     }
 }

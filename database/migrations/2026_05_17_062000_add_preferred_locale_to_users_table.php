@@ -9,14 +9,18 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('preferred_locale', 12)->nullable()->after('role')->index();
+            if (! Schema::hasColumn('users', 'preferred_locale')) {
+                $table->string('preferred_locale', 12)->nullable()->index();
+            }
         });
     }
 
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn('preferred_locale');
+            if (Schema::hasColumn('users', 'preferred_locale')) {
+                $table->dropColumn('preferred_locale');
+            }
         });
     }
 };

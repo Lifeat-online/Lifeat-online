@@ -62,4 +62,33 @@ class RegistrationTest extends TestCase
             });
         }
     }
+
+    public function test_new_users_can_register_when_live_schema_has_extra_required_columns(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->string('signup_status');
+        });
+
+        try {
+            $response = $this->post('/register', [
+                'name' => 'Strict Schema User',
+                'email' => 'strict-schema@example.com',
+                'password' => 'password',
+                'password_confirmation' => 'password',
+            ]);
+
+            $this->assertAuthenticated();
+            $response->assertRedirect(route('dashboard', absolute: false));
+            $this->assertDatabaseHas('users', [
+                'email' => 'strict-schema@example.com',
+                'signup_status' => 'active',
+            ]);
+        } finally {
+            Schema::table('users', function (Blueprint $table) {
+                if (Schema::hasColumn('users', 'signup_status')) {
+                    $table->dropColumn('signup_status');
+                }
+            });
+        }
+    }
 }
