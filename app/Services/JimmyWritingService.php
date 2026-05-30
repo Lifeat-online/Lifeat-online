@@ -10,6 +10,7 @@ use App\Models\ResearchItem;
 use App\Models\Tag;
 use App\Models\User;
 use App\Support\Ai\AiPromptCatalog;
+use App\Support\Editorial\BriefFreshness;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -88,6 +89,16 @@ class JimmyWritingService
             ];
         }
 
+        $freshness = $brief->freshness();
+
+        if (! $freshness['approvable']) {
+            return [
+                'ok' => false,
+                'skipped' => true,
+                'message' => BriefFreshness::approvalMessage($freshness),
+            ];
+        }
+
         $prompt = $this->prompts->get('jimmy_article_draft');
         $sourceContexts = $this->sourceContexts($brief);
 
@@ -115,6 +126,7 @@ class JimmyWritingService
                 ],
                 'brief' => $this->briefContext($brief),
                 'research_item' => $this->researchItemContext($brief->researchItem),
+                'freshness_policy' => BriefFreshness::policyContext($brief->researchItem?->published_at),
                 'source_contexts' => $sourceContexts,
             ],
             $brief,
@@ -350,7 +362,8 @@ class JimmyWritingService
             'suggested_tags' => $brief->suggested_tags ?: [],
             'scores' => [
                 'locality' => (float) $brief->locality_score,
-                'newsworthiness' => (float) $brief->newsworthiness_score,
+                'newsworthiness' => $brief->freshnessAdjustedNewsworthinessScore(),
+                'timeliness' => $brief->effectiveTimelinessScore(),
                 'confidence' => (float) $brief->confidence_score,
                 'duplicate_risk' => (float) $brief->duplicate_risk,
             ],

@@ -6,6 +6,8 @@ return [
     'default_locale' => env('LIFE_RESEARCH_LOCALE', 'en-ZA'),
     'default_country' => env('LIFE_RESEARCH_COUNTRY', 'ZA'),
     'default_limit' => env('LIFE_RESEARCH_LIMIT', 25),
+    'brief_max_age_days' => env('LIFE_RESEARCH_BRIEF_MAX_AGE_DAYS', 7),
+    'brief_future_tolerance_hours' => env('LIFE_RESEARCH_BRIEF_FUTURE_TOLERANCE_HOURS', 6),
 
     'location_keywords' => [
         'Bethlehem',

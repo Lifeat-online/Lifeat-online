@@ -9,6 +9,7 @@ use App\Models\Category;
 use App\Models\ResearchItem;
 use App\Models\User;
 use App\Support\Ai\AiPromptCatalog;
+use App\Support\Editorial\BriefFreshness;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -67,6 +68,18 @@ class EditorialBriefService
             return ['ok' => false, 'skipped' => true, 'message' => 'Research item already has an article brief.'];
         }
 
+        $freshness = BriefFreshness::assess($item->published_at);
+
+        if (! $freshness['approvable']) {
+            $item->update(['status' => ResearchItem::STATUS_IGNORED]);
+
+            return [
+                'ok' => false,
+                'skipped' => true,
+                'message' => BriefFreshness::approvalMessage($freshness),
+            ];
+        }
+
         $prompt = $this->prompts->get('editorial_brief');
         $categories = $this->articleCategories();
 
@@ -75,6 +88,8 @@ class EditorialBriefService
             $prompt['version'],
             $prompt['system'],
             [
+                'current_date' => now()->toDateString(),
+                'current_datetime' => now()->toDateTimeString(),
                 'instructions' => [
                     'target' => 'editorial content brief only',
                     'schema' => $prompt['schema'],
@@ -89,9 +104,12 @@ class EditorialBriefService
                         'Do not invent facts or sources.',
                         'Flag press-release-only stories as lower newsworthiness unless there is a clear local public impact.',
                         'Use duplicate_risk when similar recent Life@ articles are supplied.',
+                        'Prioritize breaking and fresh content published within the last 7 days.',
+                        'Reject or heavily penalize stories older than 7 days or missing a published_at date.',
                     ],
                 ],
                 'research_item' => $this->researchItemContext($item),
+                'freshness_policy' => BriefFreshness::policyContext($item->published_at),
                 'recent_life_articles' => $this->recentArticleContext(),
             ],
             $item,
@@ -104,6 +122,13 @@ class EditorialBriefService
         }
 
         $payload = (array) ($result['payload'] ?? []);
+        $modelTimelinessScore = $this->scoreFrom($payload, 'timeliness_score');
+        $timelinessScore = BriefFreshness::effectiveTimelinessScore($modelTimelinessScore, $freshness);
+        $newsworthinessScore = BriefFreshness::capNewsworthiness(
+            $this->scoreFrom($payload, 'newsworthiness_score'),
+            $freshness
+        );
+
         $brief = ArticleBrief::create([
             'research_item_id' => $item->id,
             'ai_generation_id' => ($result['generation'] ?? null)?->id,
@@ -113,10 +138,11 @@ class EditorialBriefService
             'source_urls' => $this->sourceUrlsFrom($payload, $item),
             'suggested_tags' => $this->tagsFrom($payload),
             'locality_score' => $this->scoreFrom($payload, 'locality_score'),
-            'newsworthiness_score' => $this->scoreFrom($payload, 'newsworthiness_score'),
+            'newsworthiness_score' => $newsworthinessScore,
+            'timeliness_score' => $timelinessScore,
             'confidence_score' => $this->scoreFrom($payload, 'confidence_score'),
             'duplicate_risk' => $this->scoreFrom($payload, 'duplicate_risk'),
-            'editorial_notes' => $this->notesFrom($payload),
+            'editorial_notes' => BriefFreshness::appendNote($this->notesFrom($payload), $freshness),
             'status' => ArticleBrief::STATUS_PENDING_REVIEW,
         ]);
 

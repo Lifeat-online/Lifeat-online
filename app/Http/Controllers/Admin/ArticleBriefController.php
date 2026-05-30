@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ArticleBrief;
 use App\Models\Category;
 use App\Services\JimmyWritingService;
+use App\Support\Editorial\BriefFreshness;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -57,6 +58,7 @@ class ArticleBriefController extends Controller
     public function update(Request $request, ArticleBrief $articleBrief): RedirectResponse
     {
         $validated = $this->validated($request);
+        $validated = $this->freshnessAdjustedScores($articleBrief, $validated);
 
         $articleBrief->update([
             ...$validated,
@@ -71,6 +73,15 @@ class ArticleBriefController extends Controller
 
     public function approve(Request $request, ArticleBrief $articleBrief, JimmyWritingService $jimmy): RedirectResponse
     {
+        $articleBrief->loadMissing('researchItem');
+        $freshness = $articleBrief->freshness();
+
+        if (! $freshness['approvable']) {
+            return redirect()
+                ->route('admin.article-briefs.index', $this->preservedFilters($request))
+                ->withErrors(['timeliness' => BriefFreshness::approvalMessage($freshness)]);
+        }
+
         $articleBrief->update([
             'status' => ArticleBrief::STATUS_APPROVED,
             'rejection_reason' => null,
@@ -153,10 +164,26 @@ class ArticleBriefController extends Controller
             'suggested_tags' => ['nullable', 'string', 'max:2000'],
             'locality_score' => ['required', 'numeric', 'min:0', 'max:100'],
             'newsworthiness_score' => ['required', 'numeric', 'min:0', 'max:100'],
+            'timeliness_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'confidence_score' => ['required', 'numeric', 'min:0', 'max:100'],
             'duplicate_risk' => ['required', 'numeric', 'min:0', 'max:100'],
             'editorial_notes' => ['nullable', 'string'],
         ]);
+    }
+
+    private function freshnessAdjustedScores(ArticleBrief $articleBrief, array $validated): array
+    {
+        $articleBrief->loadMissing('researchItem');
+        $freshness = $articleBrief->freshness();
+        $modelTimelinessScore = array_key_exists('timeliness_score', $validated)
+            ? (float) $validated['timeliness_score']
+            : (float) $articleBrief->timeliness_score;
+
+        $validated['timeliness_score'] = BriefFreshness::effectiveTimelinessScore($modelTimelinessScore, $freshness);
+        $validated['newsworthiness_score'] = BriefFreshness::capNewsworthiness((float) $validated['newsworthiness_score'], $freshness);
+        $validated['editorial_notes'] = BriefFreshness::appendNote((string) ($validated['editorial_notes'] ?? ''), $freshness);
+
+        return $validated;
     }
 
     private function linesToArray(string $value): array

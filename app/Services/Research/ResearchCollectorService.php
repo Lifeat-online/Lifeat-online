@@ -4,6 +4,7 @@ namespace App\Services\Research;
 
 use App\Models\ResearchItem;
 use App\Models\ResearchSource;
+use App\Support\Editorial\BriefFreshness;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -108,6 +109,11 @@ class ResearchCollectorService
 
             foreach ($items as $item) {
                 if (($item['title'] ?? '') === '') {
+                    $result['skipped']++;
+                    continue;
+                }
+
+                if (! BriefFreshness::assess($item['published_at'] ?? null)['approvable']) {
                     $result['skipped']++;
                     continue;
                 }

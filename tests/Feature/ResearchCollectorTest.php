@@ -6,11 +6,19 @@ use App\Models\ResearchItem;
 use App\Models\ResearchSource;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class ResearchCollectorTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->travelTo(Carbon::parse('2026-05-29 12:00:00'));
+    }
 
     public function test_research_collect_command_seeds_defaults_and_deduplicates_google_news_items(): void
     {
@@ -93,6 +101,50 @@ class ResearchCollectorTest extends TestCase
             'title' => 'Clarens festival road closures',
             'source_type' => ResearchSource::TYPE_RSS,
             'status' => ResearchItem::STATUS_NEW,
+        ]);
+    }
+
+    public function test_research_collector_skips_stale_feed_items(): void
+    {
+        ResearchSource::create([
+            'name' => 'Fresh Local Feed',
+            'slug' => 'fresh-local-feed',
+            'type' => ResearchSource::TYPE_RSS,
+            'url' => 'https://local.example.com/fresh.xml',
+            'is_active' => true,
+        ]);
+
+        Http::fake([
+            'https://local.example.com/fresh.xml' => Http::response($this->rssFeed([
+                [
+                    'title' => 'Fresh Bethlehem road closure',
+                    'link' => 'https://local.example.com/fresh-road-closure',
+                    'guid' => 'fresh-1',
+                    'description' => 'A current road closure is affecting Bethlehem traffic.',
+                    'pubDate' => 'Fri, 29 May 2026 09:00:00 +0200',
+                    'source' => 'Local Feed',
+                ],
+                [
+                    'title' => 'Bethlehem airshow incident from last year',
+                    'link' => 'https://local.example.com/old-airshow-incident',
+                    'guid' => 'old-1',
+                    'description' => 'An old airshow incident is being recirculated.',
+                    'pubDate' => 'Sat, 24 May 2025 09:00:00 +0200',
+                    'source' => 'Local Feed',
+                ],
+            ]), 200, ['Content-Type' => 'application/rss+xml']),
+        ]);
+
+        $this->artisan('life:research:collect --source=fresh-local-feed --limit=10')
+            ->expectsOutputToContain('fresh-local-feed: 1 new, 0 duplicate(s), 1 skipped, 2 parsed')
+            ->assertExitCode(0);
+
+        $this->assertDatabaseHas('research_items', [
+            'title' => 'Fresh Bethlehem road closure',
+            'status' => ResearchItem::STATUS_NEW,
+        ]);
+        $this->assertDatabaseMissing('research_items', [
+            'title' => 'Bethlehem airshow incident from last year',
         ]);
     }
 

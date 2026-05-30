@@ -62,6 +62,17 @@
                         $sourceUrls = collect($brief->source_urls ?? [])->filter()->implode("\n");
                         $suggestedTags = collect($brief->suggested_tags ?? [])->filter()->implode(', ');
                         $draftArticle = $brief->article;
+                        $freshness = $brief->freshness();
+                        $freshnessOk = (bool) ($freshness['approvable'] ?? false);
+                        $freshnessTone = $freshnessOk
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-red-50 text-red-700';
+                        $freshnessPanel = $freshnessOk
+                            ? 'bg-emerald-50 text-emerald-900'
+                            : 'bg-red-50 text-red-900';
+                        $approvalMessage = \App\Support\Editorial\BriefFreshness::approvalMessage($freshness);
+                        $effectiveNewsworthiness = $brief->freshnessAdjustedNewsworthinessScore();
+                        $effectiveTimeliness = $brief->effectiveTimelinessScore();
                     @endphp
                     <article class="rounded-lg bg-white p-6 shadow-sm">
                         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -74,6 +85,7 @@
                                     @if ($brief->researchItem?->source_name)
                                         <span>{{ $brief->researchItem->source_name }}</span>
                                     @endif
+                                    <span class="rounded-full px-2 py-1 {{ $freshnessTone }}">{{ $freshness['label'] }} - {{ $freshness['age_label'] }}</span>
                                     @if ($draftArticle)
                                         <span class="rounded-full bg-green-50 px-2 py-1 text-green-700">Article draft linked</span>
                                     @endif
@@ -84,13 +96,22 @@
                                     <a class="mt-2 inline-block text-sm text-indigo-600" href="{{ $brief->researchItem->source_url }}" target="_blank" rel="noopener">Open source</a>
                                 @endif
                             </div>
-                            <div class="grid grid-cols-2 gap-2 text-sm md:grid-cols-4 lg:min-w-96">
+                            <div class="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3 xl:grid-cols-7 lg:min-w-[44rem]">
                                 <div class="rounded-md bg-slate-50 p-3"><span class="text-gray-500">Locality</span><strong class="block">{{ number_format((float) $brief->locality_score, 0) }}</strong></div>
-                                <div class="rounded-md bg-slate-50 p-3"><span class="text-gray-500">News</span><strong class="block">{{ number_format((float) $brief->newsworthiness_score, 0) }}</strong></div>
+                                <div class="rounded-md bg-slate-50 p-3"><span class="text-gray-500">News</span><strong class="block">{{ number_format($effectiveNewsworthiness, 0) }}</strong></div>
+                                <div class="rounded-md p-3 {{ $freshnessPanel }}"><span class="opacity-75">Fresh</span><strong class="block">{{ number_format($effectiveTimeliness, 0) }}</strong></div>
+                                <div class="rounded-md p-3 {{ $freshnessPanel }}"><span class="opacity-75">Age</span><strong class="block">{{ $freshness['age_label'] }}</strong></div>
+                                <div class="rounded-md p-3 {{ $freshnessPanel }}"><span class="opacity-75">Published</span><strong class="block text-xs leading-5">{{ $freshness['published_label'] }}</strong></div>
                                 <div class="rounded-md bg-slate-50 p-3"><span class="text-gray-500">Confidence</span><strong class="block">{{ number_format((float) $brief->confidence_score, 0) }}</strong></div>
                                 <div class="rounded-md bg-slate-50 p-3"><span class="text-gray-500">Duplicate</span><strong class="block">{{ number_format((float) $brief->duplicate_risk, 0) }}</strong></div>
                             </div>
                         </div>
+
+                        @if (! $freshnessOk)
+                            <div class="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                                {{ $approvalMessage }}
+                            </div>
+                        @endif
 
                         <form method="post" action="{{ route('admin.article-briefs.update', $brief) }}" class="mt-5 grid gap-4 md:grid-cols-2">
                             @csrf
@@ -123,14 +144,32 @@
                                 <label class="mb-1 block text-sm font-medium">Source URLs</label>
                                 <textarea class="w-full rounded-md border-gray-300" name="source_urls" rows="3">{{ old('source_urls', $sourceUrls) }}</textarea>
                             </div>
-                            <div class="grid gap-3 md:col-span-2 md:grid-cols-4">
+                            <div class="grid gap-3 md:col-span-2 md:grid-cols-3">
+                                <div class="rounded-md border border-gray-200 bg-slate-50 p-3">
+                                    <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Source published</p>
+                                    <p class="mt-1 font-semibold text-gray-900">{{ $freshness['published_label'] }}</p>
+                                </div>
+                                <div class="rounded-md border border-gray-200 p-3 {{ $freshnessPanel }}">
+                                    <p class="text-xs font-medium uppercase tracking-wide opacity-75">Source age</p>
+                                    <p class="mt-1 font-semibold">{{ $freshness['age_label'] }}</p>
+                                </div>
+                                <div class="rounded-md border border-gray-200 p-3 {{ $freshnessPanel }}">
+                                    <p class="text-xs font-medium uppercase tracking-wide opacity-75">Freshness rule</p>
+                                    <p class="mt-1 font-semibold">Max {{ $freshness['max_age_days'] }} days</p>
+                                </div>
+                            </div>
+                            <div class="grid gap-3 md:col-span-2 md:grid-cols-5">
                                 <div>
                                     <label class="mb-1 block text-sm font-medium">Locality</label>
                                     <input class="w-full rounded-md border-gray-300" type="number" min="0" max="100" step="0.01" name="locality_score" value="{{ old('locality_score', $brief->locality_score) }}">
                                 </div>
                                 <div>
                                     <label class="mb-1 block text-sm font-medium">Newsworthiness</label>
-                                    <input class="w-full rounded-md border-gray-300" type="number" min="0" max="100" step="0.01" name="newsworthiness_score" value="{{ old('newsworthiness_score', $brief->newsworthiness_score) }}">
+                                    <input class="w-full rounded-md border-gray-300" type="number" min="0" max="100" step="0.01" name="newsworthiness_score" value="{{ old('newsworthiness_score', $effectiveNewsworthiness) }}">
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-sm font-medium">Freshness</label>
+                                    <input class="w-full rounded-md border-gray-300" type="number" min="0" max="100" step="0.01" name="timeliness_score" value="{{ old('timeliness_score', $effectiveTimeliness) }}">
                                 </div>
                                 <div>
                                     <label class="mb-1 block text-sm font-medium">Confidence</label>
@@ -166,7 +205,7 @@
                                 @csrf
                                 <input type="hidden" name="status" value="{{ $filters['status'] ?? '' }}">
                                 <input type="hidden" name="q" value="{{ $filters['q'] ?? '' }}">
-                                <button class="rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white" type="submit">Approve for Jimmy</button>
+                                <button class="rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300" type="submit" title="{{ $freshnessOk ? 'Approve for Jimmy' : $approvalMessage }}" @disabled(! $freshnessOk)>Approve for Jimmy</button>
                             </form>
                             <form method="post" action="{{ route('admin.article-briefs.reject', $brief) }}" class="flex flex-wrap gap-2">
                                 @csrf

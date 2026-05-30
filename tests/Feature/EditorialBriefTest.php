@@ -89,6 +89,43 @@ class EditorialBriefTest extends TestCase
         $brief = ArticleBrief::firstOrFail();
         $this->assertSame(['Bethlehem', 'Water', 'Dihlabeng'], $brief->suggested_tags);
         $this->assertSame(['https://example.com/bethlehem-water-repairs'], $brief->source_urls);
+        $this->assertGreaterThan(0, (float) $brief->timeliness_score);
+    }
+
+    public function test_editorial_brief_skips_stale_research_items_without_calling_ai(): void
+    {
+        $this->configureOpenRouter();
+
+        $source = ResearchSource::create([
+            'name' => 'Google News: Bethlehem',
+            'slug' => 'google-news-bethlehem',
+            'type' => ResearchSource::TYPE_GOOGLE_NEWS_RSS,
+            'query' => 'Bethlehem Free State',
+            'is_active' => true,
+        ]);
+        $item = ResearchItem::create([
+            'research_source_id' => $source->id,
+            'source_name' => 'SABC News',
+            'source_type' => ResearchSource::TYPE_GOOGLE_NEWS_RSS,
+            'source_url' => 'https://example.com/bethlehem-airshow-old',
+            'title' => 'Vehicles catch fire at Bethlehem Airshow',
+            'summary' => 'An old airshow incident is being recirculated.',
+            'published_at' => now()->subYear(),
+            'fetched_at' => now(),
+            'detected_locations' => ['Bethlehem', 'Free State'],
+            'fingerprint' => hash('sha256', 'https://example.com/bethlehem-airshow-old'),
+            'status' => ResearchItem::STATUS_NEW,
+        ]);
+
+        Http::fake();
+
+        $this->artisan('life:editorial:brief --limit=5')
+            ->expectsOutputToContain('Editorial briefs complete: 0 created, 0 failed, 1 skipped.')
+            ->assertExitCode(0);
+
+        $this->assertSame(0, ArticleBrief::count());
+        $this->assertSame(ResearchItem::STATUS_IGNORED, $item->fresh()->status);
+        Http::assertNothingSent();
     }
 
     public function test_editorial_brief_falls_back_to_nvidia_text_model_after_timeout(): void
@@ -208,6 +245,7 @@ class EditorialBriefTest extends TestCase
             ->assertOk()
             ->assertSee('Brief Review Queue')
             ->assertSee('Approve for Jimmy')
+            ->assertSee('Source age')
             ->assertSee($brief->title);
 
         $this->actingAs($admin)
@@ -251,7 +289,28 @@ class EditorialBriefTest extends TestCase
         $this->assertSame('Not local enough.', $rejectedBrief->rejection_reason);
     }
 
-    private function brief(array $overrides = []): ArticleBrief
+    public function test_admin_cannot_approve_stale_article_brief(): void
+    {
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        $brief = $this->brief([
+            'title' => 'Old airshow report',
+            'newsworthiness_score' => 60,
+            'timeliness_score' => 60,
+        ], [
+            'published_at' => now()->subYear(),
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('admin.article-briefs.approve', $brief))
+            ->assertRedirect(route('admin.article-briefs.index'))
+            ->assertSessionHasErrors('timeliness');
+
+        $brief->refresh();
+        $this->assertSame(ArticleBrief::STATUS_PENDING_REVIEW, $brief->status);
+        $this->assertNull($brief->reviewed_at);
+    }
+
+    private function brief(array $overrides = [], array $itemOverrides = []): ArticleBrief
     {
         $item = ResearchItem::create([
             'source_name' => 'Example News',
@@ -259,9 +318,11 @@ class EditorialBriefTest extends TestCase
             'source_url' => 'https://example.com/'.uniqid('story-', true),
             'title' => 'Community story signal',
             'summary' => 'A local research item.',
+            'published_at' => now(),
             'fetched_at' => now(),
             'fingerprint' => hash('sha256', uniqid('research-', true)),
             'status' => ResearchItem::STATUS_BRIEFED,
+            ...$itemOverrides,
         ]);
 
         return ArticleBrief::create([
@@ -272,6 +333,7 @@ class EditorialBriefTest extends TestCase
             'suggested_tags' => ['Community'],
             'locality_score' => 80,
             'newsworthiness_score' => 70,
+            'timeliness_score' => 80,
             'confidence_score' => 75,
             'duplicate_risk' => 10,
             'editorial_notes' => 'Review before Jimmy writes.',

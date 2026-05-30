@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Editorial\BriefFreshness;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -23,6 +24,7 @@ class ArticleBrief extends Model
         'suggested_tags',
         'locality_score',
         'newsworthiness_score',
+        'timeliness_score',
         'confidence_score',
         'duplicate_risk',
         'editorial_notes',
@@ -39,6 +41,7 @@ class ArticleBrief extends Model
             'suggested_tags' => 'array',
             'locality_score' => 'decimal:2',
             'newsworthiness_score' => 'decimal:2',
+            'timeliness_score' => 'decimal:2',
             'confidence_score' => 'decimal:2',
             'duplicate_risk' => 'decimal:2',
             'reviewed_at' => 'datetime',
@@ -68,5 +71,25 @@ class ArticleBrief extends Model
     public function article(): HasOne
     {
         return $this->hasOne(Article::class);
+    }
+
+    public function freshness(): array
+    {
+        return BriefFreshness::assess($this->researchItem?->published_at);
+    }
+
+    public function effectiveTimelinessScore(): float
+    {
+        return BriefFreshness::effectiveTimelinessScore((float) $this->timeliness_score, $this->freshness());
+    }
+
+    public function freshnessAdjustedNewsworthinessScore(): float
+    {
+        return BriefFreshness::capNewsworthiness((float) $this->newsworthiness_score, $this->freshness());
+    }
+
+    public function isFreshEnoughForApproval(): bool
+    {
+        return (bool) ($this->freshness()['approvable'] ?? false);
     }
 }
