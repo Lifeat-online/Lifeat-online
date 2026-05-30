@@ -5,22 +5,35 @@
 
     <div class="py-10">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+            @php
+                $activeForm = old('_form', request('form'));
+            @endphp
+
             @if (session('status'))
                 <div class="rounded-md bg-green-50 px-4 py-3 text-sm text-green-800">{{ session('status') }}</div>
             @endif
 
             <div class="grid gap-4 md:grid-cols-4">
-                <div class="rounded-lg bg-white p-5 shadow-sm"><p class="text-sm text-gray-500">Drivers</p><p class="mt-2 text-3xl font-bold">{{ $counts['drivers'] }}</p></div>
+                <a href="{{ route('transport.manager.drivers.index') }}" class="block rounded-lg bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2">
+                    <p class="text-sm text-gray-500">Drivers</p>
+                    <p class="mt-2 text-3xl font-bold">{{ $counts['drivers'] }}</p>
+                    <p class="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Manage drivers</p>
+                </a>
                 <div class="rounded-lg bg-white p-5 shadow-sm"><p class="text-sm text-gray-500">Approved drivers</p><p class="mt-2 text-3xl font-bold">{{ $counts['approvedDrivers'] }}</p></div>
-                <div class="rounded-lg bg-white p-5 shadow-sm"><p class="text-sm text-gray-500">Vehicles</p><p class="mt-2 text-3xl font-bold">{{ $counts['vehicles'] }}</p></div>
+                <a href="{{ route('transport.manager.vehicles.index') }}" class="block rounded-lg bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2">
+                    <p class="text-sm text-gray-500">Vehicles</p>
+                    <p class="mt-2 text-3xl font-bold">{{ $counts['vehicles'] }}</p>
+                    <p class="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Manage vehicles</p>
+                </a>
                 <div class="rounded-lg bg-white p-5 shadow-sm"><p class="text-sm text-gray-500">On duty</p><p class="mt-2 text-3xl font-bold">{{ $counts['activeDuty'] }}</p></div>
             </div>
 
             <div class="grid gap-6 lg:grid-cols-2">
-                <section class="rounded-lg bg-white p-6 shadow-sm">
-                    <h3 class="text-lg font-semibold text-gray-900">Add driver</h3>
+                <details id="add-driver" class="rounded-lg bg-white p-6 shadow-sm" {{ $activeForm === 'driver' ? 'open' : '' }}>
+                    <summary class="cursor-pointer text-lg font-semibold text-gray-900">Add driver</summary>
                     <form method="post" action="{{ route('transport.manager.drivers.store') }}" class="mt-5 space-y-4">
                         @csrf
+                        <input type="hidden" name="_form" value="driver">
                         <div class="grid gap-4 md:grid-cols-2">
                             <label class="block text-sm font-medium text-gray-700">Name
                                 <input name="name" value="{{ old('name') }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
@@ -62,12 +75,13 @@
                         </label>
                         <button class="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Save driver</button>
                     </form>
-                </section>
+                </details>
 
-                <section class="rounded-lg bg-white p-6 shadow-sm">
-                    <h3 class="text-lg font-semibold text-gray-900">Add vehicle</h3>
+                <details id="add-vehicle" class="rounded-lg bg-white p-6 shadow-sm" {{ $activeForm === 'vehicle' ? 'open' : '' }}>
+                    <summary class="cursor-pointer text-lg font-semibold text-gray-900">Add vehicle</summary>
                     <form method="post" action="{{ route('transport.manager.vehicles.store') }}" class="mt-5 space-y-4">
                         @csrf
+                        <input type="hidden" name="_form" value="vehicle">
                         <div class="grid gap-4 md:grid-cols-2">
                             <label class="block text-sm font-medium text-gray-700">Driver
                                 <select name="transport_driver_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
@@ -130,14 +144,17 @@
                         </div>
                         <button class="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Save vehicle</button>
                     </form>
-                </section>
+                </details>
             </div>
 
             <section class="rounded-lg bg-white p-6 shadow-sm">
-                <h3 class="text-lg font-semibold text-gray-900">Recent drivers</h3>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h3 class="text-lg font-semibold text-gray-900">Recent drivers</h3>
+                    <a href="{{ route('transport.manager.drivers.index') }}" class="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">View all drivers</a>
+                </div>
                 <div class="mt-4 overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead><tr class="text-left text-gray-500"><th class="py-2">Driver</th><th>Status</th><th>Vehicles</th><th>Duty</th></tr></thead>
+                        <thead><tr class="text-left text-gray-500"><th class="py-2">Driver</th><th>Status</th><th>Vehicles</th><th>Duty</th><th class="text-right">Actions</th></tr></thead>
                         <tbody class="divide-y divide-gray-100">
                             @foreach ($drivers as $driver)
                                 <tr>
@@ -145,6 +162,9 @@
                                     <td class="py-3">{{ ucfirst($driver->status) }}</td>
                                     <td class="py-3">{{ $driver->vehicles->count() }}</td>
                                     <td class="py-3">{{ $driver->activeDutySession ? ucfirst($driver->activeDutySession->status) : 'Off duty' }}</td>
+                                    <td class="py-3 text-right">
+                                        <a href="{{ route('transport.manager.drivers.edit', $driver) }}" class="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Edit</a>
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>

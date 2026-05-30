@@ -243,6 +243,181 @@ class TransportModuleTest extends TestCase
         ]);
     }
 
+    public function test_transport_manager_can_open_driver_list_and_update_a_driver(): void
+    {
+        $manager = User::factory()->create(['role' => 'transport_manager']);
+        $driverUser = User::factory()->create([
+            'name' => 'Original Driver',
+            'email' => 'original.driver@example.com',
+            'role' => 'transport_driver',
+        ]);
+        $driver = TransportDriver::create([
+            'user_id' => $driverUser->id,
+            'manager_user_id' => $manager->id,
+            'status' => TransportDriver::STATUS_PENDING,
+            'phone' => '0810000000',
+            'can_transport_people' => false,
+            'can_transport_parcels' => true,
+        ]);
+
+        $this->actingAs($manager)
+            ->get(route('transport.manager.dashboard'))
+            ->assertOk()
+            ->assertSee(route('transport.manager.drivers.index'), false)
+            ->assertSee('Manage drivers')
+            ->assertSee('<details id="add-driver"', false)
+            ->assertDontSee('<details id="add-driver" class="rounded-lg bg-white p-6 shadow-sm" open', false);
+
+        $this->actingAs($manager)
+            ->get(route('transport.manager.dashboard', ['form' => 'driver']))
+            ->assertOk()
+            ->assertSee('<details id="add-driver" class="rounded-lg bg-white p-6 shadow-sm" open', false);
+
+        $this->actingAs($manager)
+            ->get(route('transport.manager.drivers.index'))
+            ->assertOk()
+            ->assertSee('Transport Drivers')
+            ->assertSee('Original Driver')
+            ->assertSee(route('transport.manager.drivers.edit', $driver), false);
+
+        $this->actingAs($manager)
+            ->get(route('transport.manager.drivers.edit', $driver))
+            ->assertOk()
+            ->assertSee('Edit Driver')
+            ->assertSee('original.driver@example.com')
+            ->assertSee(route('transport.manager.drivers.update', $driver), false);
+
+        $this->actingAs($manager)
+            ->put(route('transport.manager.drivers.update', $driver), [
+                'name' => 'Updated Driver',
+                'email' => 'updated.driver@example.com',
+                'phone' => '0820000000',
+                'id_number' => '8001015009087',
+                'license_number' => 'LIC-123',
+                'emergency_contact_name' => 'Emergency Person',
+                'emergency_contact_phone' => '0830000000',
+                'status' => 'approved',
+                'can_transport_people' => '1',
+                'notes' => 'Ready for airport trips.',
+            ])
+            ->assertRedirect(route('transport.manager.drivers.index'));
+
+        $driver->refresh();
+        $driverUser->refresh();
+
+        $this->assertSame('Updated Driver', $driverUser->name);
+        $this->assertSame('updated.driver@example.com', $driverUser->email);
+        $this->assertSame('0820000000', $driverUser->phone);
+        $this->assertTrue($driver->isApproved());
+        $this->assertTrue($driver->can_transport_people);
+        $this->assertFalse($driver->can_transport_parcels);
+        $this->assertNotNull($driver->approved_at);
+        $this->assertSame($manager->id, $driver->approved_by_user_id);
+        $this->assertSame('Ready for airport trips.', $driver->notes);
+    }
+
+    public function test_transport_manager_can_open_vehicle_list_and_update_a_vehicle(): void
+    {
+        $manager = User::factory()->create(['role' => 'transport_manager']);
+        $driverUser = User::factory()->create([
+            'name' => 'Vehicle Driver',
+            'email' => 'vehicle.driver@example.com',
+            'role' => 'transport_driver',
+        ]);
+        $driver = TransportDriver::create([
+            'user_id' => $driverUser->id,
+            'manager_user_id' => $manager->id,
+            'status' => TransportDriver::STATUS_APPROVED,
+            'can_transport_parcels' => true,
+            'approved_at' => now(),
+        ]);
+        $vehicle = TransportVehicle::create([
+            'transport_driver_id' => $driver->id,
+            'manager_user_id' => $manager->id,
+            'name' => 'Old Scooter',
+            'vehicle_type' => 'scooter',
+            'registration_number' => 'OLD-123',
+            'status' => TransportVehicle::STATUS_PENDING,
+            'can_carry_parcels' => true,
+            'pricing_mode' => 'per_km',
+            'base_fee' => 10,
+            'per_km_fee' => 5,
+            'minimum_fee' => 25,
+            'accepts_cash' => true,
+        ]);
+
+        $this->actingAs($manager)
+            ->get(route('transport.manager.dashboard'))
+            ->assertOk()
+            ->assertSee(route('transport.manager.vehicles.index'), false)
+            ->assertSee('Manage vehicles')
+            ->assertSee('<details id="add-vehicle"', false)
+            ->assertDontSee('<details id="add-vehicle" class="rounded-lg bg-white p-6 shadow-sm" open', false);
+
+        $this->actingAs($manager)
+            ->get(route('transport.manager.dashboard', ['form' => 'vehicle']))
+            ->assertOk()
+            ->assertSee('<details id="add-vehicle" class="rounded-lg bg-white p-6 shadow-sm" open', false);
+
+        $this->actingAs($manager)
+            ->get(route('transport.manager.vehicles.index'))
+            ->assertOk()
+            ->assertSee('Transport Vehicles')
+            ->assertSee('Old Scooter')
+            ->assertSee(route('transport.manager.vehicles.edit', $vehicle), false);
+
+        $this->actingAs($manager)
+            ->get(route('transport.manager.vehicles.edit', $vehicle))
+            ->assertOk()
+            ->assertSee('Edit Vehicle')
+            ->assertSee('Old Scooter')
+            ->assertSee(route('transport.manager.vehicles.update', $vehicle), false);
+
+        $this->actingAs($manager)
+            ->put(route('transport.manager.vehicles.update', $vehicle), [
+                'transport_driver_id' => $driver->id,
+                'name' => 'Updated Bakkie',
+                'vehicle_type' => 'bakkie',
+                'registration_number' => 'NEW-456',
+                'status' => 'approved',
+                'can_carry_people' => '1',
+                'can_carry_parcels' => '1',
+                'max_passengers' => '3',
+                'max_weight_kg' => '350.50',
+                'pricing_mode' => 'per_km_plus_people',
+                'base_fee' => '20',
+                'per_km_fee' => '8',
+                'per_person_fee' => '4',
+                'minimum_fee' => '50',
+                'waiting_fee' => '2',
+                'cancellation_fee' => '15',
+                'accepts_payfast' => '1',
+                'notes' => 'Can handle larger parcel trips.',
+            ])
+            ->assertRedirect(route('transport.manager.vehicles.index'));
+
+        $vehicle->refresh();
+
+        $this->assertSame('Updated Bakkie', $vehicle->name);
+        $this->assertSame('bakkie', $vehicle->vehicle_type);
+        $this->assertSame('NEW-456', $vehicle->registration_number);
+        $this->assertTrue($vehicle->isApproved());
+        $this->assertTrue($vehicle->can_carry_people);
+        $this->assertTrue($vehicle->can_carry_parcels);
+        $this->assertFalse($vehicle->accepts_cash);
+        $this->assertTrue($vehicle->accepts_payfast);
+        $this->assertSame('per_km_plus_people', $vehicle->pricing_mode);
+        $this->assertSame('20.00', $vehicle->base_fee);
+        $this->assertSame('8.00', $vehicle->per_km_fee);
+        $this->assertSame('4.00', $vehicle->per_person_fee);
+        $this->assertSame('50.00', $vehicle->minimum_fee);
+        $this->assertSame('2.00', $vehicle->waiting_fee);
+        $this->assertSame('15.00', $vehicle->cancellation_fee);
+        $this->assertNotNull($vehicle->approved_at);
+        $this->assertSame($manager->id, $vehicle->approved_by_user_id);
+        $this->assertSame('Can handle larger parcel trips.', $vehicle->notes);
+    }
+
     public function test_driver_workspace_is_hidden_until_driver_clocks_in(): void
     {
         $user = User::factory()->create(['role' => 'transport_driver']);

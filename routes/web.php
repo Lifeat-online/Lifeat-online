@@ -240,8 +240,14 @@ Route::middleware(['auth'])->prefix('transport')->name('transport.')->group(func
 
     Route::middleware('role:transport_manager,admin,dev')->prefix('manager')->name('manager.')->group(function () {
         Route::get('/', TransportManagerDashboardController::class)->name('dashboard');
+        Route::get('/drivers', [TransportManagerDriverController::class, 'index'])->name('drivers.index');
         Route::post('/drivers', [TransportManagerDriverController::class, 'store'])->name('drivers.store');
+        Route::get('/drivers/{driver}/edit', [TransportManagerDriverController::class, 'edit'])->name('drivers.edit');
+        Route::put('/drivers/{driver}', [TransportManagerDriverController::class, 'update'])->name('drivers.update');
+        Route::get('/vehicles', [TransportManagerVehicleController::class, 'index'])->name('vehicles.index');
         Route::post('/vehicles', [TransportManagerVehicleController::class, 'store'])->name('vehicles.store');
+        Route::get('/vehicles/{vehicle}/edit', [TransportManagerVehicleController::class, 'edit'])->name('vehicles.edit');
+        Route::put('/vehicles/{vehicle}', [TransportManagerVehicleController::class, 'update'])->name('vehicles.update');
     });
 
     Route::middleware('role:transport_driver,admin')->prefix('driver')->name('driver.')->group(function () {
