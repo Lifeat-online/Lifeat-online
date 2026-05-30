@@ -31,10 +31,10 @@ class RegistrationTest extends TestCase
         $response->assertRedirect(route('dashboard', absolute: false));
     }
 
-    public function test_new_users_can_register_when_legacy_users_table_has_no_role_column(): void
+    public function test_new_users_can_register_when_legacy_users_table_is_missing_role_and_timestamps(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn('role');
+            $table->dropColumn(['role', 'created_at', 'updated_at']);
         });
 
         try {
@@ -51,11 +51,15 @@ class RegistrationTest extends TestCase
                 'email' => 'legacy@example.com',
             ]);
         } finally {
-            if (! Schema::hasColumn('users', 'role')) {
-                Schema::table('users', function (Blueprint $table) {
+            Schema::table('users', function (Blueprint $table) {
+                if (! Schema::hasColumn('users', 'role')) {
                     $table->string('role')->default('member')->after('password');
-                });
-            }
+                }
+
+                if (! Schema::hasColumn('users', 'created_at')) {
+                    $table->timestamps();
+                }
+            });
         }
     }
 }

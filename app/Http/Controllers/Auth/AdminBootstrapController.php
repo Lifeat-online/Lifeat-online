@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 
@@ -30,17 +31,44 @@ class AdminBootstrapController extends Controller
         }
 
         try {
+            $columns = collect(Schema::getColumnListing('users'))->flip();
+
             $attributes = [
                 'name' => $name,
                 'password' => Hash::make($password),
-                'email_verified_at' => now(),
             ];
 
-            if (Schema::hasColumn('users', 'role')) {
+            if ($columns->has('email_verified_at')) {
+                $attributes['email_verified_at'] = now();
+            }
+
+            if ($columns->has('role')) {
                 $attributes['role'] = 'super_admin';
             }
 
-            $user = User::query()->updateOrCreate(['email' => $email], $attributes);
+            $userId = DB::table('users')->where('email', $email)->value('id');
+
+            if ($userId) {
+                if ($columns->has('updated_at')) {
+                    $attributes['updated_at'] = now();
+                }
+
+                DB::table('users')->where('id', $userId)->update($attributes);
+            } else {
+                $attributes['email'] = $email;
+
+                if ($columns->has('created_at')) {
+                    $attributes['created_at'] = now();
+                }
+
+                if ($columns->has('updated_at')) {
+                    $attributes['updated_at'] = now();
+                }
+
+                $userId = DB::table('users')->insertGetId($attributes);
+            }
+
+            $user = User::query()->findOrFail($userId);
 
             Auth::logout();
             Auth::login($user, true);
