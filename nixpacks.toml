@@ -3,7 +3,7 @@ IS_LARAVEL = "true"
 NIXPACKS_PHP_ROOT_DIR = "/app/public"
 
 [phases.setup]
-nixPkgs = ["...", "python311Packages.supervisor"]
+nixPkgs = ["...", "curl", "python311Packages.supervisor"]
 
 [phases.build]
 cmds = [

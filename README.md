@@ -16,7 +16,7 @@ A Laravel platform for local job creation and community monetisation. The app co
 - **Backend**: Laravel 13.x on PHP 8.4+
 - **Frontend**: Blade, Tailwind CSS, Alpine.js, Vite
 - **Database**: SQLite for local development, MySQL/PostgreSQL compatible for production
-- **Deployment**: Railway-managed deployment pipeline
+- **Deployment**: Hetzner/Coolify Nixpacks deployment pipeline
 - **Payments**: PayFast integration foundations
 
 ## Local Installation
@@ -52,12 +52,13 @@ For local PHPUnit runs, ensure the PHP CLI has these extensions enabled: `mbstri
 
 ## Production Notes
 
-- Railway is responsible for deployment and release orchestration.
+- Hetzner/Coolify is responsible for deployment and release orchestration.
 - The in-app git update utility has been removed; do not reintroduce app-level `git pull` deployment controls.
 - Run `php artisan production:check` during deploy validation and resolve any errors before public launch.
-- On Railway, run separate worker and scheduler processes for `php artisan queue:work --sleep=3 --tries=3 --timeout=120` and `php artisan schedule:work`, then set `QUEUE_WORKER_ENABLED=true` and `SCHEDULER_ENABLED=true`.
-- Transport realtime uses Laravel Reverb. Run it online as a separate Railway service/process with `php artisan reverb:start --host=0.0.0.0 --port=$PORT`, set `BROADCAST_CONNECTION=reverb`, and point `REVERB_HOST` / `VITE_REVERB_HOST` at that service's public HTTPS domain.
-- For Railway uploads, prefer a durable volume mounted over `storage/app` and set `UPLOAD_STORAGE_BACKEND=railway_volume` plus `UPLOAD_STORAGE_MOUNT_PATH`.
+- Configure the Coolify health check path as `/up` with expected status `200`; the Nixpacks image includes `curl` so Coolify can run the probe inside the container.
+- Run separate worker and scheduler processes for `php artisan queue:work --sleep=3 --tries=3 --timeout=120` and `php artisan schedule:work`, or enable them in the web container with `QUEUE_WORKER_ENABLED=true` and `SCHEDULER_ENABLED=true`.
+- Transport realtime uses Laravel Reverb. Run it online as a separate service/process with `php artisan reverb:start --host=0.0.0.0 --port=$PORT`, set `BROADCAST_CONNECTION=reverb`, and point `REVERB_HOST` / `VITE_REVERB_HOST` at that service's public HTTPS domain.
+- For uploads, prefer durable mounted storage or S3-compatible object storage; set the matching filesystem and public storage environment variables before launch.
 - Enable managed database backups and record a successful restore drill with `BACKUPS_ENABLED=true`, `BACKUP_PROVIDER`, `BACKUP_RESTORE_DRILL_COMPLETED=true`, and `BACKUP_LAST_RESTORE_DRILL_DATE`.
 - Use the production readiness tracker in `Planning/production-readiness-todo.md` for launch blockers, verification, and operational hardening.
 
