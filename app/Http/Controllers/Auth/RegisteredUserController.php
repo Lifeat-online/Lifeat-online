@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Database\QueryException;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -33,82 +32,64 @@ class RegisteredUserController extends Controller
      *
      * @throws ValidationException
      */
-    public function store(Request $request): RedirectResponse|JsonResponse
+    public function store(Request $request): RedirectResponse
     {
-        $stage = 'validate';
+        $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
+            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+        ]);
 
-        try {
-            $request->validate([
-                'name' => ['required', 'string', 'max:255'],
-                'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-                'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            ]);
+        $columns = $this->userColumns();
 
-            $stage = 'columns';
-            $columns = $this->userColumns();
+        $requestedAttributes = [
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+        ];
 
-            $stage = 'attributes';
-            $requestedAttributes = [
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-            ];
-
-            $attributes = [];
-            foreach ($requestedAttributes as $column => $value) {
-                if ($columns->has($column)) {
-                    $attributes[$column] = $value;
-                }
+        $attributes = [];
+        foreach ($requestedAttributes as $column => $value) {
+            if ($columns->has($column)) {
+                $attributes[$column] = $value;
             }
-
-            if ($columns->has('role')) {
-                $roleColumn = $columns->get('role');
-
-                if (User::count() === 0) {
-                    $attributes['role'] = $this->stringValueForColumn($roleColumn, ['admin', 'super_admin', 'member', 'registered_user']);
-                } elseif (! $this->canOmitUserColumn($roleColumn)) {
-                    $attributes['role'] = $this->stringValueForColumn($roleColumn, ['member', 'registered_user', 'user']);
-                }
-            }
-
-            if ($columns->has('created_at')) {
-                $attributes['created_at'] = now();
-            }
-
-            if ($columns->has('updated_at')) {
-                $attributes['updated_at'] = now();
-            }
-
-            foreach ($columns as $name => $column) {
-                if (array_key_exists($name, $attributes) || $this->canOmitUserColumn($column)) {
-                    continue;
-                }
-
-                $attributes[$name] = $this->defaultForRequiredUserColumn($name, $column, $request);
-            }
-
-            $stage = 'insert';
-            $this->insertUser($attributes, $request);
-
-            $stage = 'reload';
-            $user = User::query()->where('email', $request->email)->firstOrFail();
-
-            $stage = 'registered-event';
-            event(new Registered($user));
-
-            $stage = 'login';
-            Auth::login($user);
-
-            return redirect(route('dashboard', absolute: false));
-        } catch (\Throwable $e) {
-            report($e);
-
-            if ($request->input('_codex_probe') === 'registration-20260530') {
-                return response()->json($this->diagnosticPayload($stage, $e), 500);
-            }
-
-            throw $e;
         }
+
+        if ($columns->has('role')) {
+            $roleColumn = $columns->get('role');
+
+            if (User::count() === 0) {
+                $attributes['role'] = $this->stringValueForColumn($roleColumn, ['admin', 'super_admin', 'member', 'registered_user']);
+            } elseif (! $this->canOmitUserColumn($roleColumn)) {
+                $attributes['role'] = $this->stringValueForColumn($roleColumn, ['member', 'registered_user', 'user']);
+            }
+        }
+
+        if ($columns->has('created_at')) {
+            $attributes['created_at'] = now();
+        }
+
+        if ($columns->has('updated_at')) {
+            $attributes['updated_at'] = now();
+        }
+
+        foreach ($columns as $name => $column) {
+            if (array_key_exists($name, $attributes) || $this->canOmitUserColumn($column)) {
+                continue;
+            }
+
+            $attributes[$name] = $this->defaultForRequiredUserColumn($name, $column, $request);
+        }
+
+        $this->insertUser($attributes, $request);
+
+        $user = User::query()->where('email', $request->email)->firstOrFail();
+
+        event(new Registered($user));
+
+        Auth::login($user);
+
+        return redirect(route('dashboard', absolute: false));
     }
 
     private function canOmitUserColumn(array $column): bool
@@ -305,24 +286,4 @@ class RegisteredUserController extends Controller
         return Str::lower($default) === 'null' ? null : $default;
     }
 
-    private function diagnosticPayload(string $stage, \Throwable $e): array
-    {
-        $payload = [
-            'message' => 'Registration diagnostic',
-            'stage' => $stage,
-            'exception' => class_basename($e),
-            'code' => (string) $e->getCode(),
-        ];
-
-        if ($e instanceof QueryException) {
-            $payload['sql_state'] = (string) ($e->errorInfo[0] ?? '');
-            $payload['driver_code'] = (string) ($e->errorInfo[1] ?? '');
-        }
-
-        if (preg_match("/(?:Field|column) ['\"]?([^'\"\s]+)['\"]?/", $e->getMessage(), $matches)) {
-            $payload['column_hint'] = $matches[1];
-        }
-
-        return $payload;
-    }
 }
