@@ -81,7 +81,8 @@ class AdminBootstrapController extends Controller
                     $attributes[$column] = $this->defaultForRequiredUserColumn($column, $definition, $name, $email, $password);
                 }
 
-                $userId = DB::table('users')->insertGetId($attributes);
+                DB::table('users')->insert($attributes);
+                $userId = DB::table('users')->where('email', $email)->value('id');
             }
 
             $user = User::query()->findOrFail($userId);

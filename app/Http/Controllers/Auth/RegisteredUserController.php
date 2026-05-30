@@ -80,8 +80,8 @@ class RegisteredUserController extends Controller
             $attributes[$name] = $this->defaultForRequiredUserColumn($name, $column, $request);
         }
 
-        $userId = DB::table('users')->insertGetId($attributes);
-        $user = User::query()->findOrFail($userId);
+        DB::table('users')->insert($attributes);
+        $user = User::query()->where('email', $request->email)->firstOrFail();
 
         event(new Registered($user));
 
