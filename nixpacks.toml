@@ -39,7 +39,7 @@ chmod -R 775 /app/storage /app/bootstrap/cache || true
 php /app/artisan storage:link --force || true
 php /app/artisan optimize:clear || true
 
-if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
+if [ "${RUN_MIGRATIONS:-true}" != "false" ]; then
     php /app/artisan migrate --force
 fi
 
