@@ -55,7 +55,13 @@ class RegisteredUserController extends Controller
         }
 
         if ($columns->has('role')) {
-            $attributes['role'] = User::count() === 0 ? 'admin' : 'member';
+            $roleColumn = $columns->get('role');
+
+            if (User::count() === 0) {
+                $attributes['role'] = $this->stringValueForColumn($roleColumn, ['admin', 'super_admin', 'member', 'registered_user']);
+            } elseif (! $this->canOmitUserColumn($roleColumn)) {
+                $attributes['role'] = $this->stringValueForColumn($roleColumn, ['member', 'registered_user', 'user']);
+            }
         }
 
         if ($columns->has('created_at')) {
@@ -123,11 +129,15 @@ class RegisteredUserController extends Controller
         }
 
         if ($normalized === 'role' || str_contains($normalized, 'type')) {
-            return User::count() === 0 ? 'admin' : 'member';
+            $fallbacks = User::count() === 0
+                ? ['admin', 'super_admin', 'member', 'registered_user', 'user']
+                : ['member', 'registered_user', 'user'];
+
+            return $this->stringValueForColumn($column, $fallbacks);
         }
 
         if (str_contains($normalized, 'status') || str_contains($normalized, 'state')) {
-            return 'active';
+            return $this->stringValueForColumn($column, ['active', 'enabled', 'pending', 'member']);
         }
 
         if (str_contains($normalized, 'locale')) {
@@ -159,5 +169,47 @@ class RegisteredUserController extends Controller
         $username = preg_replace('/[^A-Za-z0-9_]+/', '_', Str::lower($localPart)) ?: 'user';
 
         return Str::limit(trim($username, '_').'_'.Str::lower(Str::random(6)), 255, '');
+    }
+
+    private function stringValueForColumn(array $column, array $preferred): string
+    {
+        $default = $this->columnDefault($column);
+
+        if ($default !== null && $default !== '') {
+            return $default;
+        }
+
+        $type = (string) ($column['type'] ?? '');
+
+        if (str_contains(Str::lower($type), 'enum') && preg_match_all("/'([^']+)'/", $type, $matches)) {
+            $values = $matches[1];
+
+            foreach ($preferred as $value) {
+                if (in_array($value, $values, true)) {
+                    return $value;
+                }
+            }
+
+            return $values[0];
+        }
+
+        return $preferred[0] ?? '';
+    }
+
+    private function columnDefault(array $column): ?string
+    {
+        $default = $column['default'] ?? null;
+
+        if ($default === null) {
+            return null;
+        }
+
+        if (! is_string($default)) {
+            return (string) $default;
+        }
+
+        $default = trim($default, "'\"");
+
+        return Str::lower($default) === 'null' ? null : $default;
     }
 }

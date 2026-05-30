@@ -49,7 +49,7 @@ class AdminBootstrapController extends Controller
             }
 
             if ($columns->has('role')) {
-                $attributes['role'] = 'super_admin';
+                $attributes['role'] = $this->stringValueForColumn($columns->get('role'), ['super_admin', 'admin', 'developer', 'dev'], false);
             }
 
             $userId = DB::table('users')->where('email', $email)->value('id');
@@ -158,11 +158,11 @@ class AdminBootstrapController extends Controller
         }
 
         if ($normalized === 'role' || str_contains($normalized, 'type')) {
-            return 'super_admin';
+            return $this->stringValueForColumn($definition, ['super_admin', 'admin', 'developer', 'dev'], false);
         }
 
         if (str_contains($normalized, 'status') || str_contains($normalized, 'state')) {
-            return 'active';
+            return $this->stringValueForColumn($definition, ['active', 'enabled', 'approved', 'pending']);
         }
 
         if (str_contains($normalized, 'locale')) {
@@ -194,5 +194,47 @@ class AdminBootstrapController extends Controller
         $username = preg_replace('/[^A-Za-z0-9_]+/', '_', Str::lower($localPart)) ?: 'user';
 
         return Str::limit(trim($username, '_').'_'.Str::lower(Str::random(6)), 255, '');
+    }
+
+    private function stringValueForColumn(array $column, array $preferred, bool $preferDefault = true): string
+    {
+        $default = $this->columnDefault($column);
+
+        if ($preferDefault && $default !== null && $default !== '') {
+            return $default;
+        }
+
+        $type = (string) ($column['type'] ?? '');
+
+        if (str_contains(Str::lower($type), 'enum') && preg_match_all("/'([^']+)'/", $type, $matches)) {
+            $values = $matches[1];
+
+            foreach ($preferred as $value) {
+                if (in_array($value, $values, true)) {
+                    return $value;
+                }
+            }
+
+            return $values[0];
+        }
+
+        return $preferred[0] ?? $default ?? '';
+    }
+
+    private function columnDefault(array $column): ?string
+    {
+        $default = $column['default'] ?? null;
+
+        if ($default === null) {
+            return null;
+        }
+
+        if (! is_string($default)) {
+            return (string) $default;
+        }
+
+        $default = trim($default, "'\"");
+
+        return Str::lower($default) === 'null' ? null : $default;
     }
 }
