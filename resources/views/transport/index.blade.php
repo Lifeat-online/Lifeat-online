@@ -34,36 +34,6 @@
 @endpush
 
 @section('content')
-    <section class="section transport-hero">
-        <article class="transport-hero-panel">
-            <span class="badge">Taxi / Delivery</span>
-            <h2 class="h2-tight">Move people, parcels, groceries, tools, and small loads through local transport work.</h2>
-            <p class="muted mb-0">The platform supports bicycles, scooters, cars, bakkies, LDVs, and larger vehicles so drivers can earn with the transport they already have.</p>
-            <div class="transport-actions">
-                <a class="button" href="{{ route('transport.requests.create') }}">Request taxi or delivery</a>
-                <a class="button-link" href="{{ route('transport.driver.duty') }}">Driver clock-in</a>
-                @auth
-                    @if (auth()->user()->hasRole('transport_manager', 'admin', 'dev'))
-                        <a class="button-link" href="{{ route('transport.manager.dashboard') }}">Manager tools</a>
-                    @endif
-                @endauth
-            </div>
-        </article>
-        <aside class="card">
-            <span class="eyebrow">Live dispatch</span>
-            <div class="transport-stack">
-                <div class="transport-stat">
-                    <strong>Clients can still schedule when nobody is online.</strong>
-                    <span class="muted">Immediate requests dispatch to available matching drivers; scheduled jobs are kept for later fulfilment.</span>
-                </div>
-                <div class="transport-stat">
-                    <strong>Websockets only wake up on active live pages.</strong>
-                    <span class="muted">Driver and client tracking stays real time without opening sockets across the whole site.</span>
-                </div>
-            </div>
-        </aside>
-    </section>
-
     <section class="section">
         <div class="section-head">
             <div>
@@ -125,6 +95,36 @@
                 </div>
             </aside>
         </div>
+    </section>
+
+    <section class="section transport-hero">
+        <article class="transport-hero-panel">
+            <span class="badge">Taxi / Delivery</span>
+            <h2 class="h2-tight">Move people, parcels, groceries, tools, and small loads through local transport work.</h2>
+            <p class="muted mb-0">The platform supports bicycles, scooters, cars, bakkies, LDVs, and larger vehicles so drivers can earn with the transport they already have.</p>
+            <div class="transport-actions">
+                <a class="button" href="{{ route('transport.requests.create') }}">Request taxi or delivery</a>
+                <a class="button-link" href="{{ route('transport.driver.duty') }}">Driver clock-in</a>
+                @auth
+                    @if (auth()->user()->hasRole('transport_manager', 'admin', 'dev'))
+                        <a class="button-link" href="{{ route('transport.manager.dashboard') }}">Manager tools</a>
+                    @endif
+                @endauth
+            </div>
+        </article>
+        <aside class="card">
+            <span class="eyebrow">Live dispatch</span>
+            <div class="transport-stack">
+                <div class="transport-stat">
+                    <strong>Clients can still schedule when nobody is online.</strong>
+                    <span class="muted">Immediate requests dispatch to available matching drivers; scheduled jobs are kept for later fulfilment.</span>
+                </div>
+                <div class="transport-stat">
+                    <strong>Websockets only wake up on active live pages.</strong>
+                    <span class="muted">Driver and client tracking stays real time without opening sockets across the whole site.</span>
+                </div>
+            </div>
+        </aside>
     </section>
 
     <section class="section">

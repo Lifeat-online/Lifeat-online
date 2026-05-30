@@ -25,6 +25,7 @@ class TransportModuleTest extends TestCase
         $this->get(route('transport.index'))
             ->assertOk()
             ->assertSee('Request taxi or delivery')
+            ->assertSeeInOrder(['Live driver availability', 'Move people, parcels, groceries, tools, and small loads'])
             ->assertSee(route('transport.requests.create'), false);
     }
 
