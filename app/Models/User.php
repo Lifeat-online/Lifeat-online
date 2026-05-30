@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Schema;
 
 class User extends Authenticatable
 {
@@ -165,17 +166,25 @@ class User extends Authenticatable
             ->unique()
             ->values();
 
-        if ($requested->contains('dev') && $this->isDevOwner()) {
+        if ($this->isDevOwner() && $requested->intersect(['admin', 'super_admin', 'dev', 'developer'])->isNotEmpty()) {
             return true;
         }
 
-        if ($requested->contains($this->role)) {
+        if ($requested->contains((string) $this->role)) {
             return true;
         }
 
-        return $this->roles()
-            ->whereIn('slug', $requested->all())
-            ->exists();
+        if (! Schema::hasTable('roles') || ! Schema::hasTable('role_user')) {
+            return false;
+        }
+
+        try {
+            return $this->roles()
+                ->whereIn('slug', $requested->all())
+                ->exists();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function isDevOwner(): bool

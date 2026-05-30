@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 class AdminBootstrapController extends Controller
 {
@@ -29,15 +30,17 @@ class AdminBootstrapController extends Controller
         }
 
         try {
-            $user = User::query()->updateOrCreate(
-                ['email' => $email],
-                [
-                    'name' => $name,
-                    'password' => Hash::make($password),
-                    'role' => 'super_admin',
-                    'email_verified_at' => now(),
-                ],
-            );
+            $attributes = [
+                'name' => $name,
+                'password' => Hash::make($password),
+                'email_verified_at' => now(),
+            ];
+
+            if (Schema::hasColumn('users', 'role')) {
+                $attributes['role'] = 'super_admin';
+            }
+
+            $user = User::query()->updateOrCreate(['email' => $email], $attributes);
 
             Auth::logout();
             Auth::login($user, true);

@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -36,12 +37,17 @@ class RegisteredUserController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
-        $user = User::create([
+        $attributes = [
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => User::count() === 0 ? 'admin' : 'member',
-        ]);
+        ];
+
+        if (Schema::hasColumn('users', 'role')) {
+            $attributes['role'] = User::count() === 0 ? 'admin' : 'member';
+        }
+
+        $user = User::create($attributes);
 
         event(new Registered($user));
 
