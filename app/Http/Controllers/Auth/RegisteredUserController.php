@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -39,7 +40,7 @@ class RegisteredUserController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
-        $columns = collect(Schema::getColumns('users'))->keyBy('name');
+        $columns = $this->userColumns();
 
         $requestedAttributes = [
             'name' => $request->name,
@@ -80,7 +81,7 @@ class RegisteredUserController extends Controller
             $attributes[$name] = $this->defaultForRequiredUserColumn($name, $column, $request);
         }
 
-        DB::table('users')->insert($attributes);
+        $this->insertUser($attributes, $request);
         $user = User::query()->where('email', $request->email)->firstOrFail();
 
         event(new Registered($user));
@@ -107,6 +108,73 @@ class RegisteredUserController extends Controller
         return in_array($column['name'] ?? null, ['id'], true);
     }
 
+    private function userColumns()
+    {
+        try {
+            return collect(Schema::getColumns('users'))->keyBy('name');
+        } catch (\Throwable) {
+            return collect([
+                ['name' => 'name', 'nullable' => false, 'default' => null, 'type' => 'varchar', 'type_name' => 'varchar'],
+                ['name' => 'email', 'nullable' => false, 'default' => null, 'type' => 'varchar', 'type_name' => 'varchar'],
+                ['name' => 'password', 'nullable' => false, 'default' => null, 'type' => 'varchar', 'type_name' => 'varchar'],
+            ])->keyBy('name');
+        }
+    }
+
+    private function insertUser(array $attributes, Request $request): void
+    {
+        $attempts = 0;
+
+        while (true) {
+            try {
+                DB::table('users')->insert($attributes);
+
+                return;
+            } catch (QueryException $e) {
+                $attempts++;
+
+                if ($attempts >= 6 || ! $this->adjustInsertAttributes($attributes, $e, $request)) {
+                    throw $e;
+                }
+            }
+        }
+    }
+
+    private function adjustInsertAttributes(array &$attributes, QueryException $e, Request $request): bool
+    {
+        $message = $e->getMessage();
+
+        if (preg_match("/Unknown column '([^']+)'/", $message, $matches)
+            || preg_match('/column "([^"]+)" of relation "users" does not exist/', $message, $matches)) {
+            unset($attributes[$matches[1]]);
+
+            return true;
+        }
+
+        if (preg_match("/Field '([^']+)' doesn't have a default value/", $message, $matches)
+            || preg_match('/null value in column "([^"]+)" violates not-null constraint/', $message, $matches)) {
+            $column = $matches[1];
+            $attributes[$column] = $this->defaultForRequiredUserColumn($column, [
+                'name' => $column,
+                'nullable' => false,
+                'default' => null,
+                'type' => $column === 'id' ? 'integer' : 'varchar',
+                'type_name' => $column === 'id' ? 'integer' : 'varchar',
+            ], $request);
+
+            return true;
+        }
+
+        if (preg_match("/Data truncated for column '([^']+)'/", $message, $matches)
+            || preg_match("/Incorrect .* value: .* for column '([^']+)'/", $message, $matches)) {
+            unset($attributes[$matches[1]]);
+
+            return true;
+        }
+
+        return false;
+    }
+
     private function defaultForRequiredUserColumn(string $name, array $column, Request $request): mixed
     {
         $normalized = Str::lower($name);
@@ -114,6 +182,10 @@ class RegisteredUserController extends Controller
 
         if (str_contains($normalized, 'password')) {
             return Hash::make($request->password);
+        }
+
+        if ($normalized === 'id') {
+            return ((int) DB::table('users')->max('id')) + 1;
         }
 
         if ($normalized === 'username') {
