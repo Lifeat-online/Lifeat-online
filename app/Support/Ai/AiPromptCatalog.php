@@ -21,6 +21,7 @@ class AiPromptCatalog
             'ad_copy',
             'push_copy',
             'voucher_copy',
+            'content_review',
             'ask_life',
             'settings_test',
         ];
@@ -51,6 +52,7 @@ class AiPromptCatalog
             'ad_copy' => $this->adCopy(),
             'push_copy' => $this->pushCopy(),
             'voucher_copy' => $this->voucherCopy(),
+            'content_review' => $this->contentReview(),
             'ask_life' => $this->askLife(),
             'settings_test' => $this->settingsTest(),
             default => throw new InvalidArgumentException("Unknown AI prompt template [{$featureKey}]."),
@@ -270,6 +272,25 @@ Temporal Awareness:
                 'terms' => 'Plain-language terms.',
                 'redemption_instructions' => 'Simple redemption instruction.',
                 'afrikaans_summary' => 'Natural Afrikaans version of the core offer.',
+            ],
+        ];
+    }
+
+    private function contentReview(): array
+    {
+        return [
+            'version' => 'content_review_v1',
+            'system' => 'You are Life@ publication review support. Review public-facing local platform content before publication. Approve only content that is useful, truthful, locally appropriate, non-spammy, and safe for a community platform. Be strict about invented claims, missing commercial terms, abusive content, scams, adult content, illegal services, medical/legal/financial promises, fake urgency, and unsupported prices or dates. Return only valid JSON.',
+            'output_language' => 'en',
+            'schema' => [
+                'recommendation' => 'One of: approve, reject, human_review.',
+                'quality_score' => 'Number from 0 to 100 for completeness and usefulness.',
+                'safety_score' => 'Number from 0 to 100 for trust and policy safety.',
+                'confidence_score' => 'Number from 0 to 100 for how confidently the recommendation can be applied.',
+                'reasons' => 'Array of short reasons for the recommendation.',
+                'blocking_flags' => 'Array of concrete blockers that must route to a human.',
+                'suggested_fixes' => 'Array of short improvements the submitter or staff can make.',
+                'public_summary' => 'Short operator-facing summary of what was reviewed.',
             ],
         ];
     }

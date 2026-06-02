@@ -16,6 +16,11 @@
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
+                    @if (Auth::user()->hasRole('admin', 'editor', 'staff', 'support'))
+                        <x-nav-link :href="route('admin.action-station.index')" :active="request()->routeIs('admin.action-station.*')">
+                            {{ __('Action Station') }}
+                        </x-nav-link>
+                    @endif
                     @if (Auth::user()->hasRole('admin', 'editor', 'support'))
                         <x-nav-link :href="route('admin.finance.index')" :active="request()->routeIs('admin.finance.*')">
                             {{ __('Finance') }}
@@ -149,6 +154,11 @@
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
+            @if (Auth::user()->hasRole('admin', 'editor', 'staff', 'support'))
+                <x-responsive-nav-link :href="route('admin.action-station.index')" :active="request()->routeIs('admin.action-station.*')">
+                    {{ __('Action Station') }}
+                </x-responsive-nav-link>
+            @endif
             @if (Auth::user()->hasRole('admin', 'editor', 'support'))
                 <x-responsive-nav-link :href="route('admin.finance.index')" :active="request()->routeIs('admin.finance.*')">
                     {{ __('Finance') }}

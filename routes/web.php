@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\ArticleController as AdminArticleController;
+use App\Http\Controllers\Admin\ActionStationController as AdminActionStationController;
 use App\Http\Controllers\Admin\ArticleBriefController as AdminArticleBriefController;
 use App\Http\Controllers\Admin\ArticleImageController as AdminArticleImageController;
 use App\Http\Controllers\Admin\AiAssistController as AdminAiAssistController;
@@ -372,6 +373,10 @@ Route::middleware(['auth', 'verified', 'role:councillor'])->prefix('councillor')
 
 Route::middleware(['auth', 'role:admin,editor,staff,support'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', AdminDashboardController::class)->name('dashboard');
+    Route::get('/action-station', [AdminActionStationController::class, 'index'])->name('action-station.index');
+    Route::post('/action-station/settings', [AdminActionStationController::class, 'updateSettings'])->middleware('role:admin,editor')->name('action-station.settings.update');
+    Route::post('/action-station/review', [AdminActionStationController::class, 'reviewContent'])->middleware('role:admin,editor')->name('action-station.review');
+    Route::post('/action-station/review-all', [AdminActionStationController::class, 'reviewContentQueue'])->middleware('role:admin,editor')->name('action-station.review-all');
     Route::get('/metrics', AdminMetricsController::class)->name('metrics');
     Route::get('/push-notifications', [AdminPushNotificationTestController::class, 'index'])->middleware('role:admin,editor')->name('push-notifications.index');
     Route::post('/push-notifications', [AdminPushNotificationTestController::class, 'store'])->middleware('role:admin,editor')->name('push-notifications.store');
