@@ -1,43 +1,126 @@
+@php
+    $askLifeLocale = app()->getLocale() === 'af' ? 'af' : 'en';
+    $askLifeTexts = [
+        'en' => [
+            'askJimmy' => 'Ask Jimmy',
+            'headerSubtitle' => 'Find local answers, actions, and the right Life@ page.',
+            'greeting' => 'Hi, I am Jimmy. What should I help you do?',
+            'questionLabel' => 'Question',
+            'placeholder' => 'Try: tyre repair in Bethlehem, events this weekend, improve my listing',
+            'askTitle' => 'Ask',
+            'toggleVoice' => 'Toggle voice',
+            'muteVoice' => 'Mute voice',
+            'enableVoice' => 'Enable voice',
+            'clearConversation' => 'Clear conversation',
+            'closeJimmy' => 'Close Jimmy',
+            'thinking' => 'Jimmy is thinking',
+            'open' => 'Open',
+            'source' => 'Source',
+            'lifeSource' => 'Life@ source',
+            'date' => 'Date',
+            'value' => 'Value',
+            'price' => 'Price',
+            'status' => 'Status',
+            'fullSearchTitle' => 'Full Life@ search',
+            'fullSearchSummary' => 'Open the full results page for a wider scan.',
+            'openSearch' => 'Open search',
+            'listen' => 'Listen',
+            'listenTitle' => 'Listen to this answer',
+            'listenAria' => 'Listen to Jimmy read this answer',
+            'loading' => 'Loading',
+            'playingSaved' => 'Playing saved',
+            'playing' => 'Playing',
+            'tryAgain' => 'Try again',
+            'voiceUnavailable' => 'Voice unavailable',
+            'helpful' => 'Helpful',
+            'notHelpful' => 'Needs work',
+            'saved' => 'Saved',
+            'feedbackFailed' => 'Could not save feedback',
+            'fallbackAnswer' => 'I could not build an answer from Life@ sources yet.',
+            'unavailable' => 'Jimmy is unavailable right now. Try the full search page.',
+        ],
+        'af' => [
+            'askJimmy' => 'Vra vir Jimmy',
+            'headerSubtitle' => 'Vind plaaslike antwoorde, aksies en die regte Life@ bladsy.',
+            'greeting' => 'Hallo, ek is Jimmy. Waarmee moet ek jou help?',
+            'questionLabel' => 'Vraag',
+            'placeholder' => 'Probeer: bandherstelwerk in Bethlehem, geleenthede hierdie naweek, verbeter my listing',
+            'askTitle' => 'Vra',
+            'toggleVoice' => 'Skakel stem',
+            'muteVoice' => 'Demp stem',
+            'enableVoice' => 'Skakel stem aan',
+            'clearConversation' => 'Maak gesprek skoon',
+            'closeJimmy' => 'Maak Jimmy toe',
+            'thinking' => 'Jimmy dink',
+            'open' => 'Maak oop',
+            'source' => 'Bron',
+            'lifeSource' => 'Life@ bron',
+            'date' => 'Datum',
+            'value' => 'Waarde',
+            'price' => 'Prys',
+            'status' => 'Status',
+            'fullSearchTitle' => 'Volledige Life@ soektog',
+            'fullSearchSummary' => 'Maak die volledige resultatebladsy oop vir n wyer soektog.',
+            'openSearch' => 'Maak soektog oop',
+            'listen' => 'Luister',
+            'listenTitle' => 'Luister na hierdie antwoord',
+            'listenAria' => 'Luister hoe Jimmy hierdie antwoord lees',
+            'loading' => 'Laai',
+            'playingSaved' => 'Speel gestoorde klank',
+            'playing' => 'Speel',
+            'tryAgain' => 'Probeer weer',
+            'voiceUnavailable' => 'Stem is nie beskikbaar nie',
+            'helpful' => 'Nuttig',
+            'notHelpful' => 'Werk nodig',
+            'saved' => 'Gestoor',
+            'feedbackFailed' => 'Kon nie terugvoer stoor nie',
+            'fallbackAnswer' => 'Ek kon nog nie n antwoord uit Life@ bronne bou nie.',
+            'unavailable' => 'Jimmy is nou nie beskikbaar nie. Probeer die volledige soekbladsy.',
+        ],
+    ][$askLifeLocale];
+@endphp
+
 <div
     class="ask-life-widget"
     data-ask-life
     data-endpoint="{{ route('ask-life.store') }}"
     data-feedback-endpoint="{{ route('ask-life.feedback') }}"
     data-speak-endpoint="{{ route('ask-life.speak') }}"
+    data-locale="{{ $askLifeLocale }}"
 >
-    <button type="button" class="ask-life-fab" data-ask-life-toggle aria-expanded="false" aria-controls="ask-life-panel" title="Ask Jimmy">
+    <button type="button" class="ask-life-fab" data-ask-life-toggle aria-expanded="false" aria-controls="ask-life-panel" title="{{ $askLifeTexts['askJimmy'] }}">
         <x-icon name="sparkles" class="w-5 h-5" />
-        <span>Ask Jimmy</span>
+        <span>{{ $askLifeTexts['askJimmy'] }}</span>
     </button>
 
-    <section id="ask-life-panel" class="ask-life-panel" data-ask-life-panel hidden aria-label="Ask Jimmy">
+    <section id="ask-life-panel" class="ask-life-panel" data-ask-life-panel hidden aria-label="{{ $askLifeTexts['askJimmy'] }}">
         <div class="ask-life-head">
             <div>
                 <strong>Jimmy</strong>
-                <p>Find local answers, actions, and the right Life@ page.</p>
+                <p>{{ $askLifeTexts['headerSubtitle'] }}</p>
             </div>
             <div class="ask-life-head-actions">
-                <button type="button" class="ask-life-icon-btn" data-ask-life-voice-toggle aria-label="Toggle voice" title="Toggle voice">
+                <button type="button" class="ask-life-icon-btn" data-ask-life-voice-toggle aria-label="{{ $askLifeTexts['toggleVoice'] }}" title="{{ $askLifeTexts['toggleVoice'] }}">
                     <span data-voice-on><x-icon name="volume" class="w-4 h-4" /></span>
                     <span data-voice-off hidden><x-icon name="volume-off" class="w-4 h-4" /></span>
                 </button>
-                <button type="button" class="ask-life-icon-btn" data-ask-life-clear aria-label="Clear conversation" title="Clear conversation">
+                <button type="button" class="ask-life-icon-btn" data-ask-life-clear aria-label="{{ $askLifeTexts['clearConversation'] }}" title="{{ $askLifeTexts['clearConversation'] }}">
                     <x-icon name="trash" class="w-4 h-4" />
                 </button>
-                <button type="button" class="ask-life-close" data-ask-life-toggle aria-label="Close Jimmy">
+                <button type="button" class="ask-life-close" data-ask-life-toggle aria-label="{{ $askLifeTexts['closeJimmy'] }}">
                     <x-icon name="x" class="w-5 h-5" />
                 </button>
             </div>
         </div>
 
         <div class="ask-life-messages" data-ask-life-messages>
-            <div class="ask-life-message ask-life-message-bot">Hi, I am Jimmy. What should I help you do?</div>
+            <div class="ask-life-message ask-life-message-bot">{{ $askLifeTexts['greeting'] }}</div>
         </div>
 
         <form class="ask-life-form" data-ask-life-form>
-            <label class="sr-only" for="ask-life-question">Question</label>
-            <textarea id="ask-life-question" data-ask-life-question rows="2" maxlength="500" placeholder="Try: tyre repair in Bethlehem, events this weekend, improve my listing"></textarea>
-            <button type="submit" class="ask-life-submit" title="Ask">
+            <label class="sr-only" for="ask-life-question">{{ $askLifeTexts['questionLabel'] }}</label>
+            <textarea id="ask-life-question" data-ask-life-question rows="2" maxlength="500" placeholder="{{ $askLifeTexts['placeholder'] }}"></textarea>
+            <button type="submit" class="ask-life-submit" title="{{ $askLifeTexts['askTitle'] }}">
                 <x-icon name="arrow-right" class="w-5 h-5" />
             </button>
         </form>
@@ -62,6 +145,8 @@
         const feedbackEndpoint = root.dataset.feedbackEndpoint;
         const speakEndpoint = root.dataset.speakEndpoint;
         const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const text = @json($askLifeTexts);
+        const fallbackSearchUrl = @json(route('search.index'));
 
         const STORAGE_KEY = 'jimmy_chat_v1';
         const VOICE_KEY = 'jimmy_voice';
@@ -70,6 +155,10 @@
         let activeAudio = null;
         let conversationHistory = [];
         let voiceEnabled = storageGet(VOICE_KEY) !== 'false';
+
+        function tr(key, fallback = '') {
+            return text[key] || fallback || key;
+        }
 
         function storageGet(key) {
             try { return localStorage.getItem(key); } catch (_) { return null; }
@@ -91,7 +180,7 @@
                 path,
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Johannesburg',
                 local_time: new Date().toISOString(),
-                locale: document.documentElement.lang || navigator.language || 'en',
+                locale: root.dataset.locale || document.documentElement.lang || navigator.language || 'en',
             };
         }
 
@@ -120,7 +209,8 @@
             if (!voiceToggle) return;
             if (voiceOn) voiceOn.hidden = !voiceEnabled;
             if (voiceOff) voiceOff.hidden = voiceEnabled;
-            voiceToggle.title = voiceEnabled ? 'Mute voice' : 'Enable voice';
+            voiceToggle.title = voiceEnabled ? tr('muteVoice') : tr('enableVoice');
+            voiceToggle.setAttribute('aria-label', voiceToggle.title);
             voiceToggle.classList.toggle('muted', !voiceEnabled);
             panel.classList.toggle('voice-off', !voiceEnabled);
         }
@@ -157,7 +247,7 @@
 
         function resetGreeting() {
             messages.replaceChildren();
-            appendMessage('Hi, I am Jimmy. What should I help you do?', 'bot');
+            appendMessage(tr('greeting'), 'bot');
         }
 
         function loadHistory() {
@@ -189,7 +279,7 @@
         function appendTyping() {
             const el = document.createElement('div');
             el.className = 'ask-life-message ask-life-message-bot ask-life-typing';
-            el.setAttribute('aria-label', 'Jimmy is thinking');
+            el.setAttribute('aria-label', tr('thinking'));
             el.setAttribute('aria-live', 'polite');
             for (let i = 0; i < 3; i++) el.appendChild(document.createElement('span'));
             messages.appendChild(el);
@@ -223,7 +313,7 @@
                 const a = document.createElement('a');
                 a.href = action.url || '#';
                 a.className = `ask-life-action-link ask-life-action-${action.kind || 'link'}`;
-                a.textContent = action.label || 'Open';
+                a.textContent = action.label || tr('open');
                 if (action.external) {
                     a.target = '_blank';
                     a.rel = 'noopener';
@@ -238,13 +328,13 @@
             const speakBtn = document.createElement('button');
             speakBtn.type = 'button';
             speakBtn.className = 'ask-life-speak';
-            speakBtn.title = 'Listen to this answer';
-            speakBtn.setAttribute('aria-label', 'Listen to Jimmy read this answer');
-            speakBtn.textContent = 'Listen';
+            speakBtn.title = tr('listenTitle');
+            speakBtn.setAttribute('aria-label', tr('listenAria'));
+            speakBtn.textContent = tr('listen');
 
             speakBtn.addEventListener('click', async () => {
                 speakBtn.disabled = true;
-                speakBtn.textContent = 'Loading';
+                speakBtn.textContent = tr('loading');
                 try {
                     const res = await fetch(speakEndpoint, {
                         method: 'POST',
@@ -252,17 +342,17 @@
                         body: JSON.stringify({ text: answerText, locale }),
                     });
                     const data = await res.json().catch(() => ({}));
-                    if (!res.ok || !data.ok || !data.audio_url) throw new Error(data.message || 'Voice unavailable');
+                    if (!res.ok || !data.ok || !data.audio_url) throw new Error(data.message || tr('voiceUnavailable'));
                     if (activeAudio) activeAudio.pause();
                     activeAudio = new Audio(data.audio_url);
-                    speakBtn.textContent = data.cached ? 'Playing saved' : 'Playing';
-                    activeAudio.addEventListener('ended', () => { speakBtn.disabled = false; speakBtn.textContent = 'Listen'; }, { once: true });
-                    activeAudio.addEventListener('error', () => { speakBtn.disabled = false; speakBtn.textContent = 'Try again'; }, { once: true });
+                    speakBtn.textContent = data.cached ? tr('playingSaved') : tr('playing');
+                    activeAudio.addEventListener('ended', () => { speakBtn.disabled = false; speakBtn.textContent = tr('listen'); }, { once: true });
+                    activeAudio.addEventListener('error', () => { speakBtn.disabled = false; speakBtn.textContent = tr('tryAgain'); }, { once: true });
                     await activeAudio.play();
                 } catch {
                     speakBtn.disabled = false;
-                    speakBtn.textContent = 'Voice unavailable';
-                    setTimeout(() => { speakBtn.textContent = 'Listen'; }, 2500);
+                    speakBtn.textContent = tr('voiceUnavailable');
+                    setTimeout(() => { speakBtn.textContent = tr('listen'); }, 2500);
                 }
             });
 
@@ -273,8 +363,8 @@
             const feedback = document.createElement('div');
             feedback.className = 'ask-life-feedback';
 
-            const helpful = feedbackButton('helpful', '+', 'Helpful');
-            const notHelpful = feedbackButton('not_helpful', '-', 'Needs work');
+            const helpful = feedbackButton('helpful', '+', tr('helpful'));
+            const notHelpful = feedbackButton('not_helpful', '-', tr('notHelpful'));
 
             helpful.addEventListener('click', () => submitFeedback(helpful, feedback, 'helpful', answerText, data, questionText, context));
             notHelpful.addEventListener('click', () => submitFeedback(notHelpful, feedback, 'not_helpful', answerText, data, questionText, context));
@@ -320,10 +410,10 @@
                         page_context: context,
                     }),
                 });
-                btn.title = 'Saved';
+                btn.title = tr('saved');
             } catch {
                 wrap.querySelectorAll('button').forEach(button => button.disabled = false);
-                btn.title = 'Could not save feedback';
+                btn.title = tr('feedbackFailed');
             }
         }
 
@@ -341,7 +431,7 @@
                 top.className = 'ask-life-source-top';
 
                 const badge = document.createElement('span');
-                badge.textContent = source.label || source.type || 'Source';
+                badge.textContent = source.label || source.type || tr('source');
                 top.appendChild(badge);
 
                 if (source.location) {
@@ -351,7 +441,7 @@
                 }
 
                 const title = document.createElement('strong');
-                title.textContent = source.title || 'Life@ source';
+                title.textContent = source.title || tr('lifeSource');
 
                 const summary = document.createElement('p');
                 summary.textContent = source.summary || '';
@@ -386,10 +476,10 @@
         function metaLine(meta) {
             const parts = [];
             if (meta.business) parts.push(meta.business);
-            if (meta.date) parts.push(`Date: ${meta.date}`);
-            if (meta.value) parts.push(`Value: ${meta.value}`);
-            if (meta.price) parts.push(`Price: ${meta.price}`);
-            if (meta.status && meta.status !== 'published') parts.push(`Status: ${meta.status}`);
+            if (meta.date) parts.push(`${tr('date')}: ${meta.date}`);
+            if (meta.value) parts.push(`${tr('value')}: ${meta.value}`);
+            if (meta.price) parts.push(`${tr('price')}: ${meta.price}`);
+            if (meta.status && meta.status !== 'published') parts.push(`${tr('status')}: ${meta.status}`);
             if (Array.isArray(meta.categories) && meta.categories.length) parts.push(meta.categories.slice(0, 2).join(', '));
             return parts.slice(0, 3).join(' | ');
         }
@@ -398,12 +488,12 @@
             const card = document.createElement('article');
             card.className = 'ask-life-source-card ask-life-source-search';
             const title = document.createElement('strong');
-            title.textContent = 'Full Life@ search';
+            title.textContent = tr('fullSearchTitle');
             const summary = document.createElement('p');
-            summary.textContent = 'Open the full results page for a wider scan.';
+            summary.textContent = tr('fullSearchSummary');
             const actions = document.createElement('div');
             actions.className = 'ask-life-card-actions';
-            actions.appendChild(actionLink({ label: 'Open search', url: searchUrl, kind: 'search' }));
+            actions.appendChild(actionLink({ label: tr('openSearch'), url: searchUrl, kind: 'search' }));
             card.append(title, summary, actions);
             return card;
         }
@@ -412,7 +502,7 @@
             const a = document.createElement('a');
             a.href = action.url || '#';
             a.className = `ask-life-card-action ask-life-card-action-${action.kind || 'link'}`;
-            a.textContent = action.label || 'Open';
+            a.textContent = action.label || tr('open');
             if (action.external) {
                 a.target = '_blank';
                 a.rel = 'noopener';
@@ -475,7 +565,7 @@
                 });
 
                 const data = await res.json().catch(() => ({}));
-                const answer = data.answer || 'I could not build an answer from Life@ sources yet.';
+                const answer = data.answer || tr('fallbackAnswer');
 
                 resolveTyping(typing, answer);
                 conversationHistory.push({ role: 'assistant', content: answer });
@@ -485,10 +575,10 @@
                 appendSourceCards(data.sources || [], data.search_url);
                 appendFollowUps(data.follow_up_questions || []);
             } catch {
-                resolveTyping(typing, 'Jimmy is unavailable right now. Try the full search page.');
+                resolveTyping(typing, tr('unavailable'));
                 conversationHistory.pop();
                 saveHistory();
-                appendSourceCards([], '{{ route('search.index') }}');
+                appendSourceCards([], fallbackSearchUrl);
             } finally {
                 question.disabled = false;
                 question.focus();

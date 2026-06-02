@@ -28,39 +28,43 @@ class AskLifeService
     {
         $question = trim($question);
         $context = $this->normalizeContext($context);
+        $targetLocale = $this->targetLocale($question, $user, $context);
+        $context['locale'] = $targetLocale;
         $intent = $this->detectIntent($question, $context, $user);
         $search = $this->searchContext($question, $context);
 
-        if ($guided = $this->guidedAnswer($question, $context, $intent)) {
+        if ($guided = $this->guidedAnswer($question, $context, $intent, $targetLocale)) {
             return $guided;
         }
 
         $sources = $this->sourcesForQuestion($question, $user, $context, $intent, $search);
 
         if ($sources->isEmpty()) {
-            $answer = $this->emptyAnswer($intent, $search);
+            $answer = $this->emptyAnswer($intent, $search, $targetLocale);
 
             return [
                 'ok' => true,
                 'source' => 'fallback',
                 'answer' => $answer,
-                'locale' => $this->detectLocale($question, $answer),
+                'locale' => $targetLocale,
                 'confidence' => 0,
                 'intent' => $intent,
                 'search_context' => $this->publicSearchContext($search),
                 'page_context' => $context,
                 'sources' => [],
-                'answer_actions' => $this->answerActions($intent, collect(), $question, $context, $search),
+                'answer_actions' => $this->answerActions($intent, collect(), $question, $context, $search, $targetLocale),
                 'follow_up_questions' => [
-                    $search['location'] ? 'Should I widen this beyond '.$search['location'].'?' : 'Which town should I search in?',
-                    'Are you looking for a business, event, article, voucher, classified, fault report, or transport help?',
+                    $search['location']
+                        ? $this->t('follow.widen_location', $targetLocale, ['location' => (string) $search['location']])
+                        : $this->t('follow.which_town', $targetLocale),
+                    $this->t('follow.what_type', $targetLocale),
                 ],
                 'search_url' => route('search.index', ['q' => $question]),
             ];
         }
 
         if (! $this->gateway->configured()) {
-            return $this->fallbackAnswer($question, $sources, 'AI provider is not configured yet.', $intent, $context, $search);
+            return $this->fallbackAnswer($question, $sources, 'AI provider is not configured yet.', $intent, $context, $search, $targetLocale);
         }
 
         $prompt = $this->prompts->get('ask_life');
@@ -78,11 +82,14 @@ class AskLifeService
                     'detected_intent' => $intent,
                     'search_context' => $this->publicSearchContext($search),
                     'page_context' => $context,
+                    'target_locale' => $targetLocale,
+                    'target_language' => $this->localeName($targetLocale),
+                    'language_instruction' => $this->languageInstruction($targetLocale),
                     'current_date' => CarbonImmutable::now($search['timezone'])->toDateString(),
                 ],
                 null,
                 $user,
-                'en',
+                $targetLocale,
             );
 
             if (($result['ok'] ?? false) && filled(data_get($result, 'payload.answer'))) {
@@ -100,28 +107,30 @@ class AskLifeService
                     'ok' => true,
                     'source' => 'ai',
                     'answer' => (string) data_get($result, 'payload.answer'),
-                    'locale' => $this->detectLocale((string) data_get($result, 'payload.answer'), $question),
+                    'locale' => $targetLocale,
                     'confidence' => (float) data_get($result, 'payload.confidence', 0.65),
                     'intent' => $intent,
                     'search_context' => $this->publicSearchContext($search),
                     'page_context' => $context,
-                    'sources' => $this->sourceCards($rankedSources->take(8), $intent, $question, $context)->values()->all(),
-                    'answer_actions' => $this->answerActions($intent, $rankedSources, $question, $context, $search),
+                    'sources' => $this->sourceCards($rankedSources->take(8), $intent, $question, $context, $targetLocale)->values()->all(),
+                    'answer_actions' => $this->answerActions($intent, $rankedSources, $question, $context, $search, $targetLocale),
                     'follow_up_questions' => collect(data_get($result, 'payload.follow_up_questions', []))->take(3)->values()->all(),
                     'generation_id' => data_get($result, 'generation.id'),
                     'search_url' => route('search.index', ['q' => $question]),
                 ];
             }
 
-            return $this->fallbackAnswer($question, $sources, $result['message'] ?? 'AI provider did not return a usable answer.', $intent, $context, $search);
+            return $this->fallbackAnswer($question, $sources, $result['message'] ?? 'AI provider did not return a usable answer.', $intent, $context, $search, $targetLocale);
         } catch (Throwable $exception) {
-            return $this->fallbackAnswer($question, $sources, $exception->getMessage(), $intent, $context, $search);
+            return $this->fallbackAnswer($question, $sources, $exception->getMessage(), $intent, $context, $search, $targetLocale);
         }
     }
 
     public function sourcesForQuestion(string $question, ?User $user = null, array $context = [], ?array $intent = null, ?array $search = null): Collection
     {
         $context = $this->normalizeContext($context);
+        $locale = $this->targetLocale($question, $user, $context);
+        $context['locale'] = $locale;
         $intent ??= $this->detectIntent($question, $context, $user);
         $search ??= $this->searchContext($question, $context);
         $terms = $search['terms'];
@@ -130,11 +139,11 @@ class AskLifeService
         if ($terms !== []) {
             foreach ($intent['source_types'] as $sourceType) {
                 $dynamicSources = $dynamicSources->merge(match ($sourceType) {
-                    'business' => $this->listingSources($terms, $user, $search),
-                    'event' => $this->eventSources($terms, $user, $search),
-                    'article' => $this->articleSources($terms, $user, $search),
-                    'voucher' => $this->voucherSources($terms, $user, $search),
-                    'classified' => $this->classifiedSources($terms, $user, $search),
+                    'business' => $this->listingSources($terms, $user, $search, $locale),
+                    'event' => $this->eventSources($terms, $user, $search, $locale),
+                    'article' => $this->articleSources($terms, $user, $search, $locale),
+                    'voucher' => $this->voucherSources($terms, $user, $search, $locale),
+                    'classified' => $this->classifiedSources($terms, $user, $search, $locale),
                     'fault' => $this->faultSources($terms, $user, $search),
                     default => collect(),
                 });
@@ -142,8 +151,8 @@ class AskLifeService
         }
 
         return $this->rankSources($dynamicSources, $search, $intent)
-            ->merge($this->pageContextSources($context, $intent))
-            ->merge($this->platformGuideSources($question, $terms, $intent, $context))
+            ->merge($this->pageContextSources($context, $intent, $locale))
+            ->merge($this->platformGuideSources($question, $terms, $intent, $context, $locale))
             ->unique('id')
             ->take(18)
             ->values();
@@ -162,39 +171,39 @@ class AskLifeService
             ->all();
     }
 
-    private function guidedAnswer(string $question, array $context, array $intent): ?array
+    private function guidedAnswer(string $question, array $context, array $intent, string $locale): ?array
     {
         if ($this->isBusinessOnboardingQuestion($question)) {
-            return $this->businessOnboardingAnswer($question, $context, $intent);
+            return $this->businessOnboardingAnswer($question, $context, $intent, $locale);
         }
 
         return null;
     }
 
-    private function businessOnboardingAnswer(string $question, array $context, array $intent): array
+    private function businessOnboardingAnswer(string $question, array $context, array $intent, string $locale): array
     {
-        $answer = 'Yes. Start on Add Listing: create or log in to your account, enter your business name and town, choose a staff-assisted or self-service directory package, then continue to checkout. Once the listing is active, you can add events, adverts, push campaigns, and vouchers from your account.';
+        $answer = $this->t('business_onboarding.answer', $locale);
         $sources = collect([
             [
                 'id' => 'guide:add-listing',
                 'type' => 'start',
-                'title' => 'Add your business listing',
-                'summary' => 'Create a starter listing, choose a directory package, and continue to checkout.',
+                'title' => $this->t('business_onboarding.add_title', $locale),
+                'summary' => $this->t('business_onboarding.add_summary', $locale),
                 'location' => null,
                 'url' => route('add-listing.index'),
                 'meta' => [
-                    'action' => 'Start listing',
+                    'action' => $this->t('action.start_listing', $locale),
                 ],
             ],
             [
                 'id' => 'guide:advertise',
                 'type' => 'packages',
-                'title' => 'Compare advertising and directory packages',
-                'summary' => 'See directory, event, advert, push, and voucher options.',
+                'title' => $this->t('business_onboarding.compare_title', $locale),
+                'summary' => $this->t('business_onboarding.compare_summary', $locale),
                 'location' => null,
                 'url' => route('advertise.index'),
                 'meta' => [
-                    'action' => 'Compare packages',
+                    'action' => $this->t('action.compare_packages', $locale),
                 ],
             ],
         ]);
@@ -203,17 +212,17 @@ class AskLifeService
             'ok' => true,
             'source' => 'guided',
             'answer' => $answer,
-            'locale' => $this->detectLocale($answer, $question),
+            'locale' => $locale,
             'confidence' => 0.9,
             'intent' => $intent,
             'search_context' => $this->publicSearchContext($this->searchContext($question, $context)),
             'page_context' => $context,
-            'sources' => $this->sourceCards($sources, $intent, $question, $context)->values()->all(),
-            'answer_actions' => $this->answerActions($intent, $sources, $question, $context, $this->searchContext($question, $context)),
+            'sources' => $this->sourceCards($sources, $intent, $question, $context, $locale)->values()->all(),
+            'answer_actions' => $this->answerActions($intent, $sources, $question, $context, $this->searchContext($question, $context), $locale),
             'follow_up_questions' => [
-                'Do you want staff-assisted setup or self-service?',
-                'Which town is your business in?',
-                'Do you also want adverts, events, push campaigns, or vouchers?',
+                $this->t('follow.staff_or_self', $locale),
+                $this->t('follow.business_town', $locale),
+                $this->t('follow.business_addons', $locale),
             ],
             'search_url' => null,
         ];
@@ -237,9 +246,9 @@ class AskLifeService
             && collect($actionMarkers)->contains(fn (string $marker): bool => str_contains($normalized, $marker));
     }
 
-    private function listingSources(array $terms, ?User $user = null, array $search = []): Collection
+    private function listingSources(array $terms, ?User $user = null, array $search = [], string $locale = 'en'): Collection
     {
-        $query = Listing::with('categories');
+        $query = Listing::with(['contentTranslations', 'categories.contentTranslations']);
 
         // Public users: only published listings
         if (! $user) {
@@ -274,24 +283,24 @@ class AskLifeService
             ->map(fn (Listing $listing): array => [
                 'id' => 'listing:'.$listing->id,
                 'type' => 'business',
-                'title' => $listing->title,
-                'summary' => $this->summary($listing->excerpt ?: $listing->description),
-                'location' => $this->location([$listing->city, $listing->region]),
+                'title' => $listing->localizedValue('title', $locale),
+                'summary' => $this->summary($listing->localizedValue('excerpt', $locale) ?: $listing->localizedValue('description', $locale)),
+                'location' => $this->location([$listing->localizedValue('city', $locale), $listing->localizedValue('region', $locale)]),
                 'url' => route('directory.show', $listing),
                 'meta' => [
-                    'categories' => $listing->categories->pluck('name')->values()->all(),
+                    'categories' => $listing->categories->map(fn ($category) => $category->localizedValue('name', $locale))->values()->all(),
                     'phone' => $listing->phone,
                     'website' => $listing->website_url,
                     'status' => $listing->status,
                     'featured' => $listing->is_featured,
-                    'address' => $this->location([$listing->address_line, $listing->city, $listing->region]),
+                    'address' => $this->location([$listing->localizedValue('address_line', $locale), $listing->localizedValue('city', $locale), $listing->localizedValue('region', $locale)]),
                 ],
             ]);
     }
 
-    private function eventSources(array $terms, ?User $user = null, array $search = []): Collection
+    private function eventSources(array $terms, ?User $user = null, array $search = [], string $locale = 'en'): Collection
     {
-        $query = Event::with(['categories', 'listing']);
+        $query = Event::with(['contentTranslations', 'categories.contentTranslations', 'listing.contentTranslations']);
 
         // Public users: only published events
         if (! $user) {
@@ -328,24 +337,24 @@ class AskLifeService
             ->map(fn (Event $event): array => [
                 'id' => 'event:'.$event->id,
                 'type' => 'event',
-                'title' => $event->title,
-                'summary' => $this->summary($event->excerpt ?: $event->description),
-                'location' => $this->location([$event->venue_name, $event->city, $event->region]),
+                'title' => $event->localizedValue('title', $locale),
+                'summary' => $this->summary($event->localizedValue('excerpt', $locale) ?: $event->localizedValue('description', $locale)),
+                'location' => $this->location([$event->localizedValue('venue_name', $locale), $event->localizedValue('city', $locale), $event->localizedValue('region', $locale)]),
                 'url' => route('events.show', $event),
                 'meta' => [
                     'date' => $event->start_at?->format('Y-m-d H:i'),
                     'ends_at' => $event->end_at?->format('Y-m-d H:i'),
-                    'categories' => $event->categories->pluck('name')->values()->all(),
-                    'business' => $event->listing?->title,
+                    'categories' => $event->categories->map(fn ($category) => $category->localizedValue('name', $locale))->values()->all(),
+                    'business' => $event->listing?->localizedValue('title', $locale),
                     'status' => $event->status,
                     'website' => $event->website_url,
                 ],
             ]);
     }
 
-    private function articleSources(array $terms, ?User $user = null, array $search = []): Collection
+    private function articleSources(array $terms, ?User $user = null, array $search = [], string $locale = 'en'): Collection
     {
-        $query = Article::with(['author', 'categories']);
+        $query = Article::with(['author', 'contentTranslations', 'categories.contentTranslations']);
 
         // Public users: only published articles
         if (! $user || ! $user->hasRole('admin', 'editor', 'staff', 'writer')) {
@@ -371,22 +380,22 @@ class AskLifeService
             ->map(fn (Article $article): array => [
                 'id' => 'article:'.$article->id,
                 'type' => 'article',
-                'title' => $article->title,
-                'summary' => $this->summary($article->excerpt ?: $article->body),
+                'title' => $article->localizedTitle($locale),
+                'summary' => $this->summary($article->localizedExcerpt($locale) ?: $article->localizedBody($locale)),
                 'location' => null,
                 'url' => route('articles.show', $article),
                 'meta' => [
                     'published' => $article->published_at?->format('Y-m-d'),
                     'author' => $article->author?->name,
-                    'categories' => $article->categories->pluck('name')->values()->all(),
+                    'categories' => $article->categories->map(fn ($category) => $category->localizedValue('name', $locale))->values()->all(),
                     'status' => $article->status,
                 ],
             ]);
     }
 
-    private function voucherSources(array $terms, ?User $user = null, array $search = []): Collection
+    private function voucherSources(array $terms, ?User $user = null, array $search = [], string $locale = 'en'): Collection
     {
-        $query = Voucher::with('listing');
+        $query = Voucher::with(['contentTranslations', 'listing.contentTranslations']);
 
         // Public users: only active vouchers with published listings
         if (! $user) {
@@ -426,12 +435,12 @@ class AskLifeService
             ->map(fn (Voucher $voucher): array => [
                 'id' => 'voucher:'.$voucher->id,
                 'type' => 'voucher',
-                'title' => $voucher->title,
-                'summary' => $this->summary($voucher->description ?: $voucher->terms),
-                'location' => $this->location([$voucher->listing?->city, $voucher->listing?->region]),
+                'title' => $voucher->localizedValue('title', $locale),
+                'summary' => $this->summary($voucher->localizedValue('description', $locale) ?: $voucher->localizedValue('terms', $locale)),
+                'location' => $this->location([$voucher->listing?->localizedValue('city', $locale), $voucher->listing?->localizedValue('region', $locale)]),
                 'url' => route('vouchers.show', [$voucher->listing, $voucher]),
                 'meta' => [
-                    'business' => $voucher->listing?->title,
+                    'business' => $voucher->listing?->localizedValue('title', $locale),
                     'value' => $voucher->formattedValue(),
                     'ends_at' => $voucher->end_at?->format('Y-m-d'),
                     'status' => $voucher->status,
@@ -441,9 +450,9 @@ class AskLifeService
             ]);
     }
 
-    private function classifiedSources(array $terms, ?User $user = null, array $search = []): Collection
+    private function classifiedSources(array $terms, ?User $user = null, array $search = [], string $locale = 'en'): Collection
     {
-        $query = Classified::query();
+        $query = Classified::with('contentTranslations');
 
         // Public users: only published classifieds
         if (! $user) {
@@ -475,12 +484,12 @@ class AskLifeService
             ->map(fn (Classified $classified): array => [
                 'id' => 'classified:'.$classified->id,
                 'type' => 'classified',
-                'title' => $classified->title,
-                'summary' => $this->summary($classified->description),
-                'location' => $this->location([$classified->city, $classified->region]),
+                'title' => $classified->localizedValue('title', $locale),
+                'summary' => $this->summary($classified->localizedValue('description', $locale)),
+                'location' => $this->location([$classified->localizedValue('city', $locale), $classified->localizedValue('region', $locale)]),
                 'url' => route('classifieds.show', $classified),
                 'meta' => [
-                    'price' => $classified->contact_for_price ? 'Contact for price' : ($classified->price !== null ? $classified->currency.' '.number_format((float) $classified->price, 2) : null),
+                    'price' => $classified->contact_for_price ? $this->t('meta.contact_for_price', $locale) : ($classified->price !== null ? $classified->currency.' '.number_format((float) $classified->price, 2) : null),
                     'status' => $classified->status,
                 ],
             ]);
@@ -519,7 +528,7 @@ class AskLifeService
             ]);
     }
 
-    private function platformGuideSources(string $question, array $terms, array $intent, array $context): Collection
+    private function platformGuideSources(string $question, array $terms, array $intent, array $context, string $locale): Collection
     {
         $normalized = mb_strtolower($question.' '.implode(' ', $terms));
         $broadHelp = trim($normalized) === ''
@@ -531,7 +540,7 @@ class AskLifeService
             || str_contains($normalized, 'ondersteun')
             || str_contains($normalized, 'help my');
 
-        $guides = collect($this->platformGuides());
+        $guides = collect($this->platformGuides($locale));
 
         if ($broadHelp) {
             return $guides->values();
@@ -560,9 +569,9 @@ class AskLifeService
             : $guides->whereIn('id', ['guide:directory', 'guide:search', 'guide:contact'])->values();
     }
 
-    private function platformGuides(): array
+    private function platformGuides(string $locale = 'en'): array
     {
-        return [
+        $guides = [
             [
                 'id' => 'guide:search',
                 'type' => 'guide',
@@ -708,25 +717,119 @@ class AskLifeService
                 'keywords' => ['contact', 'support', 'person', 'human', 'helpdesk', 'private', 'account', 'payment', 'billing', 'ondersteuning'],
             ],
         ];
+
+        if ($locale !== 'af') {
+            return $guides;
+        }
+
+        $afrikaans = [
+            'guide:search' => [
+                'title' => 'Jimmy kan jou help om Life@ te gebruik',
+                'summary' => 'Jimmy kan mense help om plaaslike besighede, artikels, geleenthede, koopbewyse, geklassifiseerde advertensies, burgerlike foutverslae, vervoerhulp en besigheid-aanboordstappe te vind. Hy moet eerlik wees wanneer Life@ nog nie n geverifieerde rekord het nie.',
+                'location' => 'Life@',
+                'best_for' => 'Algemene hulp, opvolgvrae, en om die regte Life@ afdeling te vind.',
+            ],
+            'guide:directory' => [
+                'title' => 'Besigheidsgids',
+                'summary' => 'Die gids wys gepubliseerde plaaslike besighede. Mense kan volgens besigheidstipe, kategorie, dorp, diens of besigheidsnaam soek.',
+                'location' => 'Life@ Gids',
+                'best_for' => 'Om besighede en dienste te vind.',
+            ],
+            'guide:business-owner' => [
+                'title' => 'Besigheidseienaar gereedskap',
+                'summary' => 'Ingetekende besigheidseienaars kan listings verbeter, fotos byvoeg, geleenthede skep, advertensies loop, stootveldtogte stuur, en koopbewyse publiseer vanuit die listing-werkspasie.',
+                'location' => 'Life@ Rekening',
+                'best_for' => 'Om n besigheidsprofiel te verbeter of die volgende stap na n listing te kies.',
+            ],
+            'guide:add-listing' => [
+                'title' => 'Voeg n besigheidslisting by',
+                'summary' => 'Besigheidseienaars kan n listing begin, personeel-ondersteunde of selfdiens aanboord kies, en advertensie-opsies ontsluit nadat die listingreis begin.',
+                'location' => 'Life@ Aanboord',
+                'best_for' => 'Om n besigheid op Life@ by te voeg of te registreer.',
+            ],
+            'guide:advertise' => [
+                'title' => 'Advertensies en pakkette',
+                'summary' => 'Life@ advertensie-opsies sluit gidspakkette, geleentheidsigbaarheid, advertensies, stootveldtogte en koopbewyse in. Besigheidseienaars moet kies volgens of hulle ontdekking, bereik, herhalende besoeke of n spesifieke promosie nodig het.',
+                'location' => 'Life@ Adverteer',
+                'best_for' => 'Om pakkette, veldtogte en promosiegereedskap te kies.',
+            ],
+            'guide:events' => [
+                'title' => 'Geleenthede',
+                'summary' => 'Life@ geleenthede help mense ontdek wat naby gebeur. Besonderhede moet uit gepubliseerde geleentheidsrekords kom.',
+                'location' => 'Life@ Geleenthede',
+                'best_for' => 'Om plaaslike geleenthede en datums te vind.',
+            ],
+            'guide:articles' => [
+                'title' => 'Artikels en plaaslike opdaterings',
+                'summary' => 'Life@ artikels dek plaaslike stories en gemeenskapsopdaterings. Jimmy moet net gepubliseerde artikelrekords opsom wat aan hom verskaf is.',
+                'location' => 'Life@ Artikels',
+                'best_for' => 'Plaaslike nuus, opdaterings en verduidelikings.',
+            ],
+            'guide:vouchers' => [
+                'title' => 'Koopbewyse en aanbiedinge',
+                'summary' => 'Life@ koopbewyse wys aktiewe aanbiedinge van gelyste besighede. Waarde en bepalings moet uit gepubliseerde koopbewysrekords kom.',
+                'location' => 'Life@ Koopbewyse',
+                'best_for' => 'Aanbiedinge, spesiale pryse, afslag en plaaslike promosies.',
+            ],
+            'guide:classifieds' => [
+                'title' => 'Geklassifiseerde advertensies',
+                'summary' => 'Life@ geklassifiseerdes help mense om plaaslike items en gemeenskapsinskrywings te vind of in te dien. Pryse en beskikbaarheid moet uit gepubliseerde rekords kom.',
+                'location' => 'Life@ Geklassifiseerdes',
+                'best_for' => 'Koop, verkoop, en blaai deur plaaslike items.',
+            ],
+            'guide:faults' => [
+                'title' => 'Burgerlike foutverslae',
+                'summary' => 'Life@ foute help mense om goedgekeurde burgerlike probleme soos waterlekke, slaggate, straatligte, storting en elektrisiteitsprobleme te sien en aan te meld.',
+                'location' => 'Life@ Foute',
+                'best_for' => 'Om plaaslike burgerlike probleme te sien of aan te meld.',
+            ],
+            'guide:transport' => [
+                'title' => 'Vervoerhulp',
+                'summary' => 'Life@ vervoer kan mense lei na rit-, taxi-, aflewerings- of trekversoek werkstrome wanneer daardie dienste beskikbaar is.',
+                'location' => 'Life@ Vervoer',
+                'best_for' => 'Taxi, aflewering, bakkie, pakkie en trekhulp.',
+            ],
+            'guide:contact' => [
+                'title' => 'Kontak Life@',
+                'summary' => 'Wanneer iemand menslike hulp nodig het, is Life@ kontak die veiligste volgende stap. Jimmy moet nie voorgee dat hy amptelike besluite neem of private adminrekords kan sien nie.',
+                'location' => 'Life@ Ondersteuning',
+                'best_for' => 'Menslike ondersteuning, onsekerheid, regstellings of private rekeninghulp.',
+            ],
+        ];
+
+        return collect($guides)
+            ->map(function (array $guide) use ($afrikaans): array {
+                $translation = $afrikaans[$guide['id']] ?? [];
+
+                return array_replace($guide, [
+                    'title' => $translation['title'] ?? $guide['title'],
+                    'summary' => $translation['summary'] ?? $guide['summary'],
+                    'location' => $translation['location'] ?? $guide['location'],
+                    'meta' => array_replace($guide['meta'] ?? [], [
+                        'best_for' => $translation['best_for'] ?? data_get($guide, 'meta.best_for'),
+                    ]),
+                ]);
+            })
+            ->all();
     }
 
-    private function fallbackAnswer(string $question, Collection $sources, string $reason, array $intent, array $context, array $search): array
+    private function fallbackAnswer(string $question, Collection $sources, string $reason, array $intent, array $context, array $search, string $locale): array
     {
         if ($sources->isNotEmpty() && $sources->every(fn (array $source): bool => ($source['type'] ?? null) === 'guide')) {
             return [
                 'ok' => true,
                 'source' => 'fallback',
-                'answer' => 'I can help you work out where to go on Life@: businesses, events, local articles, vouchers, classifieds, civic fault reports, transport help, and business onboarding. I will be honest when I do not have a verified Life@ record yet, and I will point you to the safest next step.',
-                'locale' => $this->detectLocale($question),
+                'answer' => $this->t('fallback.guides_answer', $locale),
+                'locale' => $locale,
                 'confidence' => 0.35,
                 'intent' => $intent,
                 'search_context' => $this->publicSearchContext($search),
                 'page_context' => $context,
-                'sources' => $this->sourceCards($sources->take(8), $intent, $question, $context)->values()->all(),
-                'answer_actions' => $this->answerActions($intent, $sources, $question, $context, $search),
+                'sources' => $this->sourceCards($sources->take(8), $intent, $question, $context, $locale)->values()->all(),
+                'answer_actions' => $this->answerActions($intent, $sources, $question, $context, $search, $locale),
                 'follow_up_questions' => [
-                    'What town should I focus on?',
-                    'Are you looking for a business, event, article, voucher, classified, fault report, or transport help?',
+                    $this->t('follow.which_town', $locale),
+                    $this->t('follow.what_type', $locale),
                 ],
                 'search_url' => route('search.index', ['q' => $question]),
                 'message' => $reason,
@@ -735,32 +838,328 @@ class AskLifeService
 
         $topTypes = $sources
             ->groupBy('type')
-            ->map(fn (Collection $items, string $type): string => $items->count().' '.$type.($items->count() === 1 ? '' : 's'))
+            ->map(fn (Collection $items, string $type): string => $items->count().' '.$this->sourceTypeName($type, $items->count(), $locale))
             ->values()
             ->implode(', ');
 
         $first = $sources->first();
         $answer = $topTypes !== ''
-            ? 'I found '.$topTypes.' on Life@ that may help. Start with '.$first['title'].'.'
-            : 'I could not find a direct Life@ match yet.';
+            ? $this->t('fallback.found_sources', $locale, ['types' => $topTypes, 'title' => (string) $first['title']])
+            : $this->t('fallback.no_direct_match_short', $locale);
 
         return [
             'ok' => true,
             'source' => 'fallback',
             'answer' => $answer,
-            'locale' => $this->detectLocale($answer, $question),
+            'locale' => $locale,
             'confidence' => $sources->isEmpty() ? 0 : 0.45,
             'intent' => $intent,
             'search_context' => $this->publicSearchContext($search),
             'page_context' => $context,
-            'sources' => $this->sourceCards($sources->take(8), $intent, $question, $context)->values()->all(),
-            'answer_actions' => $this->answerActions($intent, $sources, $question, $context, $search),
+            'sources' => $this->sourceCards($sources->take(8), $intent, $question, $context, $locale)->values()->all(),
+            'answer_actions' => $this->answerActions($intent, $sources, $question, $context, $search, $locale),
             'follow_up_questions' => [
-                $search['location'] ? 'Show me more near '.$search['location'] : 'Try adding a town or category',
-                'Search this phrase across Life@',
+                $search['location']
+                    ? $this->t('follow.show_more_near', $locale, ['location' => (string) $search['location']])
+                    : $this->t('follow.add_town_or_category', $locale),
+                $this->t('follow.search_phrase', $locale),
             ],
             'search_url' => route('search.index', ['q' => $question]),
             'message' => $reason,
+        ];
+    }
+
+    private function targetLocale(string $question, ?User $user, array $context): string
+    {
+        $preferredLocales = [];
+
+        foreach ([
+            $user?->preferred_locale,
+            $context['locale'] ?? null,
+            app()->getLocale(),
+        ] as $locale) {
+            $normalized = $this->normalizeLocale($locale);
+
+            if ($normalized === 'af') {
+                return $normalized;
+            }
+
+            if ($normalized !== null) {
+                $preferredLocales[] = $normalized;
+            }
+        }
+
+        if ($this->detectLocale($question) === 'af') {
+            return 'af';
+        }
+
+        return $preferredLocales[0] ?? 'en';
+    }
+
+    private function normalizeLocale(?string $locale): ?string
+    {
+        $locale = trim((string) $locale);
+
+        if ($locale === '') {
+            return null;
+        }
+
+        $locale = str_replace('_', '-', mb_strtolower($locale));
+        $locale = explode('-', $locale)[0] ?: $locale;
+
+        return array_key_exists($locale, (array) config('localization.supported', []))
+            ? $locale
+            : null;
+    }
+
+    private function localeName(string $locale): string
+    {
+        return (string) data_get(config('localization.supported'), "{$locale}.name", $locale);
+    }
+
+    private function languageInstruction(string $locale): string
+    {
+        return $locale === 'af'
+            ? 'Answer in natural Afrikaans. Keep Life@, business names, routes, URLs, and official place names unchanged where appropriate.'
+            : 'Answer in natural South African English. Keep Life@, business names, routes, URLs, and official place names unchanged where appropriate.';
+    }
+
+    private function sourceTypeName(string $type, int $count, string $locale): string
+    {
+        $singular = $this->t('type.'.$type, $locale);
+
+        if ($count === 1) {
+            return $singular;
+        }
+
+        return $this->t('type_plural.'.$type, $locale, [], $singular.'s');
+    }
+
+    private function t(string $key, string $locale, array $replace = [], ?string $fallback = null): string
+    {
+        $locale = $this->normalizeLocale($locale) ?? 'en';
+        $translations = $this->translations();
+        $value = data_get($translations, "{$locale}.{$key}")
+            ?? data_get($translations, "en.{$key}")
+            ?? $fallback
+            ?? $key;
+
+        foreach ($replace as $name => $replacement) {
+            $value = str_replace(':'.$name, (string) $replacement, (string) $value);
+        }
+
+        return (string) $value;
+    }
+
+    private function translations(): array
+    {
+        return [
+            'en' => [
+                'action' => [
+                    'view' => 'View',
+                    'call' => 'Call',
+                    'website' => 'Website',
+                    'directions' => 'Directions',
+                    'report_fault' => 'Report fault',
+                    'open_listings' => 'Open listings',
+                    'open_best_match' => 'Open best match',
+                    'full_search' => 'Full search',
+                    'my_listings' => 'My listings',
+                    'advertise' => 'Advertise',
+                    'events' => 'Events',
+                    'vouchers' => 'Vouchers',
+                    'classifieds' => 'Classifieds',
+                    'post_classified' => 'Post classified',
+                    'fault_map' => 'Fault map',
+                    'transport' => 'Transport',
+                    'contact_life' => 'Contact Life@',
+                    'listing_workspace' => 'Listing workspace',
+                    'start_listing' => 'Start listing',
+                    'compare_packages' => 'Compare packages',
+                ],
+                'label' => [
+                    'business' => 'Business',
+                    'event' => 'Event',
+                    'article' => 'Article',
+                    'voucher' => 'Voucher',
+                    'classified' => 'Classified',
+                    'fault' => 'Fault',
+                    'guide' => 'Guide',
+                    'page' => 'Current page',
+                    'start' => 'Start',
+                    'packages' => 'Packages',
+                ],
+                'type' => [
+                    'business' => 'business',
+                    'event' => 'event',
+                    'article' => 'article',
+                    'voucher' => 'voucher',
+                    'classified' => 'classified',
+                    'fault' => 'fault',
+                    'guide' => 'guide',
+                    'page' => 'page',
+                    'start' => 'start',
+                    'packages' => 'package option',
+                ],
+                'type_plural' => [
+                    'business' => 'businesses',
+                    'event' => 'events',
+                    'article' => 'articles',
+                    'voucher' => 'vouchers',
+                    'classified' => 'classifieds',
+                    'fault' => 'faults',
+                    'guide' => 'guides',
+                    'page' => 'pages',
+                    'start' => 'starts',
+                    'packages' => 'package options',
+                ],
+                'meta' => [
+                    'contact_for_price' => 'Contact for price',
+                ],
+                'business_onboarding' => [
+                    'answer' => 'Yes. Start on Add Listing: create or log in to your account, enter your business name and town, choose a staff-assisted or self-service directory package, then continue to checkout. Once the listing is active, you can add events, adverts, push campaigns, and vouchers from your account.',
+                    'add_title' => 'Add your business listing',
+                    'add_summary' => 'Create a starter listing, choose a directory package, and continue to checkout.',
+                    'compare_title' => 'Compare advertising and directory packages',
+                    'compare_summary' => 'See directory, event, advert, push, and voucher options.',
+                ],
+                'fallback' => [
+                    'guides_answer' => 'I can help you work out where to go on Life@: businesses, events, local articles, vouchers, classifieds, civic fault reports, transport help, and business onboarding. I will be honest when I do not have a verified Life@ record yet, and I will point you to the safest next step.',
+                    'found_sources' => 'I found :types on Life@ that may help. Start with :title.',
+                    'no_direct_match_short' => 'I could not find a direct Life@ match yet.',
+                ],
+                'follow' => [
+                    'widen_location' => 'Should I widen this beyond :location?',
+                    'which_town' => 'Which town should I search in?',
+                    'what_type' => 'Are you looking for a business, event, article, voucher, classified, fault report, or transport help?',
+                    'staff_or_self' => 'Do you want staff-assisted setup or self-service?',
+                    'business_town' => 'Which town is your business in?',
+                    'business_addons' => 'Do you also want adverts, events, push campaigns, or vouchers?',
+                    'show_more_near' => 'Show me more near :location',
+                    'add_town_or_category' => 'Try adding a town or category',
+                    'search_phrase' => 'Search this phrase across Life@',
+                ],
+                'empty' => [
+                    'near_me' => 'I can help with that, but I need the town first because Life@ does not have your precise location in this chat. Tell me the town or area and I will narrow it down.',
+                    'event_discovery' => 'I could not find a matching Life@ event for that time or place yet. Try a town, venue, or event type and I will check again.',
+                    'voucher_discovery' => 'I could not find a matching active Life@ voucher yet. Try the business name, town, or kind of special you want.',
+                    'fault_reporting' => 'I could not find a matching approved fault report yet. You can open the fault map or report a new fault with a location and photo.',
+                    'business_owner' => 'I could not find a matching listing workspace item yet. Tell me which business or task you mean, and I can point you to the next account action.',
+                    'general' => 'I could not find a direct Life@ match yet. Try a more specific town, business type, event name, article topic, voucher, classified item, or fault category.',
+                ],
+                'page' => [
+                    'current_title' => 'Current Life@ page',
+                    'current_summary' => 'The user is currently viewing this Life@ page. Use it to answer follow-up questions about what they are looking at, while staying honest about facts not present in the page context.',
+                    'listing_workspace_summary' => 'The user is in a listing workspace. Help them improve the listing, add photos, create events, run adverts, prepare push campaigns, publish vouchers, or find human support.',
+                    'current_location' => 'Current page',
+                ],
+                'intent' => [
+                    'current_page_help' => 'Current page help',
+                ],
+            ],
+            'af' => [
+                'action' => [
+                    'view' => 'Maak oop',
+                    'call' => 'Bel',
+                    'website' => 'Webwerf',
+                    'directions' => 'Aanwysings',
+                    'report_fault' => 'Rapporteer fout',
+                    'open_listings' => 'Maak listings oop',
+                    'open_best_match' => 'Maak beste passing oop',
+                    'full_search' => 'Volledige soektog',
+                    'my_listings' => 'My listings',
+                    'advertise' => 'Adverteer',
+                    'events' => 'Geleenthede',
+                    'vouchers' => 'Koopbewyse',
+                    'classifieds' => 'Geklassifiseerdes',
+                    'post_classified' => 'Plaas geklassifiseerde advertensie',
+                    'fault_map' => 'Foutkaart',
+                    'transport' => 'Vervoer',
+                    'contact_life' => 'Kontak Life@',
+                    'listing_workspace' => 'Listing-werkspasie',
+                    'start_listing' => 'Begin listing',
+                    'compare_packages' => 'Vergelyk pakkette',
+                ],
+                'label' => [
+                    'business' => 'Besigheid',
+                    'event' => 'Geleentheid',
+                    'article' => 'Artikel',
+                    'voucher' => 'Koopbewys',
+                    'classified' => 'Geklassifiseerde',
+                    'fault' => 'Fout',
+                    'guide' => 'Gids',
+                    'page' => 'Huidige bladsy',
+                    'start' => 'Begin',
+                    'packages' => 'Pakkette',
+                ],
+                'type' => [
+                    'business' => 'besigheid',
+                    'event' => 'geleentheid',
+                    'article' => 'artikel',
+                    'voucher' => 'koopbewys',
+                    'classified' => 'geklassifiseerde',
+                    'fault' => 'fout',
+                    'guide' => 'gids',
+                    'page' => 'bladsy',
+                    'start' => 'beginpunt',
+                    'packages' => 'pakketopsie',
+                ],
+                'type_plural' => [
+                    'business' => 'besighede',
+                    'event' => 'geleenthede',
+                    'article' => 'artikels',
+                    'voucher' => 'koopbewyse',
+                    'classified' => 'geklassifiseerdes',
+                    'fault' => 'foute',
+                    'guide' => 'gidse',
+                    'page' => 'bladsye',
+                    'start' => 'beginpunte',
+                    'packages' => 'pakketopsies',
+                ],
+                'meta' => [
+                    'contact_for_price' => 'Kontak vir prys',
+                ],
+                'business_onboarding' => [
+                    'answer' => 'Ja. Begin by Voeg Listing By: skep of meld aan by jou rekening, vul jou besigheidsnaam en dorp in, kies n personeel-ondersteunde of selfdiens gidspakket, en gaan dan voort na betaalpunt. Sodra die listing aktief is, kan jy geleenthede, advertensies, stootveldtogte en koopbewyse vanuit jou rekening byvoeg.',
+                    'add_title' => 'Voeg jou besigheidslisting by',
+                    'add_summary' => 'Skep n beginlisting, kies n gidspakket, en gaan voort na betaalpunt.',
+                    'compare_title' => 'Vergelyk advertensie- en gidspakkette',
+                    'compare_summary' => 'Sien gids-, geleentheid-, advertensie-, stootveldtog- en koopbewysopsies.',
+                ],
+                'fallback' => [
+                    'guides_answer' => 'Ek kan jou help uitwerk waarheen om op Life@ te gaan: besighede, geleenthede, plaaslike artikels, koopbewyse, geklassifiseerdes, burgerlike foutverslae, vervoerhulp en besigheid-aanboord. Ek sal eerlik wees wanneer Life@ nog nie n geverifieerde rekord het nie, en ek sal jou na die veiligste volgende stap wys.',
+                    'found_sources' => 'Ek het :types op Life@ gevind wat dalk kan help. Begin by :title.',
+                    'no_direct_match_short' => 'Ek kon nog nie n direkte Life@ passing vind nie.',
+                ],
+                'follow' => [
+                    'widen_location' => 'Moet ek wyer as :location soek?',
+                    'which_town' => 'In watter dorp moet ek soek?',
+                    'what_type' => 'Soek jy n besigheid, geleentheid, artikel, koopbewys, geklassifiseerde advertensie, foutverslag of vervoerhulp?',
+                    'staff_or_self' => 'Wil jy personeel-ondersteunde opstelling of selfdiens he?',
+                    'business_town' => 'In watter dorp is jou besigheid?',
+                    'business_addons' => 'Wil jy ook advertensies, geleenthede, stootveldtogte of koopbewyse he?',
+                    'show_more_near' => 'Wys my meer naby :location',
+                    'add_town_or_category' => 'Probeer n dorp of kategorie byvoeg',
+                    'search_phrase' => 'Soek hierdie frase deur Life@',
+                ],
+                'empty' => [
+                    'near_me' => 'Ek kan daarmee help, maar ek het eers die dorp nodig omdat Life@ nie jou presiese ligging in hierdie klets het nie. Gee vir my die dorp of area en ek sal dit vernou.',
+                    'event_discovery' => 'Ek kon nog nie n passende Life@ geleentheid vir daardie tyd of plek vind nie. Probeer n dorp, venue of soort geleentheid en ek sal weer kyk.',
+                    'voucher_discovery' => 'Ek kon nog nie n passende aktiewe Life@ koopbewys vind nie. Probeer die besigheidsnaam, dorp of soort aanbieding wat jy soek.',
+                    'fault_reporting' => 'Ek kon nog nie n passende goedgekeurde foutverslag vind nie. Jy kan die foutkaart oopmaak of n nuwe fout met n ligging en foto rapporteer.',
+                    'business_owner' => 'Ek kon nog nie n passende listing-werkspasie item vind nie. Se vir my watter besigheid of taak jy bedoel, en ek kan jou na die volgende rekeningaksie wys.',
+                    'general' => 'Ek kon nog nie n direkte Life@ passing vind nie. Probeer n meer spesifieke dorp, besigheidstipe, geleentheidsnaam, artikelonderwerp, koopbewys, geklassifiseerde item of foutkategorie.',
+                ],
+                'page' => [
+                    'current_title' => 'Huidige Life@ bladsy',
+                    'current_summary' => 'Die gebruiker kyk tans na hierdie Life@ bladsy. Gebruik dit om opvolgvrae te beantwoord oor waarna hulle kyk, terwyl jy eerlik bly oor feite wat nie in die bladsykonteks is nie.',
+                    'listing_workspace_summary' => 'Die gebruiker is in n listing-werkspasie. Help hulle om die listing te verbeter, fotos by te voeg, geleenthede te skep, advertensies te loop, stootveldtogte voor te berei, koopbewyse te publiseer, of menslike ondersteuning te vind.',
+                    'current_location' => 'Huidige bladsy',
+                ],
+                'intent' => [
+                    'current_page_help' => 'Huidige bladsy hulp',
+                ],
+            ],
         ];
     }
 
@@ -1071,17 +1470,17 @@ class AskLifeService
         return null;
     }
 
-    private function pageContextSources(array $context, array $intent): Collection
+    private function pageContextSources(array $context, array $intent, string $locale): Collection
     {
         if (($context['page_type'] ?? 'general') === 'general') {
             return collect();
         }
 
-        $title = $context['page_heading'] ?? $context['page_title'] ?? 'Current Life@ page';
-        $summary = 'The user is currently viewing this Life@ page. Use it to answer follow-up questions about what they are looking at, while staying honest about facts not present in the page context.';
+        $title = $context['page_heading'] ?? $context['page_title'] ?? $this->t('page.current_title', $locale);
+        $summary = $this->t('page.current_summary', $locale);
 
         if (($context['page_type'] ?? '') === 'account_listing_workspace') {
-            $summary = 'The user is in a listing workspace. Help them improve the listing, add photos, create events, run adverts, prepare push campaigns, publish vouchers, or find human support.';
+            $summary = $this->t('page.listing_workspace_summary', $locale);
         }
 
         return collect([
@@ -1090,11 +1489,11 @@ class AskLifeService
                 'type' => 'page',
                 'title' => $title,
                 'summary' => $summary,
-                'location' => 'Current page',
+                'location' => $this->t('page.current_location', $locale),
                 'url' => $context['page_url'] ?? null,
                 'meta' => [
                     'page_type' => $context['page_type'] ?? 'general',
-                    'intent' => $intent['label'] ?? 'Current page help',
+                    'intent' => $intent['label'] ?? $this->t('intent.current_page_help', $locale),
                 ],
             ],
         ]);
@@ -1175,51 +1574,51 @@ class AskLifeService
             ->values();
     }
 
-    private function sourceCards(Collection $sources, array $intent, string $question, array $context): Collection
+    private function sourceCards(Collection $sources, array $intent, string $question, array $context, string $locale): Collection
     {
-        return $sources->map(function (array $source) use ($intent, $question, $context): array {
+        return $sources->map(function (array $source) use ($intent, $question, $context, $locale): array {
             unset($source['keywords']);
 
-            $source['label'] = $this->sourceLabel((string) ($source['type'] ?? 'source'));
+            $source['label'] = $this->sourceLabel((string) ($source['type'] ?? 'source'), $locale);
             $source['meta'] = collect($source['meta'] ?? [])
                 ->reject(fn ($value): bool => $value === null || $value === '' || $value === [])
                 ->all();
-            $source['actions'] = $this->sourceActions($source, $intent, $question, $context);
+            $source['actions'] = $this->sourceActions($source, $intent, $question, $context, $locale);
 
             return $source;
         });
     }
 
-    private function sourceActions(array $source, array $intent, string $question, array $context): array
+    private function sourceActions(array $source, array $intent, string $question, array $context, string $locale): array
     {
         $actions = [];
 
         if (filled($source['url'] ?? null)) {
-            $actions[] = $this->action('View', (string) $source['url'], 'primary');
+            $actions[] = $this->action($this->t('action.view', $locale), (string) $source['url'], 'primary');
         }
 
         if (filled(data_get($source, 'meta.phone'))) {
             $phone = preg_replace('/[^\d+]/', '', (string) data_get($source, 'meta.phone'));
             if ($phone !== '') {
-                $actions[] = $this->action('Call', 'tel:'.$phone, 'phone');
+                $actions[] = $this->action($this->t('action.call', $locale), 'tel:'.$phone, 'phone');
             }
         }
 
         if (filled(data_get($source, 'meta.website'))) {
-            $actions[] = $this->action('Website', (string) data_get($source, 'meta.website'), 'external', true);
+            $actions[] = $this->action($this->t('action.website', $locale), (string) data_get($source, 'meta.website'), 'external', true);
         }
 
         $mapQuery = $this->mapQueryForSource($source);
         if ($mapQuery !== null) {
-            $actions[] = $this->action('Directions', $this->mapsUrl($mapQuery), 'directions', true);
+            $actions[] = $this->action($this->t('action.directions', $locale), $this->mapsUrl($mapQuery), 'directions', true);
         }
 
         if (($source['type'] ?? '') === 'fault') {
-            $actions[] = $this->action('Report fault', route('faults.report.create'), 'secondary');
+            $actions[] = $this->action($this->t('action.report_fault', $locale), route('faults.report.create'), 'secondary');
         }
 
         if (($source['id'] ?? '') === 'guide:business-owner') {
-            $actions[] = $this->action('Open listings', route('account.listings.index'), 'secondary');
+            $actions[] = $this->action($this->t('action.open_listings', $locale), route('account.listings.index'), 'secondary');
         }
 
         return collect($actions)
@@ -1229,44 +1628,44 @@ class AskLifeService
             ->all();
     }
 
-    private function answerActions(array $intent, Collection $sources, string $question, array $context, array $search): array
+    private function answerActions(array $intent, Collection $sources, string $question, array $context, array $search, string $locale): array
     {
         $actions = [];
         $first = $sources->first();
 
         if (is_array($first) && filled($first['url'] ?? null)) {
-            $actions[] = $this->action('Open best match', (string) $first['url'], 'primary');
+            $actions[] = $this->action($this->t('action.open_best_match', $locale), (string) $first['url'], 'primary');
         }
 
-        $actions[] = $this->action('Full search', route('search.index', array_filter([
+        $actions[] = $this->action($this->t('action.full_search', $locale), route('search.index', array_filter([
             'q' => $question,
             'loc' => $search['location'] ?? null,
         ])), 'search');
 
         foreach (match ($intent['key'] ?? 'general') {
             'business_owner' => [
-                $this->action('My listings', route('account.listings.index'), 'secondary'),
-                $this->action('Advertise', route('advertise.index'), 'secondary'),
+                $this->action($this->t('action.my_listings', $locale), route('account.listings.index'), 'secondary'),
+                $this->action($this->t('action.advertise', $locale), route('advertise.index'), 'secondary'),
             ],
             'event_discovery' => [
-                $this->action('Events', route('events.index', array_filter(['q' => $question, 'location' => $search['location'] ?? null])), 'secondary'),
+                $this->action($this->t('action.events', $locale), route('events.index', array_filter(['q' => $question, 'location' => $search['location'] ?? null])), 'secondary'),
             ],
             'voucher_discovery' => [
-                $this->action('Vouchers', route('vouchers.index'), 'secondary'),
+                $this->action($this->t('action.vouchers', $locale), route('vouchers.index'), 'secondary'),
             ],
             'classified_discovery' => [
-                $this->action('Classifieds', route('classifieds.index'), 'secondary'),
-                $this->action('Post classified', route('classifieds.manage.create'), 'secondary'),
+                $this->action($this->t('action.classifieds', $locale), route('classifieds.index'), 'secondary'),
+                $this->action($this->t('action.post_classified', $locale), route('classifieds.manage.create'), 'secondary'),
             ],
             'fault_reporting' => [
-                $this->action('Fault map', route('faults.index'), 'secondary'),
-                $this->action('Report fault', route('faults.report.create'), 'secondary'),
+                $this->action($this->t('action.fault_map', $locale), route('faults.index'), 'secondary'),
+                $this->action($this->t('action.report_fault', $locale), route('faults.report.create'), 'secondary'),
             ],
             'transport_help' => [
-                $this->action('Transport', route('transport.index'), 'secondary'),
+                $this->action($this->t('action.transport', $locale), route('transport.index'), 'secondary'),
             ],
             'support' => [
-                $this->action('Contact Life@', route('contact.index'), 'secondary'),
+                $this->action($this->t('action.contact_life', $locale), route('contact.index'), 'secondary'),
             ],
             default => [],
         } as $action) {
@@ -1274,7 +1673,7 @@ class AskLifeService
         }
 
         if (($context['page_type'] ?? '') === 'account_listing_workspace') {
-            $actions[] = $this->action('Listing workspace', route('account.listings.index'), 'secondary');
+            $actions[] = $this->action($this->t('action.listing_workspace', $locale), route('account.listings.index'), 'secondary');
         }
 
         return collect($actions)
@@ -1294,17 +1693,19 @@ class AskLifeService
         ];
     }
 
-    private function sourceLabel(string $type): string
+    private function sourceLabel(string $type, string $locale): string
     {
         return match ($type) {
-            'business' => 'Business',
-            'event' => 'Event',
-            'article' => 'Article',
-            'voucher' => 'Voucher',
-            'classified' => 'Classified',
-            'fault' => 'Fault',
-            'guide' => 'Guide',
-            'page' => 'Current page',
+            'business' => $this->t('label.business', $locale),
+            'event' => $this->t('label.event', $locale),
+            'article' => $this->t('label.article', $locale),
+            'voucher' => $this->t('label.voucher', $locale),
+            'classified' => $this->t('label.classified', $locale),
+            'fault' => $this->t('label.fault', $locale),
+            'guide' => $this->t('label.guide', $locale),
+            'page' => $this->t('label.page', $locale),
+            'start' => $this->t('label.start', $locale),
+            'packages' => $this->t('label.packages', $locale),
             default => Str::headline($type),
         };
     }
@@ -1324,18 +1725,18 @@ class AskLifeService
         return 'https://www.google.com/maps/search/?api=1&query='.rawurlencode($query);
     }
 
-    private function emptyAnswer(array $intent, array $search): string
+    private function emptyAnswer(array $intent, array $search, string $locale): string
     {
         if (($search['near_me'] ?? false) && ! $search['location']) {
-            return 'I can help with that, but I need the town first because Life@ does not have your precise location in this chat. Tell me the town or area and I will narrow it down.';
+            return $this->t('empty.near_me', $locale);
         }
 
         return match ($intent['key'] ?? 'general') {
-            'event_discovery' => 'I could not find a matching Life@ event for that time or place yet. Try a town, venue, or event type and I will check again.',
-            'voucher_discovery' => 'I could not find a matching active Life@ voucher yet. Try the business name, town, or kind of special you want.',
-            'fault_reporting' => 'I could not find a matching approved fault report yet. You can open the fault map or report a new fault with a location and photo.',
-            'business_owner' => 'I could not find a matching listing workspace item yet. Tell me which business or task you mean, and I can point you to the next account action.',
-            default => 'I could not find a direct Life@ match yet. Try a more specific town, business type, event name, article topic, voucher, classified item, or fault category.',
+            'event_discovery' => $this->t('empty.event_discovery', $locale),
+            'voucher_discovery' => $this->t('empty.voucher_discovery', $locale),
+            'fault_reporting' => $this->t('empty.fault_reporting', $locale),
+            'business_owner' => $this->t('empty.business_owner', $locale),
+            default => $this->t('empty.general', $locale),
         };
     }
 

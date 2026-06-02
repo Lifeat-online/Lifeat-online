@@ -178,6 +178,108 @@ class AskLifeTest extends TestCase
         ]);
     }
 
+    public function test_ask_life_uses_page_locale_for_ai_answers_even_when_question_is_english(): void
+    {
+        config([
+            'services.ai.provider' => 'openrouter',
+            'services.ai.providers.openrouter.key' => 'sk-or-test',
+            'services.ai.providers.openrouter.model' => 'openai/gpt-oss-120b',
+        ]);
+
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'answer' => 'Ek is Jimmy. Ek kan jou help om die regte Life@ afdeling te vind.',
+                                'confidence' => 0.74,
+                                'source_ids' => ['guide:search'],
+                                'follow_up_questions' => ['In watter dorp moet ek soek?'],
+                            ]),
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $this->postJson(route('ask-life.store'), [
+            'question' => 'Jimmy, what can you help me with?',
+            'context' => [
+                'locale' => 'af',
+                'page_type' => 'general',
+                'timezone' => 'Africa/Johannesburg',
+            ],
+        ])
+            ->assertOk()
+            ->assertJsonPath('source', 'ai')
+            ->assertJsonPath('locale', 'af')
+            ->assertJsonPath('answer', 'Ek is Jimmy. Ek kan jou help om die regte Life@ afdeling te vind.')
+            ->assertJsonPath('sources.0.id', 'guide:search')
+            ->assertJsonPath('sources.0.label', 'Gids')
+            ->assertJsonPath('sources.0.title', 'Jimmy kan jou help om Life@ te gebruik')
+            ->assertJsonPath('answer_actions.0.label', 'Maak beste passing oop')
+            ->assertJsonPath('answer_actions.1.label', 'Volledige soektog');
+
+        Http::assertSent(function ($request): bool {
+            $payload = json_decode($request->body(), true);
+            $input = json_decode((string) data_get($payload, 'messages.1.content'), true);
+
+            return data_get($input, 'target_locale') === 'af'
+                && data_get($input, 'target_language') === 'Afrikaans'
+                && str_contains((string) data_get($input, 'language_instruction'), 'Answer in natural Afrikaans')
+                && str_contains((string) data_get($payload, 'messages.0.content'), 'If target_locale is "af"');
+        });
+
+        $this->assertDatabaseHas('ai_generations', [
+            'feature_key' => 'ask_life',
+            'prompt_version' => 'ask_life_v5',
+            'output_language' => 'af',
+        ]);
+    }
+
+    public function test_ask_life_fallback_guides_respect_afrikaans_page_locale_without_ai_provider(): void
+    {
+        config([
+            'services.ai.provider' => 'openrouter',
+            'services.ai.providers.openrouter.key' => '',
+        ]);
+
+        $this->postJson(route('ask-life.store'), [
+            'question' => 'Jimmy, what can you help me with?',
+            'context' => [
+                'locale' => 'af',
+                'page_type' => 'general',
+                'timezone' => 'Africa/Johannesburg',
+            ],
+        ])
+            ->assertOk()
+            ->assertJsonPath('source', 'fallback')
+            ->assertJsonPath('locale', 'af')
+            ->assertJsonPath('sources.0.id', 'guide:search')
+            ->assertJsonPath('sources.0.label', 'Gids')
+            ->assertJsonPath('sources.0.title', 'Jimmy kan jou help om Life@ te gebruik')
+            ->assertJsonPath('answer_actions.0.label', 'Maak beste passing oop')
+            ->assertJsonPath('answer_actions.1.label', 'Volledige soektog')
+            ->assertSee('Ek kan jou help uitwerk waarheen om op Life@ te gaan', false);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_ask_life_widget_renders_saved_afrikaans_locale_labels_before_javascript_runs(): void
+    {
+        $response = $this
+            ->withSession(['locale' => 'af'])
+            ->get(route('home'));
+
+        $response->assertOk();
+        $response->assertSee('data-locale="af"', false);
+        $response->assertSee('Vra vir Jimmy', false);
+        $response->assertSee('Vind plaaslike antwoorde, aksies en die regte Life@ bladsy.', false);
+        $response->assertSee('Hallo, ek is Jimmy. Waarmee moet ek jou help?', false);
+        $response->assertSee('Probeer: bandherstelwerk in Bethlehem', false);
+    }
+
     public function test_jimmy_can_answer_conversationally_from_platform_guides(): void
     {
         config([
