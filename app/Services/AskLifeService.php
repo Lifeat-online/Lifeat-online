@@ -988,8 +988,8 @@ class AskLifeService
 
         $afrikaans = [
             'guide:search' => [
-                'title' => 'Jimmy kan jou help om Life@ te gebruik',
-                'summary' => 'Jimmy kan mense help om plaaslike besighede, artikels, geleenthede, koopbewyse, geklassifiseerde advertensies, burgerlike foutverslae, vervoerhulp en besigheid-aanboordstappe te vind. Hy moet eerlik wees wanneer Life@ nog nie n geverifieerde rekord het nie.',
+                'title' => 'Jakobus kan jou help om Life@ te gebruik',
+                'summary' => 'Jakobus kan mense help om plaaslike besighede, artikels, geleenthede, koopbewyse, geklassifiseerde advertensies, burgerlike foutverslae, vervoerhulp en besigheid-aanboordstappe te vind. Hy moet eerlik wees wanneer Life@ nog nie n geverifieerde rekord het nie.',
                 'location' => 'Life@',
                 'best_for' => 'Algemene hulp, opvolgvrae, en om die regte Life@ afdeling te vind.',
             ],
@@ -1025,7 +1025,7 @@ class AskLifeService
             ],
             'guide:articles' => [
                 'title' => 'Artikels en plaaslike opdaterings',
-                'summary' => 'Life@ artikels dek plaaslike stories en gemeenskapsopdaterings. Jimmy moet net gepubliseerde artikelrekords opsom wat aan hom verskaf is.',
+                'summary' => 'Life@ artikels dek plaaslike stories en gemeenskapsopdaterings. Jakobus moet net gepubliseerde artikelrekords opsom wat aan hom verskaf is.',
                 'location' => 'Life@ Artikels',
                 'best_for' => 'Plaaslike nuus, opdaterings en verduidelikings.',
             ],
@@ -1055,7 +1055,7 @@ class AskLifeService
             ],
             'guide:contact' => [
                 'title' => 'Kontak Life@',
-                'summary' => 'Wanneer iemand menslike hulp nodig het, is Life@ kontak die veiligste volgende stap. Jimmy moet nie voorgee dat hy amptelike besluite neem of private adminrekords kan sien nie.',
+                'summary' => 'Wanneer iemand menslike hulp nodig het, is Life@ kontak die veiligste volgende stap. Jakobus moet nie voorgee dat hy amptelike besluite neem of private adminrekords kan sien nie.',
                 'location' => 'Life@ Ondersteuning',
                 'best_for' => 'Menslike ondersteuning, onsekerheid, regstellings of private rekeninghulp.',
             ],
@@ -1180,7 +1180,7 @@ class AskLifeService
     private function languageInstruction(string $locale): string
     {
         return $locale === 'af'
-            ? 'Answer in natural Afrikaans. Keep Life@, business names, routes, URLs, and official place names unchanged where appropriate.'
+            ? 'Answer in natural Afrikaans. Refer to the assistant as Jakobus, not Jimmy. Keep Life@, business names, routes, URLs, and official place names unchanged where appropriate.'
             : 'Answer in natural South African English. Keep Life@, business names, routes, URLs, and official place names unchanged where appropriate.';
     }
 
@@ -1441,7 +1441,7 @@ class AskLifeService
                     ],
                 ],
                 'fallback' => [
-                    'guides_answer' => 'Ek kan jou help uitwerk waarheen om op Life@ te gaan: besighede, geleenthede, plaaslike artikels, koopbewyse, geklassifiseerdes, burgerlike foutverslae, vervoerhulp en besigheid-aanboord. Ek sal eerlik wees wanneer Life@ nog nie n geverifieerde rekord het nie, en ek sal jou na die veiligste volgende stap wys.',
+                    'guides_answer' => 'Ek is Jakobus. Ek kan jou help uitwerk waarheen om op Life@ te gaan: besighede, geleenthede, plaaslike artikels, koopbewyse, geklassifiseerdes, burgerlike foutverslae, vervoerhulp en besigheid-aanboord. Ek sal eerlik wees wanneer Life@ nog nie n geverifieerde rekord het nie, en ek sal jou na die veiligste volgende stap wys.',
                     'found_sources' => 'Ek het :types op Life@ gevind wat dalk kan help. Begin by :title.',
                     'no_direct_match_short' => 'Ek kon nog nie n direkte Life@ passing vind nie.',
                 ],

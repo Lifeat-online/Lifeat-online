@@ -195,7 +195,7 @@ class AskLifeTest extends TestCase
                     [
                         'message' => [
                             'content' => json_encode([
-                                'answer' => 'Ek is Jimmy. Ek kan jou help om die regte Life@ afdeling te vind.',
+                                'answer' => 'Ek is Jakobus. Ek kan jou help om die regte Life@ afdeling te vind.',
                                 'confidence' => 0.74,
                                 'source_ids' => ['guide:search'],
                                 'follow_up_questions' => ['In watter dorp moet ek soek?'],
@@ -217,10 +217,10 @@ class AskLifeTest extends TestCase
             ->assertOk()
             ->assertJsonPath('source', 'ai')
             ->assertJsonPath('locale', 'af')
-            ->assertJsonPath('answer', 'Ek is Jimmy. Ek kan jou help om die regte Life@ afdeling te vind.')
+            ->assertJsonPath('answer', 'Ek is Jakobus. Ek kan jou help om die regte Life@ afdeling te vind.')
             ->assertJsonPath('sources.0.id', 'guide:search')
             ->assertJsonPath('sources.0.label', 'Gids')
-            ->assertJsonPath('sources.0.title', 'Jimmy kan jou help om Life@ te gebruik')
+            ->assertJsonPath('sources.0.title', 'Jakobus kan jou help om Life@ te gebruik')
             ->assertJsonPath('answer_actions.0.label', 'Maak beste passing oop')
             ->assertJsonPath('answer_actions.1.label', 'Volledige soektog');
 
@@ -230,13 +230,13 @@ class AskLifeTest extends TestCase
 
             return data_get($input, 'target_locale') === 'af'
                 && data_get($input, 'target_language') === 'Afrikaans'
-                && str_contains((string) data_get($input, 'language_instruction'), 'Answer in natural Afrikaans')
-                && str_contains((string) data_get($payload, 'messages.0.content'), 'If target_locale is "af"');
+                && str_contains((string) data_get($input, 'language_instruction'), 'Refer to the assistant as Jakobus')
+                && str_contains((string) data_get($payload, 'messages.0.content'), 'introduce or refer to yourself as Jakobus');
         });
 
         $this->assertDatabaseHas('ai_generations', [
             'feature_key' => 'ask_life',
-            'prompt_version' => 'ask_life_v7',
+            'prompt_version' => 'ask_life_v8',
             'output_language' => 'af',
         ]);
     }
@@ -261,10 +261,10 @@ class AskLifeTest extends TestCase
             ->assertJsonPath('locale', 'af')
             ->assertJsonPath('sources.0.id', 'guide:search')
             ->assertJsonPath('sources.0.label', 'Gids')
-            ->assertJsonPath('sources.0.title', 'Jimmy kan jou help om Life@ te gebruik')
+            ->assertJsonPath('sources.0.title', 'Jakobus kan jou help om Life@ te gebruik')
             ->assertJsonPath('answer_actions.0.label', 'Maak beste passing oop')
             ->assertJsonPath('answer_actions.1.label', 'Volledige soektog')
-            ->assertSee('Ek kan jou help uitwerk waarheen om op Life@ te gaan', false);
+            ->assertSee('Ek is Jakobus. Ek kan jou help uitwerk waarheen om op Life@ te gaan', false);
 
         Http::assertNothingSent();
     }
@@ -280,10 +280,12 @@ class AskLifeTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('data-locale="af"', false);
-        $response->assertSee('Vra vir Jimmy', false);
+        $response->assertSee('Vra vir Jakobus', false);
         $response->assertSee('Vind plaaslike antwoorde, aksies en die regte Life@ bladsy.', false);
-        $response->assertSee('Hallo, ek is Jimmy. Waarmee moet ek jou help?', false);
+        $response->assertSee('Hallo, ek is Jakobus. Waarmee moet ek jou help?', false);
         $response->assertSee('Probeer: bandherstelwerk in Bethlehem', false);
+        $response->assertDontSee('Vra vir Jimmy', false);
+        $response->assertDontSee('Hallo, ek is Jimmy', false);
     }
 
     public function test_ask_life_is_hidden_and_blocked_for_non_dev_users(): void

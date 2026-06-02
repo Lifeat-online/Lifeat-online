@@ -2,6 +2,7 @@
     $askLifeLocale = app()->getLocale() === 'af' ? 'af' : 'en';
     $askLifeTexts = [
         'en' => [
+            'assistantName' => 'Jimmy',
             'askJimmy' => 'Ask Jimmy',
             'headerSubtitle' => 'Find local answers, actions, and the right Life@ page.',
             'greeting' => 'Hi, I am Jimmy. What should I help you do?',
@@ -40,9 +41,10 @@
             'unavailable' => 'Jimmy is unavailable right now. Try the full search page.',
         ],
         'af' => [
-            'askJimmy' => 'Vra vir Jimmy',
+            'assistantName' => 'Jakobus',
+            'askJimmy' => 'Vra vir Jakobus',
             'headerSubtitle' => 'Vind plaaslike antwoorde, aksies en die regte Life@ bladsy.',
-            'greeting' => 'Hallo, ek is Jimmy. Waarmee moet ek jou help?',
+            'greeting' => 'Hallo, ek is Jakobus. Waarmee moet ek jou help?',
             'questionLabel' => 'Vraag',
             'placeholder' => 'Probeer: bandherstelwerk in Bethlehem, geleenthede hierdie naweek, verbeter my listing',
             'askTitle' => 'Vra',
@@ -50,8 +52,8 @@
             'muteVoice' => 'Demp stem',
             'enableVoice' => 'Skakel stem aan',
             'clearConversation' => 'Maak gesprek skoon',
-            'closeJimmy' => 'Maak Jimmy toe',
-            'thinking' => 'Jimmy dink',
+            'closeJimmy' => 'Maak Jakobus toe',
+            'thinking' => 'Jakobus dink',
             'open' => 'Maak oop',
             'source' => 'Bron',
             'lifeSource' => 'Life@ bron',
@@ -64,7 +66,7 @@
             'openSearch' => 'Maak soektog oop',
             'listen' => 'Luister',
             'listenTitle' => 'Luister na hierdie antwoord',
-            'listenAria' => 'Luister hoe Jimmy hierdie antwoord lees',
+            'listenAria' => 'Luister hoe Jakobus hierdie antwoord lees',
             'loading' => 'Laai',
             'playingSaved' => 'Speel gestoorde klank',
             'playing' => 'Speel',
@@ -75,7 +77,7 @@
             'saved' => 'Gestoor',
             'feedbackFailed' => 'Kon nie terugvoer stoor nie',
             'fallbackAnswer' => 'Ek kon nog nie n antwoord uit Life@ bronne bou nie.',
-            'unavailable' => 'Jimmy is nou nie beskikbaar nie. Probeer die volledige soekbladsy.',
+            'unavailable' => 'Jakobus is nou nie beskikbaar nie. Probeer die volledige soekbladsy.',
         ],
     ][$askLifeLocale];
 @endphp
@@ -96,7 +98,7 @@
     <section id="ask-life-panel" class="ask-life-panel" data-ask-life-panel hidden aria-label="{{ $askLifeTexts['askJimmy'] }}">
         <div class="ask-life-head">
             <div>
-                <strong>Jimmy</strong>
+                <strong>{{ $askLifeTexts['assistantName'] }}</strong>
                 <p>{{ $askLifeTexts['headerSubtitle'] }}</p>
             </div>
             <div class="ask-life-head-actions">
