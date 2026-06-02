@@ -63,13 +63,13 @@ class EnvironmentCheck
             return [[
                 'level' => 'error',
                 'key' => 'UPLOAD_STORAGE_BACKEND',
-                'message' => 'Set UPLOAD_STORAGE_BACKEND to railway_volume before launch, or refactor uploads to dedicated object-storage disks.',
+                'message' => 'Set UPLOAD_STORAGE_BACKEND to mounted_volume before launch, or refactor uploads to dedicated object-storage disks.',
             ]];
         }
 
-        if ($backend === 'railway_volume') {
+        if ($backend === 'mounted_volume') {
             return array_values(array_filter([
-                $this->expectPresent('error', 'UPLOAD_STORAGE_MOUNT_PATH', $mountPath, 'UPLOAD_STORAGE_MOUNT_PATH must point to the mounted Railway upload volume.'),
+                $this->expectPresent('error', 'UPLOAD_STORAGE_MOUNT_PATH', $mountPath, 'UPLOAD_STORAGE_MOUNT_PATH must point to the mounted Hetzner/Coolify upload volume.'),
             ]));
         }
 
@@ -79,14 +79,14 @@ class EnvironmentCheck
                 $this->expectPresent('error', 'AWS_ACCESS_KEY_ID', (string) config('filesystems.disks.s3.key'), 'AWS_ACCESS_KEY_ID is required for S3-compatible upload storage.'),
                 $this->expectPresent('error', 'AWS_SECRET_ACCESS_KEY', (string) config('filesystems.disks.s3.secret'), 'AWS_SECRET_ACCESS_KEY is required for S3-compatible upload storage.'),
                 $this->expectPresent('error', 'AWS_BUCKET', (string) config('filesystems.disks.s3.bucket'), 'AWS_BUCKET is required for S3-compatible upload storage.'),
-                $this->expectPresent('warning', 'AWS_ENDPOINT', (string) config('filesystems.disks.s3.endpoint'), 'AWS_ENDPOINT should be set for Railway S3-compatible object storage.'),
+                $this->expectPresent('warning', 'AWS_ENDPOINT', (string) config('filesystems.disks.s3.endpoint'), 'AWS_ENDPOINT should be set for S3-compatible object storage.'),
             ]));
         }
 
         return [[
             'level' => 'error',
             'key' => 'UPLOAD_STORAGE_BACKEND',
-            'message' => 'UPLOAD_STORAGE_BACKEND must be railway_volume or s3.',
+            'message' => 'UPLOAD_STORAGE_BACKEND must be mounted_volume or s3.',
         ]];
     }
 

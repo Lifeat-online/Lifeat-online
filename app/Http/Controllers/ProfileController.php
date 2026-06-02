@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Services\LocalePreferenceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,7 +25,7 @@ class ProfileController extends Controller
     /**
      * Update the user's profile information.
      */
-    public function update(ProfileUpdateRequest $request): RedirectResponse
+    public function update(ProfileUpdateRequest $request, LocalePreferenceService $preferences): RedirectResponse
     {
         $request->user()->fill($request->validated());
 
@@ -34,7 +35,11 @@ class ProfileController extends Controller
 
         $request->user()->save();
 
-        return Redirect::route('profile.edit')->with('status', 'profile-updated');
+        $locale = $preferences->syncAuthenticatedUser($request, $request->user());
+
+        return Redirect::route('profile.edit')
+            ->with('status', 'profile-updated')
+            ->withCookie($preferences->cookie($locale));
     }
 
     /**

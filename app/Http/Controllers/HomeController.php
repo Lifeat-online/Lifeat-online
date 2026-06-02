@@ -15,20 +15,20 @@ class HomeController extends Controller
     {
         $adminBootstrapVisible = true;
 
-        $latestArticles = Article::with(['author', 'categories'])
+        $latestArticles = Article::with(['author', 'contentTranslations', 'categories.contentTranslations'])
             ->published()
             ->latest('published_at')
             ->limit(5)
             ->get();
 
-        $featuredListings = Listing::with('categories')
+        $featuredListings = Listing::with(['contentTranslations', 'categories.contentTranslations'])
             ->published()
             ->orderByDesc('is_featured')
             ->orderByDesc('published_at')
             ->limit(4)
             ->get();
 
-        $upcomingEvents = Event::with(['listing', 'categories'])
+        $upcomingEvents = Event::with(['contentTranslations', 'listing.contentTranslations', 'categories.contentTranslations'])
             ->published()
             ->where('start_at', '>=', now()->subDay())
             ->orderBy('start_at')
@@ -37,8 +37,9 @@ class HomeController extends Controller
 
         $featuredVouchers = Voucher::query()
             ->with([
-                'listing',
-                'categories',
+                'contentTranslations',
+                'listing.contentTranslations',
+                'categories.contentTranslations',
             ])
             ->active()
             ->whereHas('listing', fn ($listing) => $listing->where('status', 'published'))
@@ -59,6 +60,7 @@ class HomeController extends Controller
             'adminBootstrapVisible' => $adminBootstrapVisible,
             'featuredCategories' => Category::query()
                 ->where('type', 'listing')
+                ->with('contentTranslations')
                 ->withCount([
                     'listings as visible_listings_count' => fn ($query) => $query->published(),
                 ])

@@ -43,6 +43,27 @@ class ProfileTest extends TestCase
         $this->assertNull($user->email_verified_at);
     }
 
+    public function test_profile_language_preference_updates_account_session_and_cookie(): void
+    {
+        $user = User::factory()->create(['preferred_locale' => 'en']);
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'email' => $user->email,
+                'preferred_locale' => 'af',
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile')
+            ->assertCookie('locale', 'af');
+
+        $this->assertSame('af', $user->fresh()->preferred_locale);
+        $this->assertSame('af', session('locale'));
+    }
+
     public function test_email_verification_status_is_unchanged_when_the_email_address_is_unchanged(): void
     {
         $user = User::factory()->create();

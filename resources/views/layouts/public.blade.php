@@ -31,6 +31,12 @@
 </head>
 <body class="lp">
     <a class="lp-skip-link" href="#main">Skip to content</a>
+    <div class="locale-loading" data-locale-loading hidden role="status" aria-live="polite" aria-atomic="true">
+        <div class="locale-loading__panel">
+            <span class="locale-loading__spinner" aria-hidden="true"></span>
+            <span data-locale-loading-text>Loading language...</span>
+        </div>
+    </div>
     @php
         $navLinks = [
             ['label' => 'Home', 'icon' => 'sparkles', 'url' => route('home'), 'active' => request()->routeIs('home')],

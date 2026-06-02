@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Env;
 use Tests\TestCase;
 
 class ProductionReadinessCommandTest extends TestCase
@@ -11,12 +12,19 @@ class ProductionReadinessCommandTest extends TestCase
 
     public function test_production_check_reports_non_production_runtime(): void
     {
+        Env::getRepository()->clear('UPLOAD_STORAGE_BACKEND');
+        Env::getRepository()->clear('UPLOAD_STORAGE_MOUNT_PATH');
+        putenv('UPLOAD_STORAGE_BACKEND');
+        putenv('UPLOAD_STORAGE_MOUNT_PATH');
+        unset($_ENV['UPLOAD_STORAGE_BACKEND'], $_ENV['UPLOAD_STORAGE_MOUNT_PATH']);
+        unset($_SERVER['UPLOAD_STORAGE_BACKEND'], $_SERVER['UPLOAD_STORAGE_MOUNT_PATH']);
+
         $this->artisan('production:check')
             ->expectsOutputToContain('[APP_ENV] APP_ENV must be production.')
             ->expectsOutputToContain('[APP_DEBUG] APP_DEBUG must be false.')
             ->expectsOutputToContain('[QUEUE_WORKER_ENABLED] A production queue worker process must be configured and running.')
             ->expectsOutputToContain('[SCHEDULER_ENABLED] A production scheduler or cron process must be configured and running.')
-            ->expectsOutputToContain('[UPLOAD_STORAGE_BACKEND] Set UPLOAD_STORAGE_BACKEND to railway_volume before launch, or refactor uploads to dedicated object-storage disks.')
+            ->expectsOutputToContain('[UPLOAD_STORAGE_BACKEND] Set UPLOAD_STORAGE_BACKEND to mounted_volume before launch, or refactor uploads to dedicated object-storage disks.')
             ->expectsOutputToContain('[BACKUPS_ENABLED] Automated production database backups must be enabled.')
             ->expectsOutputToContain('[BACKUP_RESTORE_DRILL_COMPLETED] A production-like backup restore drill must be completed before accepting real payments.')
             ->assertExitCode(1);

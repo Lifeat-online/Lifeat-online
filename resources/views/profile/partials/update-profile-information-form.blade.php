@@ -47,6 +47,18 @@
             @endif
         </div>
 
+        <div>
+            <x-input-label for="preferred_locale" :value="__('Language preference')" />
+            <select id="preferred_locale" name="preferred_locale" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                @foreach (config('localization.supported', []) as $locale => $details)
+                    <option value="{{ $locale }}" @selected(old('preferred_locale', $user->preferred_locale ?: app()->getLocale()) === $locale)>
+                        {{ $details['native'] ?? $details['name'] ?? strtoupper($locale) }}
+                    </option>
+                @endforeach
+            </select>
+            <x-input-error class="mt-2" :messages="$errors->get('preferred_locale')" />
+        </div>
+
         <div class="flex items-center gap-4">
             <x-primary-button>{{ __('Save') }}</x-primary-button>
 

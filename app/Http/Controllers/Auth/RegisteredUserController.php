@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\LocalePreferenceService;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
@@ -32,7 +33,7 @@ class RegisteredUserController extends Controller
      *
      * @throws ValidationException
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, LocalePreferenceService $preferences): RedirectResponse
     {
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -47,6 +48,12 @@ class RegisteredUserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
         ];
+
+        $preferredLocale = $preferences->resolve($request);
+
+        if ($columns->has('preferred_locale')) {
+            $requestedAttributes['preferred_locale'] = $preferredLocale;
+        }
 
         $attributes = [];
         foreach ($requestedAttributes as $column => $value) {
@@ -89,7 +96,10 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return redirect(route('dashboard', absolute: false));
+        $locale = $preferences->syncAuthenticatedUser($request, $user);
+
+        return redirect(route('dashboard', absolute: false))
+            ->withCookie($preferences->cookie($locale));
     }
 
     private function canOmitUserColumn(array $column): bool

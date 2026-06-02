@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\LocalePreferenceService;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
@@ -11,22 +12,21 @@ class SetLocale
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $supported = array_keys((array) config('localization.supported', ['en' => []]));
-        $default = (string) config('localization.default', 'en');
-        $locale = (string) (
-            $request->session()->get('locale')
-            ?: $request->user()?->preferred_locale
-            ?: $request->cookie('locale')
-            ?: $default
-        );
+        $preferences = app(LocalePreferenceService::class);
 
-        if (! in_array($locale, $supported, true)) {
-            $locale = $default;
+        $locale = $preferences->resolve($request);
+        $shouldBackfillProfile = $request->user()
+            && $preferences->normalize($request->user()->preferred_locale) === null;
+
+        $preferences->remember($request, $locale, $request->user(), $shouldBackfillProfile);
+
+        $response = $next($request);
+        $responseLocale = $preferences->normalize(App::getLocale()) ?: $locale;
+
+        if ($request->cookie(LocalePreferenceService::COOKIE_NAME) !== $responseLocale) {
+            $response->headers->setCookie($preferences->cookie($responseLocale));
         }
 
-        $request->session()->put('locale', $locale);
-        App::setLocale($locale);
-
-        return $next($request);
+        return $response;
     }
 }

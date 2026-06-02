@@ -505,6 +505,27 @@ const initTransportRealtime = () => {
     }
 };
 
+const initLocaleSwitchLoading = () => {
+    const overlay = document.querySelector('[data-locale-loading]');
+    const text = document.querySelector('[data-locale-loading-text]');
+    const forms = Array.from(document.querySelectorAll('[data-locale-switch-form]'));
+
+    if (!overlay || !forms.length) return;
+
+    forms.forEach((form) => {
+        form.addEventListener('submit', () => {
+            const localeName = form.getAttribute('data-locale-name') || 'language';
+            if (text) text.textContent = `Loading ${localeName}...`;
+            overlay.hidden = false;
+            document.documentElement.classList.add('locale-is-loading');
+
+            form.querySelectorAll('[data-locale-switch-button]').forEach((button) => {
+                button.setAttribute('aria-busy', 'true');
+            });
+        });
+    });
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     initThemeToggle();
     initReveal();
@@ -515,4 +536,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initPushNotifications();
     initSupabase();
     initTransportRealtime();
+    initLocaleSwitchLoading();
 });

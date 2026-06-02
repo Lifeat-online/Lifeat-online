@@ -2,15 +2,23 @@
 
 namespace App\Providers;
 
-use App\Models\Listing;
 use App\Events\MallOrderPaid;
 use App\Listeners\SendMallOrderPaidEmails;
+use App\Models\Article;
+use App\Models\Category;
+use App\Models\Classified;
+use App\Models\Event as LifeEvent;
+use App\Models\Listing;
+use App\Models\LocationNode;
 use App\Models\NotificationLog;
 use App\Models\Order;
 use App\Models\PayoutRequest;
 use App\Models\Payment;
 use App\Models\StaffWallet;
 use App\Models\Subscription;
+use App\Models\Tag;
+use App\Models\Voucher;
+use App\Observers\QueueContentTranslations;
 use App\Policies\ListingPolicy;
 use App\Policies\NotificationLogPolicy;
 use App\Policies\OrderPolicy;
@@ -49,6 +57,15 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Subscription::class, SubscriptionPolicy::class);
 
         Event::listen(MallOrderPaid::class, SendMallOrderPaidEmails::class);
+
+        Article::observe(QueueContentTranslations::class);
+        Category::observe(QueueContentTranslations::class);
+        Classified::observe(QueueContentTranslations::class);
+        LifeEvent::observe(QueueContentTranslations::class);
+        Listing::observe(QueueContentTranslations::class);
+        LocationNode::observe(QueueContentTranslations::class);
+        Tag::observe(QueueContentTranslations::class);
+        Voucher::observe(QueueContentTranslations::class);
 
         $this->configureRateLimiters();
 

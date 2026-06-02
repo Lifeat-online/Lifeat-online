@@ -1097,6 +1097,50 @@
         flex: 0 0 auto;
     }
 
+    .locale-loading {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: grid;
+        place-items: center;
+        padding: 1.5rem;
+        background: rgb(15 23 42 / 0.42);
+        backdrop-filter: blur(14px);
+    }
+
+    .locale-loading[hidden] {
+        display: none;
+    }
+
+    .locale-loading__panel {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        min-height: 3.25rem;
+        padding: 0.85rem 1.1rem;
+        border-radius: 999px;
+        border: 1px solid rgb(255 255 255 / 0.28);
+        background: rgb(var(--surface-rgb, 255 255 255) / 0.94);
+        color: rgb(var(--text-rgb, 17 24 39));
+        box-shadow: 0 24px 50px rgb(15 23 42 / 0.22);
+        font-weight: 700;
+    }
+
+    .locale-loading__spinner {
+        width: 1.25rem;
+        height: 1.25rem;
+        border-radius: 999px;
+        border: 3px solid rgb(var(--brand-rgb, 99 102 241) / 0.2);
+        border-top-color: rgb(var(--brand-rgb, 99 102 241));
+        animation: locale-spin 760ms linear infinite;
+    }
+
+    @keyframes locale-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
     .language-switcher__form {
         display: flex;
         margin: 0;

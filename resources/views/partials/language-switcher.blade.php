@@ -10,7 +10,7 @@
             $label = $details['name'] ?? strtoupper($locale);
             $native = $details['native'] ?? $label;
         @endphp
-        <form method="post" action="{{ route('locale.switch', $locale) }}" class="language-switcher__form">
+        <form method="post" action="{{ route('locale.switch', $locale) }}" class="language-switcher__form" data-locale-switch-form data-locale-name="{{ $native }}">
             @csrf
             <button
                 type="submit"
@@ -18,6 +18,7 @@
                 title="{{ $isCurrent ? $label.' selected' : 'Switch to '.$label }}"
                 aria-label="{{ $isCurrent ? $label.' selected' : 'Switch to '.$label }}"
                 aria-pressed="{{ $isCurrent ? 'true' : 'false' }}"
+                data-locale-switch-button
             >
                 <span class="language-switcher__flag-wrap" aria-hidden="true">
                     <span class="language-switcher__flag language-switcher__flag--{{ $locale }}"></span>
