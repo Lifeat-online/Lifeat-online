@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AiGeneration;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -28,6 +29,8 @@ class AskLifeVoiceTest extends TestCase
             'services.voice.providers.elevenlabs.base_url' => 'https://api.elevenlabs.io/v1',
             'services.voice.providers.elevenlabs.output_format' => 'mp3_44100_128',
         ]);
+
+        $this->actingAs($this->devOwner());
     }
 
     public function test_ask_life_voice_generates_and_stores_english_audio(): void
@@ -204,5 +207,13 @@ class AskLifeVoiceTest extends TestCase
             ->assertJsonPath('ok', false);
 
         Http::assertNothingSent();
+    }
+
+    private function devOwner(): User
+    {
+        return User::factory()->create([
+            'role' => 'super_admin',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
     }
 }

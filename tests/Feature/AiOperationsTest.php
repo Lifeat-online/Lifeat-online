@@ -131,7 +131,7 @@ class AiOperationsTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $this->postJson(route('ask-life.speak'), [
+        $this->actingAs($this->devOwner())->postJson(route('ask-life.speak'), [
             'text' => 'Read this answer aloud.',
             'locale' => 'en',
         ])

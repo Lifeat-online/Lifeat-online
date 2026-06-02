@@ -33,7 +33,7 @@ class AskLifeService
         $intent = $this->detectIntent($question, $context, $user);
         $search = $this->searchContext($question, $context);
 
-        if ($guided = $this->guidedAnswer($question, $context, $intent, $targetLocale)) {
+        if ($guided = $this->guidedAnswer($question, $user, $context, $intent, $search, $targetLocale)) {
             return $guided;
         }
 
@@ -134,21 +134,10 @@ class AskLifeService
         $intent ??= $this->detectIntent($question, $context, $user);
         $search ??= $this->searchContext($question, $context);
         $terms = $search['terms'];
-        $dynamicSources = collect();
 
-        if ($terms !== []) {
-            foreach ($intent['source_types'] as $sourceType) {
-                $dynamicSources = $dynamicSources->merge(match ($sourceType) {
-                    'business' => $this->listingSources($terms, $user, $search, $locale),
-                    'event' => $this->eventSources($terms, $user, $search, $locale),
-                    'article' => $this->articleSources($terms, $user, $search, $locale),
-                    'voucher' => $this->voucherSources($terms, $user, $search, $locale),
-                    'classified' => $this->classifiedSources($terms, $user, $search, $locale),
-                    'fault' => $this->faultSources($terms, $user, $search),
-                    default => collect(),
-                });
-            }
-        }
+        $dynamicSources = $terms === []
+            ? collect()
+            : $this->dynamicSourcesFor($intent['source_types'], $terms, $user, $search, $locale);
 
         return $this->rankSources($dynamicSources, $search, $intent)
             ->merge($this->pageContextSources($context, $intent, $locale))
@@ -156,6 +145,25 @@ class AskLifeService
             ->unique('id')
             ->take(18)
             ->values();
+    }
+
+    private function dynamicSourcesFor(array $sourceTypes, array $terms, ?User $user, array $search, string $locale): Collection
+    {
+        $dynamicSources = collect();
+
+        foreach ($sourceTypes as $sourceType) {
+            $dynamicSources = $dynamicSources->merge(match ($sourceType) {
+                'business' => $this->listingSources($terms, $user, $search, $locale),
+                'event' => $this->eventSources($terms, $user, $search, $locale),
+                'article' => $this->articleSources($terms, $user, $search, $locale),
+                'voucher' => $this->voucherSources($terms, $user, $search, $locale),
+                'classified' => $this->classifiedSources($terms, $user, $search, $locale),
+                'fault' => $this->faultSources($terms, $user, $search),
+                default => collect(),
+            });
+        }
+
+        return $dynamicSources->unique('id')->values();
     }
 
     private function formatHistory(array $history): array
@@ -171,13 +179,269 @@ class AskLifeService
             ->all();
     }
 
-    private function guidedAnswer(string $question, array $context, array $intent, string $locale): ?array
+    private function guidedAnswer(string $question, ?User $user, array $context, array $intent, array $search, string $locale): ?array
     {
         if ($this->isBusinessOnboardingQuestion($question)) {
             return $this->businessOnboardingAnswer($question, $context, $intent, $locale);
         }
 
+        if (! $this->gateway->configured() && ($recommendation = $this->guidedPlatformRecommendation($question, $user, $context, $intent, $search, $locale))) {
+            return $recommendation;
+        }
+
         return null;
+    }
+
+    private function guidedPlatformRecommendation(string $question, ?User $user, array $context, array $intent, array $search, string $locale): ?array
+    {
+        $recommendation = $this->platformRecommendationFor($question, $intent, $search, $context);
+
+        if ($recommendation === null) {
+            return null;
+        }
+
+        $recommendationSearch = array_replace($search, [
+            'base_terms' => collect($search['base_terms'] ?? [])
+                ->merge($recommendation['terms'])
+                ->unique()
+                ->values()
+                ->all(),
+            'terms' => collect($search['terms'] ?? [])
+                ->merge($recommendation['terms'])
+                ->unique()
+                ->values()
+                ->all(),
+        ]);
+
+        $sources = $this->rankSources(
+            $this->dynamicSourcesFor($recommendation['source_types'], $recommendationSearch['terms'], $user, $recommendationSearch, $locale),
+            $recommendationSearch,
+            array_replace($intent, ['source_types' => $recommendation['source_types']])
+        )
+            ->sortBy(function (array $source) use ($recommendation): int {
+                $typeIndex = array_search($source['type'] ?? '', $recommendation['source_types'], true);
+
+                return (($typeIndex === false ? 99 : $typeIndex) * 1000) - (int) ($source['relevance_score'] ?? 0);
+            })
+            ->take(8)
+            ->values();
+
+        if ($sources->isEmpty()) {
+            return null;
+        }
+
+        $first = (string) data_get($sources->first(), 'title', $this->t('recommendation.default_first', $locale));
+        $answerKey = (string) ($recommendation['answer_key'] ?? 'recommendation.platform.answer');
+
+        return [
+            'ok' => true,
+            'source' => 'guided',
+            'answer' => $this->t($answerKey, $locale, [
+                'count' => (string) $sources->count(),
+                'first' => $first,
+                'topic' => (string) $recommendation['topic'],
+                'types' => $this->sourceSummary($sources, $locale),
+            ]),
+            'locale' => $locale,
+            'confidence' => 0.88,
+            'intent' => array_replace($intent, [
+                'key' => $recommendation['intent'],
+                'label' => $recommendation['label'],
+                'confidence' => 0.9,
+            ]),
+            'search_context' => $this->publicSearchContext($recommendationSearch),
+            'page_context' => $context,
+            'sources' => $this->sourceCards($sources, array_replace($intent, ['key' => $recommendation['intent']]), $question, $context, $locale)->values()->all(),
+            'answer_actions' => $this->answerActions(array_replace($intent, ['key' => $recommendation['intent']]), $sources, $question, $context, $recommendationSearch, $locale),
+            'follow_up_questions' => collect($recommendation['follow_ups'] ?? [])
+                ->map(fn (string $key): string => $this->t($key, $locale))
+                ->values()
+                ->all(),
+            'search_url' => $this->recommendationSearchUrl($recommendation, $recommendationSearch),
+        ];
+    }
+
+    private function recommendationSearchUrl(array $recommendation, array $search): string
+    {
+        $query = (string) ($recommendation['directory_query'] ?? implode(' ', $recommendation['terms'] ?? []));
+
+        return match ($recommendation['intent'] ?? 'general') {
+            'business_search', 'website_project', 'accommodation_search' => route('directory.index', array_filter([
+                'q' => $query,
+                'location' => $search['location'] ?? null,
+            ])),
+            'event_discovery' => route('events.index', array_filter(['q' => $query, 'location' => $search['location'] ?? null])),
+            'voucher_discovery' => route('vouchers.index', array_filter(['q' => $query])),
+            'classified_discovery' => route('classifieds.index', array_filter(['q' => $query, 'location' => $search['location'] ?? null])),
+            'fault_reporting' => route('faults.index', array_filter(['category' => $search['base_terms'][0] ?? null])),
+            'transport_help' => route('transport.index'),
+            'article_lookup' => route('articles.index', array_filter(['q' => $query])),
+            default => route('search.index', ['q' => $query]),
+        };
+    }
+
+    private function platformRecommendationFor(string $question, array $intent, array $search, array $context): ?array
+    {
+        $normalized = ' '.mb_strtolower((string) preg_replace('/[^\pL\pN&]+/u', ' ', $question.' '.($context['page_heading'] ?? '').' '.($context['page_type'] ?? ''))).' ';
+        $intentKey = (string) ($intent['key'] ?? 'general');
+        $hasNeedSignal = $this->hasRecommendationSignal($normalized);
+
+        foreach ($this->platformRecommendationProfiles() as $recommendation) {
+            $matchedByMarker = $this->containsAny($normalized, $recommendation['markers'] ?? []);
+            $matchedByIntent = $intentKey === ($recommendation['intent'] ?? null);
+
+            if (($matchedByMarker || ($matchedByIntent && $hasNeedSignal)) && $this->recommendationHasSearchValue($recommendation, $search)) {
+                return $recommendation;
+            }
+        }
+
+        if (! $hasNeedSignal || empty($search['base_terms'] ?? [])) {
+            return null;
+        }
+
+        return [
+            'key' => 'platform',
+            'intent' => $intentKey === 'general' ? 'platform_recommendation' : $intentKey,
+            'label' => $intent['label'] ?? 'Platform recommendation',
+            'topic' => implode(' ', $search['base_terms']),
+            'directory_query' => implode(' ', $search['base_terms']),
+            'terms' => $search['terms'] ?? $search['base_terms'],
+            'source_types' => $intent['source_types'] ?? ['business', 'event', 'voucher', 'article', 'classified', 'fault'],
+            'answer_key' => 'recommendation.platform.answer',
+            'follow_ups' => ['follow.narrow_need', 'follow.which_town'],
+        ];
+    }
+
+    private function recommendationHasSearchValue(array $recommendation, array $search): bool
+    {
+        if (! empty($recommendation['terms'] ?? [])) {
+            return true;
+        }
+
+        return ! empty($search['base_terms'] ?? []);
+    }
+
+    private function hasRecommendationSignal(string $normalized): bool
+    {
+        return $this->containsAny($normalized, [
+            ' need ', ' looking for ', ' find ', ' show me ', ' recommend ', ' where can ', ' who can ',
+            ' take me ', ' help me find ', ' get ', ' book ', ' buy ', ' sell ', ' report ',
+            ' soek ', ' benodig ', ' waar kan ', ' wys my ', ' beveel ', ' koop ', ' verkoop ',
+        ]);
+    }
+
+    private function platformRecommendationProfiles(): array
+    {
+        return [
+            [
+                'key' => 'website',
+                'intent' => 'website_project',
+                'label' => 'Website or developer recommendation',
+                'topic' => 'website, web app, online store, or developer help',
+                'directory_query' => 'developer website',
+                'terms' => ['developer', 'developers', 'website', 'web', 'web design', 'web development', 'digital', 'software', 'online store', 'ecommerce'],
+                'source_types' => ['business', 'classified', 'article', 'voucher', 'event', 'fault'],
+                'markers' => [' website ', ' web site ', ' web developer ', ' web developers ', ' developer ', ' developers ', ' build a site ', ' build me a site ', ' online store ', ' ecommerce ', ' e commerce ', ' webwerf ', ' ontwikkelaar '],
+                'answer_key' => 'recommendation.website.answer',
+                'follow_ups' => ['follow.website_budget', 'follow.website_timeline'],
+            ],
+            [
+                'key' => 'accommodation',
+                'intent' => 'accommodation_search',
+                'label' => 'Short-term accommodation recommendation',
+                'topic' => 'short-term accommodation',
+                'directory_query' => 'hotel b&b accommodation',
+                'terms' => ['hotel', 'b&b', 'bnb', 'bed breakfast', 'guest house', 'guesthouse', 'accommodation', 'self catering', 'lodge', 'overnight', 'short term', 'stay'],
+                'source_types' => ['business', 'classified', 'voucher', 'event', 'article', 'fault'],
+                'markers' => [' place to stay ', ' stay short term ', ' short term stay ', ' short term accommodation ', ' accommodation ', ' hotel ', ' b&b ', ' bnb ', ' guest house ', ' guesthouse ', ' lodge ', ' overnight ', ' sleep ', ' verblyf ', ' gastehuis '],
+                'answer_key' => 'recommendation.accommodation.answer',
+                'follow_ups' => ['follow.accommodation_dates', 'follow.accommodation_town'],
+            ],
+            [
+                'key' => 'directory',
+                'intent' => 'business_search',
+                'label' => 'Business or service recommendation',
+                'topic' => 'local businesses and services',
+                'directory_query' => 'business service',
+                'terms' => [],
+                'source_types' => ['business', 'voucher', 'event', 'article', 'classified', 'fault'],
+                'markers' => [' business ', ' service ', ' services ', ' shop ', ' store ', ' mechanic ', ' plumber ', ' restaurant ', ' doctor ', ' dentist ', ' salon ', ' electrician ', ' builder ', ' contractor ', ' besigheid ', ' winkel ', ' diens '],
+                'answer_key' => 'recommendation.platform.answer',
+                'follow_ups' => ['follow.which_town', 'follow.narrow_need'],
+            ],
+            [
+                'key' => 'events',
+                'intent' => 'event_discovery',
+                'label' => 'Event recommendation',
+                'topic' => 'local events',
+                'directory_query' => 'events',
+                'terms' => [],
+                'source_types' => ['event', 'business', 'voucher', 'article', 'classified', 'fault'],
+                'markers' => [' event ', ' events ', ' weekend ', ' today ', ' tonight ', ' tomorrow ', ' festival ', ' market ', ' concert ', ' geleentheid ', ' gebeure '],
+                'answer_key' => 'recommendation.platform.answer',
+                'follow_ups' => ['follow.event_date', 'follow.which_town'],
+            ],
+            [
+                'key' => 'vouchers',
+                'intent' => 'voucher_discovery',
+                'label' => 'Voucher or offer recommendation',
+                'topic' => 'vouchers, specials, discounts, and offers',
+                'directory_query' => 'voucher special discount',
+                'terms' => [],
+                'source_types' => ['voucher', 'business', 'event', 'article', 'classified', 'fault'],
+                'markers' => [' voucher ', ' deal ', ' deals ', ' special ', ' specials ', ' discount ', ' discounts ', ' offer ', ' offers ', ' coupon ', ' promo ', ' koepon ', ' aanbod '],
+                'answer_key' => 'recommendation.platform.answer',
+                'follow_ups' => ['follow.offer_type', 'follow.which_town'],
+            ],
+            [
+                'key' => 'classifieds',
+                'intent' => 'classified_discovery',
+                'label' => 'Classified recommendation',
+                'topic' => 'classifieds and local marketplace items',
+                'directory_query' => 'classifieds',
+                'terms' => [],
+                'source_types' => ['classified', 'business', 'voucher', 'event', 'article', 'fault'],
+                'markers' => [' classified ', ' classifieds ', ' for sale ', ' buy ', ' sell ', ' marketplace ', ' bakkie ', ' car ', ' furniture ', ' koop ', ' verkoop '],
+                'answer_key' => 'recommendation.platform.answer',
+                'follow_ups' => ['follow.classified_budget', 'follow.which_town'],
+            ],
+            [
+                'key' => 'faults',
+                'intent' => 'fault_reporting',
+                'label' => 'Civic fault help',
+                'topic' => 'civic fault reports',
+                'directory_query' => 'fault report',
+                'terms' => [],
+                'source_types' => ['fault', 'article', 'business', 'event', 'voucher', 'classified'],
+                'markers' => [' fault ', ' pothole ', ' water leak ', ' burst pipe ', ' streetlight ', ' dumping ', ' electricity ', ' outage ', ' report ', ' slaggat ', ' fout ', ' krag '],
+                'answer_key' => 'recommendation.platform.answer',
+                'follow_ups' => ['follow.fault_location', 'follow.fault_photo'],
+            ],
+            [
+                'key' => 'transport',
+                'intent' => 'transport_help',
+                'label' => 'Transport help',
+                'topic' => 'taxi, ride, delivery, parcel, or moving help',
+                'directory_query' => 'taxi transport delivery',
+                'terms' => ['taxi', 'transport', 'ride', 'delivery', 'parcel', 'moving', 'bakkie'],
+                'source_types' => ['business', 'classified', 'article', 'event', 'voucher', 'fault'],
+                'markers' => [' taxi ', ' transport ', ' ride ', ' delivery ', ' parcel ', ' move ', ' moving ', ' bakkie delivery ', ' vervoer ', ' aflewering '],
+                'answer_key' => 'recommendation.platform.answer',
+                'follow_ups' => ['follow.transport_pickup', 'follow.transport_load'],
+            ],
+            [
+                'key' => 'articles',
+                'intent' => 'article_lookup',
+                'label' => 'Article or local update recommendation',
+                'topic' => 'articles, stories, news, and local updates',
+                'directory_query' => 'articles news',
+                'terms' => [],
+                'source_types' => ['article', 'event', 'business', 'fault', 'voucher', 'classified'],
+                'markers' => [' article ', ' articles ', ' news ', ' story ', ' stories ', ' update ', ' latest ', ' explain ', ' nuus '],
+                'answer_key' => 'recommendation.platform.answer',
+                'follow_ups' => ['follow.article_topic', 'follow.which_town'],
+            ],
+        ];
     }
 
     private function businessOnboardingAnswer(string $question, array $context, array $intent, string $locale): array
@@ -836,11 +1100,7 @@ class AskLifeService
             ];
         }
 
-        $topTypes = $sources
-            ->groupBy('type')
-            ->map(fn (Collection $items, string $type): string => $items->count().' '.$this->sourceTypeName($type, $items->count(), $locale))
-            ->values()
-            ->implode(', ');
+        $topTypes = $this->sourceSummary($sources, $locale);
 
         $first = $sources->first();
         $answer = $topTypes !== ''
@@ -935,6 +1195,15 @@ class AskLifeService
         return $this->t('type_plural.'.$type, $locale, [], $singular.'s');
     }
 
+    private function sourceSummary(Collection $sources, string $locale): string
+    {
+        return $sources
+            ->groupBy('type')
+            ->map(fn (Collection $items, string $type): string => $items->count().' '.$this->sourceTypeName($type, $items->count(), $locale))
+            ->values()
+            ->implode(', ');
+    }
+
     private function t(string $key, string $locale, array $replace = [], ?string $fallback = null): string
     {
         $locale = $this->normalizeLocale($locale) ?? 'en';
@@ -976,6 +1245,10 @@ class AskLifeService
                     'listing_workspace' => 'Listing workspace',
                     'start_listing' => 'Start listing',
                     'compare_packages' => 'Compare packages',
+                    'developers' => 'Developers',
+                    'accommodation' => 'Accommodation',
+                    'directory' => 'Directory',
+                    'articles' => 'Articles',
                 ],
                 'label' => [
                     'business' => 'Business',
@@ -1023,6 +1296,18 @@ class AskLifeService
                     'compare_title' => 'Compare advertising and directory packages',
                     'compare_summary' => 'See directory, event, advert, push, and voucher options.',
                 ],
+                'recommendation' => [
+                    'default_first' => 'the first match',
+                    'website' => [
+                        'answer' => 'Yes. For a website or online project, I would start with listed developers or digital providers on Life@. I found :count possible match(es); begin with :first, then compare the other source cards for fit, location, phone, and website details.',
+                    ],
+                    'accommodation' => [
+                        'answer' => 'For a short-term place to stay, I would take you to listed accommodation providers first: hotels, B&Bs, guest houses, lodges, or self-catering options. I found :count possible match(es); start with :first and check the source cards for location and contact options.',
+                    ],
+                    'platform' => [
+                        'answer' => 'Life@ has :types that match your need for :topic. I would start with :first, then use the source cards for contact details, directions, dates, offers, or the right next action. If that is not quite right, tell me the town, category, date, budget, or urgency and I will narrow it down.',
+                    ],
+                ],
                 'fallback' => [
                     'guides_answer' => 'I can help you work out where to go on Life@: businesses, events, local articles, vouchers, classifieds, civic fault reports, transport help, and business onboarding. I will be honest when I do not have a verified Life@ record yet, and I will point you to the safest next step.',
                     'found_sources' => 'I found :types on Life@ that may help. Start with :title.',
@@ -1038,6 +1323,19 @@ class AskLifeService
                     'show_more_near' => 'Show me more near :location',
                     'add_town_or_category' => 'Try adding a town or category',
                     'search_phrase' => 'Search this phrase across Life@',
+                    'website_budget' => 'Do you need a simple website, online store, or custom web app?',
+                    'website_timeline' => 'What budget and launch timeline should I keep in mind?',
+                    'accommodation_dates' => 'What dates do you need the stay for?',
+                    'accommodation_town' => 'Which town or area should I focus on?',
+                    'narrow_need' => 'What detail should I narrow this by: town, category, price, date, or urgency?',
+                    'event_date' => 'Which date or weekend should I check?',
+                    'offer_type' => 'What kind of special or discount are you hoping for?',
+                    'classified_budget' => 'What budget or item condition should I keep in mind?',
+                    'fault_location' => 'Where exactly is the fault?',
+                    'fault_photo' => 'Do you have a photo or landmark for the report?',
+                    'transport_pickup' => 'Where is the pickup and drop-off?',
+                    'transport_load' => 'Is this a person, parcel, food delivery, or moving load?',
+                    'article_topic' => 'Which local topic or town should I focus on?',
                 ],
                 'empty' => [
                     'near_me' => 'I can help with that, but I need the town first because Life@ does not have your precise location in this chat. Tell me the town or area and I will narrow it down.',
@@ -1079,6 +1377,10 @@ class AskLifeService
                     'listing_workspace' => 'Listing-werkspasie',
                     'start_listing' => 'Begin listing',
                     'compare_packages' => 'Vergelyk pakkette',
+                    'developers' => 'Ontwikkelaars',
+                    'accommodation' => 'Verblyf',
+                    'directory' => 'Gids',
+                    'articles' => 'Artikels',
                 ],
                 'label' => [
                     'business' => 'Besigheid',
@@ -1126,6 +1428,18 @@ class AskLifeService
                     'compare_title' => 'Vergelyk advertensie- en gidspakkette',
                     'compare_summary' => 'Sien gids-, geleentheid-, advertensie-, stootveldtog- en koopbewysopsies.',
                 ],
+                'recommendation' => [
+                    'default_first' => 'die eerste passing',
+                    'website' => [
+                        'answer' => 'Ja. Vir n webwerf of aanlyn projek sal ek eers gelyste ontwikkelaars of digitale verskaffers op Life@ aanbeveel. Ek het :count moontlike passing(s) gevind; begin by :first en vergelyk dan die ander bronkaarte vir pasmaat, ligging, foon en webwerfbesonderhede.',
+                    ],
+                    'accommodation' => [
+                        'answer' => 'Vir korttermynverblyf sal ek jou eers na gelyste verblyfverskaffers neem: hotelle, B&Bs, gastehuise, lodges of selfsorgopsies. Ek het :count moontlike passing(s) gevind; begin by :first en kyk na die bronkaarte vir ligging en kontakopsies.',
+                    ],
+                    'platform' => [
+                        'answer' => 'Life@ het :types wat pas by jou behoefte vir :topic. Ek sal by :first begin, en dan die bronkaarte gebruik vir kontakbesonderhede, aanwysings, datums, aanbiedinge of die regte volgende aksie. As dit nie heeltemal reg is nie, gee vir my die dorp, kategorie, datum, begroting of dringendheid en ek sal dit vernou.',
+                    ],
+                ],
                 'fallback' => [
                     'guides_answer' => 'Ek kan jou help uitwerk waarheen om op Life@ te gaan: besighede, geleenthede, plaaslike artikels, koopbewyse, geklassifiseerdes, burgerlike foutverslae, vervoerhulp en besigheid-aanboord. Ek sal eerlik wees wanneer Life@ nog nie n geverifieerde rekord het nie, en ek sal jou na die veiligste volgende stap wys.',
                     'found_sources' => 'Ek het :types op Life@ gevind wat dalk kan help. Begin by :title.',
@@ -1141,6 +1455,19 @@ class AskLifeService
                     'show_more_near' => 'Wys my meer naby :location',
                     'add_town_or_category' => 'Probeer n dorp of kategorie byvoeg',
                     'search_phrase' => 'Soek hierdie frase deur Life@',
+                    'website_budget' => 'Het jy n eenvoudige webwerf, aanlyn winkel of pasgemaakte webtoep nodig?',
+                    'website_timeline' => 'Watter begroting en bekendstellingsdatum moet ek in gedagte hou?',
+                    'accommodation_dates' => 'Vir watter datums het jy verblyf nodig?',
+                    'accommodation_town' => 'Op watter dorp of area moet ek fokus?',
+                    'narrow_need' => 'Waarmee moet ek dit vernou: dorp, kategorie, prys, datum of dringendheid?',
+                    'event_date' => 'Watter datum of naweek moet ek nagaan?',
+                    'offer_type' => 'Watter soort spesiale aanbod of afslag soek jy?',
+                    'classified_budget' => 'Watter begroting of toestand moet ek in gedagte hou?',
+                    'fault_location' => 'Waar presies is die fout?',
+                    'fault_photo' => 'Het jy n foto of landmerk vir die verslag?',
+                    'transport_pickup' => 'Waar is die optel- en aflaaipunt?',
+                    'transport_load' => 'Is dit n persoon, pakkie, kosaflewering of treklading?',
+                    'article_topic' => 'Op watter plaaslike onderwerp of dorp moet ek fokus?',
                 ],
                 'empty' => [
                     'near_me' => 'Ek kan daarmee help, maar ek het eers die dorp nodig omdat Life@ nie jou presiese ligging in hierdie klets het nie. Gee vir my die dorp of area en ek sal dit vernou.',
@@ -1221,6 +1548,16 @@ class AskLifeService
         $pageType = (string) ($context['page_type'] ?? 'general');
 
         $definitions = [
+            'website_project' => [
+                'label' => 'Website or developer recommendation',
+                'source_types' => ['business', 'classified', 'article', 'voucher', 'event', 'fault'],
+                'markers' => [' website ', ' web site ', ' web developer ', ' web developers ', ' developer ', ' developers ', ' build a site ', ' build me a site ', ' online store ', ' ecommerce ', ' webwerf ', ' ontwikkelaar '],
+            ],
+            'accommodation_search' => [
+                'label' => 'Short-term accommodation',
+                'source_types' => ['business', 'classified', 'voucher', 'event', 'article', 'fault'],
+                'markers' => [' accommodation ', ' hotel ', ' b&b ', ' bnb ', ' guest house ', ' guesthouse ', ' lodge ', ' overnight ', ' place to stay ', ' short term stay ', ' verblyf ', ' gastehuis '],
+            ],
             'business_owner' => [
                 'label' => 'Business owner help',
                 'source_types' => ['business', 'voucher', 'event', 'article', 'classified', 'fault'],
@@ -1234,12 +1571,12 @@ class AskLifeService
             'event_discovery' => [
                 'label' => 'Find events',
                 'source_types' => ['event', 'business', 'voucher', 'article', 'classified', 'fault'],
-                'markers' => [' event ', ' events ', ' weekend ', ' today ', ' tonight ', ' tomorrow ', ' festival ', ' market ', ' concert ', ' show ', ' geleentheid ', ' gebeure '],
+                'markers' => [' event ', ' events ', ' weekend ', ' today ', ' tonight ', ' tomorrow ', ' festival ', ' market ', ' concert ', ' geleentheid ', ' gebeure '],
             ],
             'voucher_discovery' => [
                 'label' => 'Find offers',
                 'source_types' => ['voucher', 'business', 'event', 'article', 'classified', 'fault'],
-                'markers' => [' voucher ', ' deal ', ' special ', ' discount ', ' offer ', ' coupon ', ' promo ', ' koepon ', ' aanbod '],
+                'markers' => [' voucher ', ' deal ', ' deals ', ' special ', ' specials ', ' discount ', ' discounts ', ' offer ', ' offers ', ' coupon ', ' promo ', ' koepon ', ' aanbod '],
             ],
             'classified_discovery' => [
                 'label' => 'Find classifieds',
@@ -1272,7 +1609,23 @@ class AskLifeService
             $definitions['business_owner']['markers'][] = ' '.$pageType.' ';
         }
 
-        foreach ($definitions as $key => $definition) {
+        $intentPriority = [
+            'website_project',
+            'accommodation_search',
+            'business_owner',
+            'voucher_discovery',
+            'event_discovery',
+            'classified_discovery',
+            'fault_reporting',
+            'transport_help',
+            'article_lookup',
+            'business_search',
+            'support',
+        ];
+
+        foreach ($intentPriority as $key) {
+            $definition = $definitions[$key];
+
             if ($this->containsAny($normalized, $definition['markers'])) {
                 return [
                     'key' => $key,
@@ -1358,6 +1711,10 @@ class AskLifeService
             'voucher' => ['deal', 'special', 'discount', 'offer'],
             'classified' => ['sale', 'buy', 'sell', 'marketplace'],
             'transport' => ['taxi', 'ride', 'delivery', 'parcel', 'moving'],
+            'website' => ['web', 'developer', 'developers', 'design', 'digital', 'software', 'online', 'ecommerce'],
+            'developer' => ['developers', 'website', 'web', 'software', 'digital', 'online'],
+            'hotel' => ['accommodation', 'b&b', 'bnb', 'guesthouse', 'guest', 'lodge', 'overnight', 'stay'],
+            'accommodation' => ['hotel', 'b&b', 'bnb', 'guesthouse', 'guest', 'lodge', 'self catering', 'overnight'],
         ];
 
         $expanded = $baseTerms;
@@ -1503,6 +1860,8 @@ class AskLifeService
     {
         return match ($intent) {
             'business_owner' => ['guide:business-owner', 'guide:add-listing', 'guide:advertise', 'guide:contact'],
+            'website_project' => ['guide:directory', 'guide:contact'],
+            'accommodation_search' => ['guide:directory', 'guide:search'],
             'business_search' => ['guide:directory', 'guide:search'],
             'event_discovery' => ['guide:events', 'guide:search'],
             'voucher_discovery' => ['guide:vouchers', 'guide:directory'],
@@ -1647,6 +2006,16 @@ class AskLifeService
                 $this->action($this->t('action.my_listings', $locale), route('account.listings.index'), 'secondary'),
                 $this->action($this->t('action.advertise', $locale), route('advertise.index'), 'secondary'),
             ],
+            'business_search' => [
+                $this->action($this->t('action.directory', $locale), route('directory.index', array_filter(['q' => implode(' ', $search['base_terms'] ?? []), 'location' => $search['location'] ?? null])), 'secondary'),
+            ],
+            'website_project' => [
+                $this->action($this->t('action.developers', $locale), route('directory.index', array_filter(['q' => 'developer website', 'location' => $search['location'] ?? null])), 'secondary'),
+                $this->action($this->t('action.contact_life', $locale), route('contact.index'), 'secondary'),
+            ],
+            'accommodation_search' => [
+                $this->action($this->t('action.accommodation', $locale), route('directory.index', array_filter(['q' => 'hotel b&b accommodation', 'location' => $search['location'] ?? null])), 'secondary'),
+            ],
             'event_discovery' => [
                 $this->action($this->t('action.events', $locale), route('events.index', array_filter(['q' => $question, 'location' => $search['location'] ?? null])), 'secondary'),
             ],
@@ -1663,6 +2032,9 @@ class AskLifeService
             ],
             'transport_help' => [
                 $this->action($this->t('action.transport', $locale), route('transport.index'), 'secondary'),
+            ],
+            'article_lookup' => [
+                $this->action($this->t('action.articles', $locale), route('articles.index', array_filter(['q' => implode(' ', $search['base_terms'] ?? [])])), 'secondary'),
             ],
             'support' => [
                 $this->action($this->t('action.contact_life', $locale), route('contact.index'), 'secondary'),
@@ -1818,7 +2190,7 @@ class AskLifeService
             return 'public';
         }
 
-        foreach (['admin', 'editor', 'staff', 'writer', 'councillor', 'member'] as $role) {
+        foreach (['dev', 'admin', 'editor', 'staff', 'writer', 'councillor', 'member'] as $role) {
             if ($user->hasRole($role)) {
                 return $role;
             }

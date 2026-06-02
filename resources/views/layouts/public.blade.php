@@ -361,7 +361,9 @@
             </div>
         @endif
     </footer>
-    @include('partials.ask-life-widget')
+    @if (auth()->user()?->isDevOwner())
+        @include('partials.ask-life-widget')
+    @endif
     @stack('scripts')
 </body>
 </html>

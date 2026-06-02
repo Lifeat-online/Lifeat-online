@@ -6,7 +6,10 @@ use App\Models\AiGeneration;
 use App\Models\Article;
 use App\Models\Classified;
 use App\Models\Listing;
+use App\Models\Package;
+use App\Models\Subscription;
 use App\Models\User;
+use App\Models\Voucher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -22,7 +25,7 @@ class AskLifeTest extends TestCase
             'services.ai.providers.openrouter.key' => '',
         ]);
 
-        $this->postJson(route('ask-life.store'), [
+        $this->actingAs($this->devOwner())->postJson(route('ask-life.store'), [
             'question' => 'Can you assist me adding my business to your directory?',
         ])
             ->assertOk()
@@ -53,7 +56,7 @@ class AskLifeTest extends TestCase
             'published_at' => now(),
         ]);
 
-        $this->postJson(route('ask-life.store'), [
+        $this->actingAs($this->devOwner())->postJson(route('ask-life.store'), [
             'question' => 'What is happening with water in Bethlehem?',
         ])
             ->assertOk()
@@ -72,7 +75,7 @@ class AskLifeTest extends TestCase
             'services.ai.providers.openrouter.key' => '',
         ]);
 
-        $user = User::factory()->create();
+        $user = $this->devOwner();
 
         $this->actingAs($user)
             ->postJson(route('ask-life.store'), [
@@ -102,7 +105,7 @@ class AskLifeTest extends TestCase
             'services.ai.providers.openrouter.key' => '',
         ]);
 
-        $user = User::factory()->create();
+        $user = $this->devOwner();
         $listing = Listing::factory()
             ->create([
                 'user_id' => $user->id,
@@ -162,7 +165,7 @@ class AskLifeTest extends TestCase
             ]),
         ]);
 
-        $this->postJson(route('ask-life.store'), [
+        $this->actingAs($this->devOwner())->postJson(route('ask-life.store'), [
             'question' => 'Mahindra bakkie in Bethlehem',
         ])
             ->assertOk()
@@ -203,7 +206,7 @@ class AskLifeTest extends TestCase
             ]),
         ]);
 
-        $this->postJson(route('ask-life.store'), [
+        $this->actingAs($this->devOwner())->postJson(route('ask-life.store'), [
             'question' => 'Jimmy, what can you help me with?',
             'context' => [
                 'locale' => 'af',
@@ -233,7 +236,7 @@ class AskLifeTest extends TestCase
 
         $this->assertDatabaseHas('ai_generations', [
             'feature_key' => 'ask_life',
-            'prompt_version' => 'ask_life_v5',
+            'prompt_version' => 'ask_life_v7',
             'output_language' => 'af',
         ]);
     }
@@ -245,7 +248,7 @@ class AskLifeTest extends TestCase
             'services.ai.providers.openrouter.key' => '',
         ]);
 
-        $this->postJson(route('ask-life.store'), [
+        $this->actingAs($this->devOwner())->postJson(route('ask-life.store'), [
             'question' => 'Jimmy, what can you help me with?',
             'context' => [
                 'locale' => 'af',
@@ -268,7 +271,10 @@ class AskLifeTest extends TestCase
 
     public function test_ask_life_widget_renders_saved_afrikaans_locale_labels_before_javascript_runs(): void
     {
+        $dev = $this->devOwner();
+
         $response = $this
+            ->actingAs($dev)
             ->withSession(['locale' => 'af'])
             ->get(route('home'));
 
@@ -278,6 +284,168 @@ class AskLifeTest extends TestCase
         $response->assertSee('Vind plaaslike antwoorde, aksies en die regte Life@ bladsy.', false);
         $response->assertSee('Hallo, ek is Jimmy. Waarmee moet ek jou help?', false);
         $response->assertSee('Probeer: bandherstelwerk in Bethlehem', false);
+    }
+
+    public function test_ask_life_is_hidden_and_blocked_for_non_dev_users(): void
+    {
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertDontSee('data-ask-life', false);
+
+        $this->postJson(route('ask-life.store'), [
+            'question' => 'Can Jimmy help me?',
+        ])->assertForbidden();
+
+        $this->actingAs(User::factory()->create(['role' => 'super_admin']))
+            ->postJson(route('ask-life.store'), [
+                'question' => 'Can Jimmy help me?',
+            ])->assertForbidden();
+    }
+
+    public function test_ask_life_recommends_listed_developers_for_website_needs(): void
+    {
+        config([
+            'services.ai.provider' => 'openrouter',
+            'services.ai.providers.openrouter.key' => '',
+        ]);
+
+        $dev = $this->devOwner();
+        $listing = Listing::factory()->create([
+            'title' => 'Pixel Forge Developers',
+            'excerpt' => 'Website design, web apps, online stores, and digital support.',
+            'description' => 'Local developers building websites, software, and ecommerce sites.',
+            'city' => 'Bethlehem',
+            'region' => 'Free State',
+            'status' => 'published',
+            'published_at' => now(),
+            'is_featured' => true,
+        ]);
+        $this->activateListing($listing);
+
+        $this->actingAs($dev)
+            ->postJson(route('ask-life.store'), [
+                'question' => 'I need a website for my business in Bethlehem',
+            ])
+            ->assertOk()
+            ->assertJsonPath('source', 'guided')
+            ->assertJsonPath('intent.key', 'website_project')
+            ->assertJsonPath('sources.0.id', 'listing:'.$listing->id)
+            ->assertJsonPath('sources.0.title', 'Pixel Forge Developers')
+            ->assertSee('listed developers', false);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_ask_life_recommends_accommodation_for_short_term_stays(): void
+    {
+        config([
+            'services.ai.provider' => 'openrouter',
+            'services.ai.providers.openrouter.key' => '',
+        ]);
+
+        $dev = $this->devOwner();
+        $listing = Listing::factory()->create([
+            'title' => 'Clarens Mountain B&B',
+            'excerpt' => 'Short-term accommodation, guest rooms, and weekend stays.',
+            'description' => 'Bed and breakfast guest house for overnight and short-term stays in Clarens.',
+            'city' => 'Clarens',
+            'region' => 'Free State',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        $this->activateListing($listing);
+
+        $this->actingAs($dev)
+            ->postJson(route('ask-life.store'), [
+                'question' => 'I need a place to stay short term in Clarens',
+            ])
+            ->assertOk()
+            ->assertJsonPath('source', 'guided')
+            ->assertJsonPath('intent.key', 'accommodation_search')
+            ->assertJsonPath('sources.0.id', 'listing:'.$listing->id)
+            ->assertJsonPath('sources.0.title', 'Clarens Mountain B&B')
+            ->assertSee('short-term place to stay', false);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_ask_life_universally_recommends_matching_business_services(): void
+    {
+        config([
+            'services.ai.provider' => 'openrouter',
+            'services.ai.providers.openrouter.key' => '',
+        ]);
+
+        $dev = $this->devOwner();
+        $listing = Listing::factory()->create([
+            'title' => 'Bethlehem Plumbing Pros',
+            'excerpt' => 'Local plumbers for leaks, burst pipes, geysers, and emergency pipe repairs.',
+            'description' => 'Plumbing services in Bethlehem for household and business water problems.',
+            'city' => 'Bethlehem',
+            'region' => 'Free State',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        $this->activateListing($listing);
+
+        $this->actingAs($dev)
+            ->postJson(route('ask-life.store'), [
+                'question' => 'I need a plumber to fix a leak in Bethlehem',
+            ])
+            ->assertOk()
+            ->assertJsonPath('source', 'guided')
+            ->assertJsonPath('intent.key', 'business_search')
+            ->assertJsonPath('sources.0.id', 'listing:'.$listing->id)
+            ->assertJsonPath('sources.0.title', 'Bethlehem Plumbing Pros')
+            ->assertSee('Life@ has', false)
+            ->assertSee('plumber', false);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_ask_life_universally_recommends_matching_vouchers_and_businesses(): void
+    {
+        config([
+            'services.ai.provider' => 'openrouter',
+            'services.ai.providers.openrouter.key' => '',
+        ]);
+
+        $dev = $this->devOwner();
+        $listing = Listing::factory()->create([
+            'title' => 'Bethlehem Coffee Bar',
+            'excerpt' => 'Breakfast, coffee, light meals, and weekend specials.',
+            'description' => 'Local coffee shop with breakfast deals in Bethlehem.',
+            'city' => 'Bethlehem',
+            'region' => 'Free State',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        $this->activateListing($listing);
+
+        $voucher = Voucher::factory()->create([
+            'listing_id' => $listing->id,
+            'title' => 'Breakfast Coffee Special',
+            'description' => 'Discounted breakfast and coffee special for local customers.',
+            'terms' => 'Valid for breakfast orders while the voucher is active.',
+            'status' => 'published',
+            'published_at' => now(),
+            'start_at' => now()->subDay(),
+            'end_at' => now()->addWeek(),
+        ]);
+
+        $this->actingAs($dev)
+            ->postJson(route('ask-life.store'), [
+                'question' => 'Show me coffee specials in Bethlehem',
+            ])
+            ->assertOk()
+            ->assertJsonPath('source', 'guided')
+            ->assertJsonPath('intent.key', 'voucher_discovery')
+            ->assertJsonPath('sources.0.id', 'voucher:'.$voucher->id)
+            ->assertJsonPath('sources.0.title', 'Breakfast Coffee Special')
+            ->assertJsonFragment(['label' => 'Vouchers'])
+            ->assertSee('Life@ has', false);
+
+        Http::assertNothingSent();
     }
 
     public function test_jimmy_can_answer_conversationally_from_platform_guides(): void
@@ -305,7 +473,7 @@ class AskLifeTest extends TestCase
             ]),
         ]);
 
-        $this->postJson(route('ask-life.store'), [
+        $this->actingAs($this->devOwner())->postJson(route('ask-life.store'), [
             'question' => 'Jimmy, what can you help me with?',
         ])
             ->assertOk()
@@ -328,7 +496,7 @@ class AskLifeTest extends TestCase
 
     public function test_ask_life_feedback_is_persisted(): void
     {
-        $this->postJson(route('ask-life.feedback'), [
+        $this->actingAs($this->devOwner())->postJson(route('ask-life.feedback'), [
             'rating' => 'not_helpful',
             'question' => 'Where can I fix a tyre?',
             'answer' => 'I could not find a direct match yet.',
@@ -353,5 +521,34 @@ class AskLifeTest extends TestCase
             'source' => 'fallback',
             'question' => 'Where can I fix a tyre?',
         ]);
+    }
+
+    private function devOwner(): User
+    {
+        return User::query()->where('email', 'jameskoen78@gmail.com')->first()
+            ?? User::factory()->create([
+                'role' => 'super_admin',
+                'email' => 'jameskoen78@gmail.com',
+            ]);
+    }
+
+    private function activateListing(Listing $listing): Listing
+    {
+        $subscription = Subscription::create([
+            'user_id' => $listing->user_id,
+            'package_id' => Package::query()->firstOrFail()->id,
+            'subscribable_type' => Listing::class,
+            'subscribable_id' => $listing->id,
+            'status' => 'active',
+            'starts_at' => now()->subDay(),
+            'ends_at' => now()->addMonths(6),
+            'renewal_mode' => 'manual',
+        ]);
+
+        $listing->forceFill([
+            'active_subscription_id' => $subscription->id,
+        ])->save();
+
+        return $listing->refresh();
     }
 }

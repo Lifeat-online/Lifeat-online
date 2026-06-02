@@ -13,6 +13,8 @@ class AskLifeController extends Controller
 {
     public function store(Request $request, AskLifeService $askLife): JsonResponse
     {
+        $this->ensureDevOwner($request);
+
         $validated = $request->validate([
             'question' => ['required', 'string', 'min:3', 'max:500'],
             'history' => ['nullable', 'array', 'max:20'],
@@ -39,6 +41,8 @@ class AskLifeController extends Controller
 
     public function feedback(Request $request): JsonResponse
     {
+        $this->ensureDevOwner($request);
+
         $validated = $request->validate([
             'rating' => ['required', 'string', Rule::in(['helpful', 'not_helpful'])],
             'question' => ['required', 'string', 'min:3', 'max:500'],
@@ -84,6 +88,8 @@ class AskLifeController extends Controller
 
     public function speak(Request $request, VoiceGatewayService $voice): JsonResponse
     {
+        $this->ensureDevOwner($request);
+
         $validated = $request->validate([
             'text' => ['required', 'string', 'min:2', 'max:1000'],
             'locale' => ['nullable', 'string', Rule::in(['en', 'af'])],
@@ -96,5 +102,10 @@ class AskLifeController extends Controller
         );
 
         return response()->json($result, ($result['ok'] ?? false) ? 200 : 422);
+    }
+
+    private function ensureDevOwner(Request $request): void
+    {
+        abort_unless($request->user()?->isDevOwner(), 403, 'Jimmy is currently limited to the Dev owner.');
     }
 }
