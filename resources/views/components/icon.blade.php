@@ -76,6 +76,41 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 21s6.75-4.95 6.75-11.25a6.75 6.75 0 10-13.5 0C5.25 16.05 12 21 12 21zM12 12.25a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
         </svg>
         @break
+    @case('volume')
+        <svg {{ $attributes->merge($common)->except('name') }}>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 9.75h3L12 6v12l-4.5-3.75h-3v-4.5zM15.75 8.25a5.25 5.25 0 010 7.5M18 6a8.25 8.25 0 010 12" />
+        </svg>
+        @break
+    @case('volume-off')
+        <svg {{ $attributes->merge($common)->except('name') }}>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 9.75h3L12 6v12l-4.5-3.75h-3v-4.5zM16.5 9.5l4 4M20.5 9.5l-4 4" />
+        </svg>
+        @break
+    @case('trash')
+        <svg {{ $attributes->merge($common)->except('name') }}>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5M9 7.5V5.25h6V7.5M7.5 7.5l.75 12h7.5l.75-12M10.5 10.5v6M13.5 10.5v6" />
+        </svg>
+        @break
+    @case('thumb-up')
+        <svg {{ $attributes->merge($common)->except('name') }}>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 10.5v9M4.5 10.5h3v9h-3v-9zM7.5 10.5l4.2-6.3A1.5 1.5 0 0114.4 5.4l-.65 3.1h3.8a2.25 2.25 0 012.2 2.72l-1.2 5.65A3 3 0 0115.6 19.5H7.5" />
+        </svg>
+        @break
+    @case('thumb-down')
+        <svg {{ $attributes->merge($common)->except('name') }}>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 13.5v-9M4.5 4.5h3v9h-3v-9zM7.5 13.5l4.2 6.3a1.5 1.5 0 002.7-1.2l-.65-3.1h3.8a2.25 2.25 0 002.2-2.72l-1.2-5.65A3 3 0 0015.6 4.5H7.5" />
+        </svg>
+        @break
+    @case('external-link')
+        <svg {{ $attributes->merge($common)->except('name') }}>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6H6.75A2.25 2.25 0 004.5 8.25v9A2.25 2.25 0 006.75 19.5h9A2.25 2.25 0 0018 17.25V13.5M13.5 4.5h6v6M19.5 4.5l-9 9" />
+        </svg>
+        @break
+    @case('phone')
+        <svg {{ $attributes->merge($common)->except('name') }}>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7.25 4.5l2.1-.75 2.1 4.5-1.55 1.05a12.5 12.5 0 004.8 4.8l1.05-1.55 4.5 2.1-.75 2.1a2.25 2.25 0 01-2.45 1.48C10.5 17.2 6.8 13.5 5.77 6.95A2.25 2.25 0 017.25 4.5z" />
+        </svg>
+        @break
     @case('heart')
         <svg {{ $attributes->merge($common)->except('name') }}>
             <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.75c0 5.25-8.25 10.5-8.25 10.5S3.75 14 3.75 8.75A4.25 4.25 0 0112 7.15a4.25 4.25 0 018.25 1.6z" />

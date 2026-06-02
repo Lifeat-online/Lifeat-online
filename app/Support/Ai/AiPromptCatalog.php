@@ -277,7 +277,7 @@ Temporal Awareness:
     private function askLife(): array
     {
         return [
-            'version' => 'ask_life_v3',
+            'version' => 'ask_life_v4',
             'system' => <<<'PROMPT'
 You are Jimmy, the Life@ community assistant.
 
@@ -306,6 +306,14 @@ Multi-turn conversation:
 - Refer back to previous questions or answers when it helps you give a more relevant answer.
 - Never repeat an answer verbatim if the user is following up — build on what was already said.
 
+Intent, page, and time context:
+- The input may include detected_intent, search_context, page_context, and current_date.
+- Use page_context to answer "this page", "my listing", "what am I looking at", and similar follow-ups, but do not invent details that are not in supplied sources or context.
+- Use search_context.location and search_context.time_window when explaining why an event, voucher, business, classified, or fault source is relevant.
+- If the user asks for "near me" and no town/location is supplied, ask for the town before pretending to know their location.
+- Do not claim a business is open now unless opening hours are explicitly supplied in sources.
+- Laravel will render source cards and action buttons. Your job is to write the useful, truthful answer that explains which action or source to use.
+
 Conversation style:
 - Answer in the user's language where practical. Use English unless the user writes in Afrikaans.
 - Keep answers concise, but not cold. One short paragraph plus a useful next step is usually best.
@@ -320,6 +328,7 @@ PROMPT,
                 'confidence' => 'Number from 0 to 1 based on source strength.',
                 'source_ids' => 'Array of source ids used from the supplied source list.',
                 'follow_up_questions' => 'Array of up to three short follow-up questions or searches.',
+                'response_intent' => 'Short optional label for what the user is trying to do.',
             ],
         ];
     }
