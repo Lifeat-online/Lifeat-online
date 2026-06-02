@@ -44,4 +44,29 @@ class ProductionReadinessCommandTest extends TestCase
             ->expectsOutputToContain('life:images:generate --limit=3')
             ->assertExitCode(0);
     }
+
+    public function test_production_check_warns_when_translation_queue_needs_worker_command(): void
+    {
+        config([
+            'localization.auto_translate_on_publish' => true,
+            'localization.auto_translation_queue' => 'translations',
+        ]);
+        Env::getRepository()->set('QUEUE_WORKER_COMMAND', 'php artisan queue:work --queue=default --sleep=3 --tries=3 --timeout=120');
+        Env::getRepository()->clear('AUTO_TRANSLATION_WORKER_COMMAND');
+        putenv('AUTO_TRANSLATION_WORKER_COMMAND');
+        unset($_ENV['AUTO_TRANSLATION_WORKER_COMMAND'], $_SERVER['AUTO_TRANSLATION_WORKER_COMMAND']);
+
+        try {
+            $this->artisan('production:check')
+                ->expectsOutputToContain('[AUTO_TRANSLATION_WORKER_COMMAND] AUTO_TRANSLATION_QUEUE is translations, so document a worker command that listens to that queue.')
+                ->assertExitCode(1);
+        } finally {
+            Env::getRepository()->clear('QUEUE_WORKER_COMMAND');
+            Env::getRepository()->clear('AUTO_TRANSLATION_WORKER_COMMAND');
+            putenv('QUEUE_WORKER_COMMAND');
+            putenv('AUTO_TRANSLATION_WORKER_COMMAND');
+            unset($_ENV['QUEUE_WORKER_COMMAND'], $_ENV['AUTO_TRANSLATION_WORKER_COMMAND']);
+            unset($_SERVER['QUEUE_WORKER_COMMAND'], $_SERVER['AUTO_TRANSLATION_WORKER_COMMAND']);
+        }
+    }
 }

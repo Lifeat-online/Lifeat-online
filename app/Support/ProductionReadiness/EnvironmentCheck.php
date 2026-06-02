@@ -42,12 +42,61 @@ class EnvironmentCheck
      */
     private function queueAndSchedulerChecks(): array
     {
+        $queueWorkerCommand = (string) env('QUEUE_WORKER_COMMAND', '');
+
         return array_values(array_filter([
             $this->expectTrue('error', 'QUEUE_WORKER_ENABLED', $this->envBool('QUEUE_WORKER_ENABLED'), 'A production queue worker process must be configured and running.'),
-            $this->expectPresent('warning', 'QUEUE_WORKER_COMMAND', (string) env('QUEUE_WORKER_COMMAND', ''), 'Document the production queue worker command, for example php artisan queue:work --sleep=3 --tries=3 --timeout=120.'),
+            $this->expectPresent('warning', 'QUEUE_WORKER_COMMAND', $queueWorkerCommand, 'Document the production queue worker command, for example php artisan queue:work --sleep=3 --tries=3 --timeout=120.'),
             $this->expectTrue('error', 'SCHEDULER_ENABLED', $this->envBool('SCHEDULER_ENABLED'), 'A production scheduler or cron process must be configured and running.'),
             $this->expectPresent('warning', 'SCHEDULER_COMMAND', (string) env('SCHEDULER_COMMAND', ''), 'Document the production scheduler command, for example php artisan schedule:work or a once-per-minute php artisan schedule:run cron.'),
+            ...$this->autoTranslationQueueChecks($queueWorkerCommand),
         ]));
+    }
+
+    /**
+     * @return array<int, array{level: string, key: string, message: string}>
+     */
+    private function autoTranslationQueueChecks(string $queueWorkerCommand): array
+    {
+        if (! (bool) config('localization.auto_translate_on_publish', true)) {
+            return [];
+        }
+
+        $translationQueue = trim((string) config('localization.auto_translation_queue', 'default'));
+
+        if ($translationQueue === '' || $translationQueue === 'default') {
+            return [];
+        }
+
+        $translationWorkerCommand = (string) env('AUTO_TRANSLATION_WORKER_COMMAND', '');
+
+        if ($this->workerCommandIncludesQueue($queueWorkerCommand, $translationQueue)
+            || $this->workerCommandIncludesQueue($translationWorkerCommand, $translationQueue)) {
+            return [];
+        }
+
+        return [[
+            'level' => 'warning',
+            'key' => 'AUTO_TRANSLATION_WORKER_COMMAND',
+            'message' => "AUTO_TRANSLATION_QUEUE is {$translationQueue}, so document a worker command that listens to that queue.",
+        ]];
+    }
+
+    private function workerCommandIncludesQueue(string $command, string $queue): bool
+    {
+        if ($command === '' || ! preg_match_all('/--queue(?:=|\s+)([^\s]+)/', $command, $matches)) {
+            return false;
+        }
+
+        foreach ($matches[1] as $queueList) {
+            $queues = array_map('trim', explode(',', $queueList));
+
+            if (in_array($queue, $queues, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -57,6 +57,7 @@ For local PHPUnit runs, ensure the PHP CLI has these extensions enabled: `mbstri
 - Run `php artisan production:check` during deploy validation and resolve any errors before public launch.
 - Configure the Coolify health check path as `/up` with expected status `200`; the Nixpacks image includes `curl` so Coolify can run the probe inside the container.
 - Run separate worker and scheduler processes for `php artisan queue:work --sleep=3 --tries=3 --timeout=120` and `php artisan schedule:work`, or enable them in the web container with `QUEUE_WORKER_ENABLED=true` and `SCHEDULER_ENABLED=true`.
+- Auto-translation jobs default to the normal queue. For higher publishing volume, set `AUTO_TRANSLATION_QUEUE=translations` and run/document a worker that listens to it, for example `php artisan queue:work --queue=translations --sleep=3 --tries=2 --timeout=180`.
 - Transport realtime uses Laravel Reverb. Run it online as a separate service/process with `php artisan reverb:start --host=0.0.0.0 --port=$PORT`, set `BROADCAST_CONNECTION=reverb`, and point `REVERB_HOST` / `VITE_REVERB_HOST` at that service's public HTTPS domain.
 - For uploads, mount durable Hetzner/Coolify storage at `/app/storage/app` and set `UPLOAD_STORAGE_BACKEND=mounted_volume` plus `UPLOAD_STORAGE_MOUNT_PATH=/app/storage/app`; S3-compatible object storage can be wired later.
 - Enable managed database backups and record a successful restore drill with `BACKUPS_ENABLED=true`, `BACKUP_PROVIDER`, `BACKUP_RESTORE_DRILL_COMPLETED=true`, and `BACKUP_LAST_RESTORE_DRILL_DATE`.

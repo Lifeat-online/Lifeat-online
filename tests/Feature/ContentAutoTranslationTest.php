@@ -66,6 +66,37 @@ class ContentAutoTranslationTest extends TestCase
         Queue::assertNotPushed(TranslatePublishedContent::class);
     }
 
+    public function test_auto_translation_job_uses_configured_queue(): void
+    {
+        config([
+            'localization.auto_translate_on_publish' => true,
+            'localization.auto_translation_queue' => 'translations',
+        ]);
+        Queue::fake();
+
+        $this->mock(OpenRouterTranslationService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('configured')->once()->andReturn(true);
+        });
+
+        $author = User::factory()->create();
+        $article = Article::create([
+            'user_id' => $author->id,
+            'title' => 'Queued Translation Article',
+            'slug' => 'queued-translation-article',
+            'excerpt' => 'This story should use the translation queue.',
+            'body' => 'The translation job should be isolated when configured.',
+            'source_locale' => 'en',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        Queue::assertPushed(TranslatePublishedContent::class, function (TranslatePublishedContent $job) use ($article): bool {
+            return $job->translatableType === Article::class
+                && $job->translatableId === $article->id
+                && $job->queue === 'translations';
+        });
+    }
+
     public function test_translation_job_translates_supported_target_locales(): void
     {
         $author = User::factory()->create();

@@ -29,6 +29,8 @@ Use this checklist before a production launch or major Hetzner/Coolify redeploy.
 - `QUEUE_WORKER_ENABLED=true` is set only after the Coolify worker process/service is configured.
 - Worker service command: `php artisan queue:work --sleep=3 --tries=3 --timeout=120`.
 - `QUEUE_WORKER_COMMAND` records the command used by the worker service.
+- Auto-translation can stay on `AUTO_TRANSLATION_QUEUE=default` for normal volume. If `AUTO_TRANSLATION_QUEUE=translations` is used, run/document a worker for that queue, such as `php artisan queue:work --queue=translations --sleep=3 --tries=2 --timeout=180`.
+- `AUTO_TRANSLATION_DELAY_SECONDS` is set to `0` for immediate translation, or a small delay if publish bursts need smoothing.
 - `SCHEDULER_ENABLED=true` is set only after the Coolify scheduler process/service or cron is configured.
 - Scheduler service command: `php artisan schedule:work`, or a cron that runs `php artisan schedule:run` once per minute.
 - `SCHEDULER_COMMAND` records the command used by the scheduler/cron service.

@@ -26,7 +26,19 @@ class QueueContentTranslations
             return;
         }
 
-        TranslatePublishedContent::dispatch($model::class, $model->getKey())->afterCommit();
+        $dispatch = TranslatePublishedContent::dispatch($model::class, $model->getKey());
+        $queue = trim((string) config('localization.auto_translation_queue', 'default'));
+        $delay = max(0, (int) config('localization.auto_translation_delay_seconds', 0));
+
+        if ($queue !== '') {
+            $dispatch->onQueue($queue);
+        }
+
+        if ($delay > 0) {
+            $dispatch->delay(now()->addSeconds($delay));
+        }
+
+        $dispatch->afterCommit();
     }
 
     private function contentChanged(Model $model): bool
