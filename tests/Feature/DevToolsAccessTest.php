@@ -371,7 +371,7 @@ class DevToolsAccessTest extends TestCase
             ->assertJsonPath('halted', true)
             ->assertJsonPath('sections.0.halted', true)
             ->assertJsonFragment([
-                'message' => 'Processed 1 translation targets: 0 translated, 0 current, 1 failed. First issue: OpenRouter returned 429: Provider rate limit exceeded. Wait a minute, then retry with Items per run set to 1-3, or switch to a paid/non-free OpenRouter model for bulk translation. Batch stopped early to avoid repeated failed provider calls.',
+                'message' => 'Processed 1 translation targets: 0 translated, 0 current, 1 failed. First issue: OpenRouter returned 429: Provider rate limit exceeded. Wait a minute, then retry with Items per run set to 1-3, or switch to a paid/non-free translation model or provider for bulk translation. Batch stopped early to avoid repeated failed provider calls.',
             ]);
     }
 

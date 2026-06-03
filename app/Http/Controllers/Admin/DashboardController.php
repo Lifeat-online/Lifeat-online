@@ -247,6 +247,8 @@ class DashboardController extends Controller
                 'source' => 'Missing',
                 'masked_key' => '',
                 'providers' => [],
+                'feature_routes' => [],
+                'profiles' => [],
             ],
             'devAiImageStatus' => [
                 'provider' => 'openrouter',

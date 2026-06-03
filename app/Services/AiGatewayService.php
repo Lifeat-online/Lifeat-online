@@ -28,6 +28,8 @@ class AiGatewayService
                 'key' => $key,
                 'label' => (string) ($config['label'] ?? Str::headline($key)),
                 'type' => (string) ($config['type'] ?? 'openai_compatible'),
+                'capabilities' => $this->providerCapabilities($key),
+                'cost_tier' => $this->providerCostTier($key),
                 'model' => $this->model($key),
                 'fallback_models' => $this->fallbackModels($key),
                 'configured' => $this->configured($key),
@@ -51,7 +53,37 @@ class AiGatewayService
             'masked_key' => $this->maskedApiKey(),
             'providers' => $this->providers(),
             'fallback_providers' => $this->fallbackProviders($this->provider()),
+            'feature_routes' => $this->featureRoutes(),
+            'profiles' => (array) config('ai_features.profiles', []),
         ];
+    }
+
+    public function featureRoutes(): array
+    {
+        return collect((array) config('ai_features.routes', []))
+            ->map(function (array $config, string $featureKey): array {
+                $provider = $this->providerForFeature($featureKey);
+                $model = $this->modelForFeature($featureKey, $provider);
+                $profile = (string) ($config['profile'] ?? 'balanced');
+                $profileConfig = (array) config("ai_features.profiles.{$profile}", []);
+
+                return [
+                    'key' => $featureKey,
+                    'label' => (string) ($config['label'] ?? Str::headline($featureKey)),
+                    'profile' => $profile,
+                    'profile_label' => (string) ($profileConfig['label'] ?? Str::headline($profile)),
+                    'profile_description' => (string) ($profileConfig['description'] ?? ''),
+                    'provider' => $provider,
+                    'provider_label' => $this->providerLabel($provider),
+                    'model' => $model,
+                    'configured' => $this->configured($provider, $model),
+                    'fallback_providers' => $this->fallbackProviders($provider, $featureKey),
+                    'notes' => (string) ($config['notes'] ?? ''),
+                    'is_custom' => $this->featureRouteIsCustom($featureKey),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     public function provider(): string
@@ -59,6 +91,17 @@ class AiGatewayService
         $provider = (string) (Setting::getValue('ai.provider') ?: config('services.ai.provider', 'openrouter'));
 
         return array_key_exists($provider, (array) config('services.ai.providers', [])) ? $provider : 'openrouter';
+    }
+
+    public function providerForFeature(string $featureKey): string
+    {
+        $provider = (string) (
+            Setting::getValue("ai_feature.{$featureKey}.provider")
+            ?: config("ai_features.routes.{$featureKey}.provider")
+            ?: $this->provider()
+        );
+
+        return array_key_exists($provider, (array) config('services.ai.providers', [])) ? $provider : $this->provider();
     }
 
     public function providerLabel(?string $provider = null): string
@@ -73,6 +116,25 @@ class AiGatewayService
         $provider ??= $this->provider();
 
         return (string) (Setting::getValue("ai.{$provider}_model") ?: config("services.ai.providers.{$provider}.model", ''));
+    }
+
+    public function modelForFeature(string $featureKey, ?string $provider = null): string
+    {
+        $provider ??= $this->providerForFeature($featureKey);
+        $primaryProvider = $this->providerForFeature($featureKey);
+
+        if ($provider === $primaryProvider) {
+            $model = trim((string) (
+                Setting::getValue("ai_feature.{$featureKey}.model")
+                ?: config("ai_features.routes.{$featureKey}.model", '')
+            ));
+
+            if ($model !== '') {
+                return $model;
+            }
+        }
+
+        return $this->model($provider);
     }
 
     public function fallbackModels(?string $provider = null): array
@@ -101,19 +163,20 @@ class AiGatewayService
         return rtrim((string) (Setting::getValue("ai.{$provider}_base_url") ?: config("services.ai.providers.{$provider}.base_url", '')), '/');
     }
 
-    public function configured(?string $provider = null): bool
+    public function configured(?string $provider = null, ?string $model = null): bool
     {
         $provider ??= $this->provider();
+        $model = trim((string) ($model ?? $this->model($provider)));
 
         if ((bool) config("services.ai.providers.{$provider}.key_optional", false)) {
-            return $this->baseUrl($provider) !== '' && $this->model($provider) !== '';
+            return $this->baseUrl($provider) !== '' && $model !== '';
         }
 
         if ($provider === 'azure_openai') {
-            return $this->apiKey($provider) !== '' && $this->baseUrl($provider) !== '' && $this->model($provider) !== '';
+            return $this->apiKey($provider) !== '' && $this->baseUrl($provider) !== '' && $model !== '';
         }
 
-        return $this->apiKey($provider) !== '' && $this->model($provider) !== '';
+        return $this->apiKey($provider) !== '' && $model !== '';
     }
 
     public function apiKeySource(?string $provider = null): string
@@ -161,12 +224,12 @@ class AiGatewayService
         ?User $user = null,
         ?string $outputLanguage = null,
     ): array {
-        $primaryProvider = $this->provider();
-        $primaryModel = $this->model($primaryProvider);
+        $primaryProvider = $this->providerForFeature($featureKey);
+        $primaryModel = $this->modelForFeature($featureKey, $primaryProvider);
         $encodedInput = $this->encode($input);
         $inputTokens = $this->estimateTokens($systemPrompt.' '.$encodedInput);
 
-        if (! $this->configured($primaryProvider)) {
+        if (! $this->configured($primaryProvider, $primaryModel)) {
             $generation = $this->createGenerationRecord(
                 $featureKey,
                 $promptVersion,
@@ -215,7 +278,7 @@ class AiGatewayService
             'provider' => $primaryProvider,
             'model' => $primaryModel,
         ];
-        $attempts = $this->textProviderAttempts($primaryProvider);
+        $attempts = $this->textProviderAttempts($primaryProvider, $featureKey, $primaryModel);
         $this->extendExecutionWindow(count($attempts));
 
         foreach ($attempts as $attempt) {
@@ -310,9 +373,9 @@ class AiGatewayService
         ];
     }
 
-    private function textProviderAttempts(string $primaryProvider): array
+    private function textProviderAttempts(string $primaryProvider, ?string $featureKey = null, ?string $primaryModel = null): array
     {
-        $primaryModel = $this->model($primaryProvider);
+        $primaryModel = trim((string) ($primaryModel ?: $this->model($primaryProvider)));
         $attempts = [];
         $seen = [];
         $addAttempt = function (string $provider, string $model, ?array $fallbackFrom = null) use (&$attempts, &$seen): void {
@@ -340,7 +403,7 @@ class AiGatewayService
             ]);
         }
 
-        foreach ($this->fallbackProviders($primaryProvider) as $provider) {
+        foreach ($this->fallbackProviders($primaryProvider, $featureKey) as $provider) {
             if (! array_key_exists($provider, (array) config('services.ai.providers', [])) || ! $this->configured($provider)) {
                 continue;
             }
@@ -354,14 +417,24 @@ class AiGatewayService
         return $attempts;
     }
 
-    private function fallbackProviders(string $primaryProvider): array
+    private function fallbackProviders(string $primaryProvider, ?string $featureKey = null): array
     {
-        $setting = Setting::query()
-            ->where('key', 'ai.fallback_providers')
-            ->value('value');
-        $providers = $setting !== null
-            ? $this->csvList((string) $setting)
-            : $this->normaliseList((array) config('services.ai.fallback_providers', []));
+        $featureSetting = $featureKey !== null
+            ? Setting::query()->where('key', "ai_feature.{$featureKey}.fallback_providers")->value('value')
+            : null;
+
+        if ($featureSetting !== null) {
+            $providers = $this->csvList((string) $featureSetting);
+        } elseif ($featureKey !== null && config()->has("ai_features.routes.{$featureKey}.fallback_providers")) {
+            $providers = $this->normaliseList((array) config("ai_features.routes.{$featureKey}.fallback_providers", []));
+        } else {
+            $setting = Setting::query()
+                ->where('key', 'ai.fallback_providers')
+                ->value('value');
+            $providers = $setting !== null
+                ? $this->csvList((string) $setting)
+                : $this->normaliseList((array) config('services.ai.fallback_providers', []));
+        }
 
         return collect($providers)
             ->map(fn (string $provider): string => trim($provider))
@@ -369,6 +442,51 @@ class AiGatewayService
             ->unique()
             ->values()
             ->all();
+    }
+
+    private function featureRouteIsCustom(string $featureKey): bool
+    {
+        return Setting::query()
+            ->whereIn('key', [
+                "ai_feature.{$featureKey}.provider",
+                "ai_feature.{$featureKey}.model",
+                "ai_feature.{$featureKey}.fallback_providers",
+            ])
+            ->exists();
+    }
+
+    private function providerCapabilities(string $provider): array
+    {
+        $configured = config("services.ai.providers.{$provider}.capabilities");
+        if (is_array($configured) && $configured !== []) {
+            return $this->normaliseList($configured);
+        }
+
+        $type = (string) config("services.ai.providers.{$provider}.type", 'openai_compatible');
+        $capabilities = match ($type) {
+            'anthropic', 'gemini', 'azure_openai', 'cohere', 'openai_compatible' => ['text', 'structured_json'],
+            default => ['text'],
+        };
+
+        if ($provider === 'perplexity') {
+            $capabilities[] = 'web_grounded';
+        }
+
+        if ($provider === 'ollama') {
+            $capabilities[] = 'local';
+        }
+
+        return $this->normaliseList($capabilities);
+    }
+
+    private function providerCostTier(string $provider): string
+    {
+        return (string) config("services.ai.providers.{$provider}.cost_tier", match ($provider) {
+            'ollama' => 'local',
+            'openrouter', 'groq', 'huggingface' => 'cheap',
+            'anthropic', 'openai', 'azure_openai' => 'premium',
+            default => 'standard',
+        });
     }
 
     private function createGenerationRecord(

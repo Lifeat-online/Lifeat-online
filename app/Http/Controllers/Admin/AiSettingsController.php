@@ -30,12 +30,19 @@ class AiSettingsController extends Controller
         $providers = collect($gateway->providers())->pluck('key')->all();
         $imageProviders = collect($images->providers())->pluck('key')->all();
         $voiceProviders = collect($voice->providers())->pluck('key')->all();
+        $featureKeys = collect($gateway->featureRoutes())->pluck('key')->all();
 
         $validated = $request->validate([
             'provider' => ['required', 'string', Rule::in($providers)],
             'image_provider' => ['nullable', 'string', Rule::in($imageProviders)],
             'voice_provider' => ['nullable', 'string', Rule::in($voiceProviders)],
             'fallback_providers' => ['nullable', 'string', 'max:1000'],
+            'feature_providers' => ['nullable', 'array'],
+            'feature_providers.*' => ['nullable', 'string', Rule::in($providers)],
+            'feature_models' => ['nullable', 'array'],
+            'feature_models.*' => ['nullable', 'string', 'max:255'],
+            'feature_fallback_providers' => ['nullable', 'array'],
+            'feature_fallback_providers.*' => ['nullable', 'string', 'max:1000'],
             'keys' => ['nullable', 'array'],
             'keys.*' => ['nullable', 'string', 'max:1000'],
             'models' => ['nullable', 'array'],
@@ -79,6 +86,9 @@ class AiSettingsController extends Controller
         if (array_key_exists('fallback_providers', $validated)) {
             $this->setSetting($request, 'ai.fallback_providers', $this->normaliseCsvSetting((string) $validated['fallback_providers']), 'string');
         }
+
+        $this->saveFeatureRoutes($request, $validated, $featureKeys, $providers);
+
         if (filled($validated['image_provider'] ?? null)) {
             $this->setSetting($request, 'ai_image.provider', $validated['image_provider'], 'string');
         }
@@ -304,14 +314,44 @@ class AiSettingsController extends Controller
         ]);
     }
 
-    private function setSetting(Request $request, string $key, string $value, string $type): void
+    private function saveFeatureRoutes(Request $request, array $validated, array $featureKeys, array $providers): void
+    {
+        $featureProviders = (array) ($validated['feature_providers'] ?? []);
+        $featureModels = (array) ($validated['feature_models'] ?? []);
+        $featureFallbackProviders = (array) ($validated['feature_fallback_providers'] ?? []);
+
+        foreach ($featureKeys as $featureKey) {
+            if (array_key_exists($featureKey, $featureProviders)) {
+                $provider = trim((string) $featureProviders[$featureKey]);
+                if ($provider !== '' && in_array($provider, $providers, true)) {
+                    $this->setSetting($request, "ai_feature.{$featureKey}.provider", $provider, 'string', 'ai_features');
+                }
+            }
+
+            if (array_key_exists($featureKey, $featureModels)) {
+                $this->setSetting($request, "ai_feature.{$featureKey}.model", trim((string) $featureModels[$featureKey]), 'string', 'ai_features');
+            }
+
+            if (array_key_exists($featureKey, $featureFallbackProviders)) {
+                $this->setSetting(
+                    $request,
+                    "ai_feature.{$featureKey}.fallback_providers",
+                    $this->normaliseCsvSetting((string) $featureFallbackProviders[$featureKey]),
+                    'string',
+                    'ai_features'
+                );
+            }
+        }
+    }
+
+    private function setSetting(Request $request, string $key, string $value, string $type, string $group = 'ai'): void
     {
         Setting::updateOrCreate(
             ['key' => $key],
             [
                 'value' => $value,
                 'type' => $type,
-                'group' => 'ai',
+                'group' => $group,
                 'updated_by_user_id' => $request->user()?->id,
             ]
         );

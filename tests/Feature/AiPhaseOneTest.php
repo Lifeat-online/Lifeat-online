@@ -9,6 +9,7 @@ use App\Models\ResearchItem;
 use App\Models\ResearchSource;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\AiGatewayService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -28,6 +29,17 @@ class AiPhaseOneTest extends TestCase
             ->postJson(route('dev.ai.settings.store'), [
                 'provider' => 'nvidia',
                 'fallback_providers' => "openrouter\ngoogle,openai",
+                'feature_providers' => [
+                    'ask_life' => 'google',
+                    'jimmy_article_draft' => 'nvidia',
+                ],
+                'feature_models' => [
+                    'ask_life' => 'gemini-3.5-flash',
+                    'jimmy_article_draft' => 'meta/llama-3.1-70b-instruct',
+                ],
+                'feature_fallback_providers' => [
+                    'ask_life' => "openrouter\nollama",
+                ],
                 'keys' => [
                     'nvidia' => 'nvapi-test-key',
                     'openrouter' => 'sk-or-test-key',
@@ -70,10 +82,17 @@ class AiPhaseOneTest extends TestCase
             ->assertJsonPath('status.configured', true)
             ->assertJsonPath('status.fallback_providers.0', 'openrouter')
             ->assertJsonPath('status.fallback_providers.1', 'google')
+            ->assertJsonPath('status.feature_routes.0.key', 'ask_life')
+            ->assertJsonPath('status.feature_routes.0.provider', 'google')
+            ->assertJsonPath('status.feature_routes.0.model', 'gemini-3.5-flash')
             ->assertJsonPath('voice_status.configured', true);
 
         $this->assertSame('nvidia', Setting::getValue('ai.provider'));
         $this->assertSame('openrouter,google,openai', Setting::getValue('ai.fallback_providers'));
+        $this->assertSame('google', Setting::getValue('ai_feature.ask_life.provider'));
+        $this->assertSame('gemini-3.5-flash', Setting::getValue('ai_feature.ask_life.model'));
+        $this->assertSame('openrouter,ollama', Setting::getValue('ai_feature.ask_life.fallback_providers'));
+        $this->assertSame('nvidia', Setting::getValue('ai_feature.jimmy_article_draft.provider'));
         $this->assertSame('nvapi-test-key', Setting::getValue('ai.nvidia_api_key'));
         $this->assertSame('meta/llama-3.1-70b-instruct', Setting::getValue('ai.nvidia_model'));
         $this->assertSame('meta/llama-3.1-70b-instruct,mistralai/mistral-nemo-12b-instruct', Setting::getValue('ai.nvidia_fallback_models'));
@@ -95,6 +114,8 @@ class AiPhaseOneTest extends TestCase
             ->assertOk()
             ->assertSee('Voice Test')
             ->assertSee('Voice Providers')
+            ->assertSee('Text Feature Routes')
+            ->assertSee('Jimmy public assistant')
             ->assertSee('NVIDIA Speech NIM')
             ->assertSee('NVIDIA Speech NIM testing expects a hosted or local endpoint', false)
             ->assertSee(route('ask-life.speak'), false)
@@ -102,6 +123,59 @@ class AiPhaseOneTest extends TestCase
             ->assertSee('AI Writer Process')
             ->assertSee(route('dev.ai.writer.process'), false)
             ->assertSee('data-ai-writer-process', false);
+    }
+
+    public function test_text_feature_route_uses_provider_specific_model_without_openai_lock_in(): void
+    {
+        config([
+            'services.ai.provider' => 'openrouter',
+            'services.ai.providers.openrouter.key' => 'sk-or-test',
+            'services.ai.providers.openrouter.model' => 'openrouter-default',
+            'services.ai.providers.google.key' => 'gemini-test-key',
+            'services.ai.providers.google.model' => 'gemini-default',
+            'services.ai.providers.google.base_url' => 'https://generativelanguage.googleapis.com/v1beta',
+        ]);
+
+        Setting::create(['key' => 'ai_feature.ask_life.provider', 'value' => 'google', 'type' => 'string', 'group' => 'ai_features']);
+        Setting::create(['key' => 'ai_feature.ask_life.model', 'value' => 'gemini-feature-model', 'type' => 'string', 'group' => 'ai_features']);
+        Setting::create(['key' => 'ai_feature.ask_life.fallback_providers', 'value' => 'openrouter', 'type' => 'string', 'group' => 'ai_features']);
+
+        Http::fake([
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-feature-model:generateContent' => Http::response([
+                'candidates' => [[
+                    'content' => [
+                        'parts' => [[
+                            'text' => json_encode([
+                                'answer' => 'Gemini routed answer.',
+                                'confidence' => 0.8,
+                                'source_ids' => [],
+                                'follow_up_questions' => [],
+                            ]),
+                        ]],
+                    ],
+                ]],
+            ]),
+        ]);
+
+        $result = app(AiGatewayService::class)->generateStructured(
+            'ask_life',
+            'ask_life_route_test',
+            'Return JSON.',
+            ['question' => 'Can Jimmy route through Gemini?', 'schema' => ['answer' => 'string']],
+            null,
+            null,
+            'en',
+        );
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame('Gemini routed answer.', $result['payload']['answer']);
+        $this->assertDatabaseHas('ai_generations', [
+            'feature_key' => 'ask_life',
+            'provider' => 'google',
+            'model' => 'gemini-feature-model',
+            'prompt_version' => 'ask_life_route_test',
+        ]);
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://generativelanguage.googleapis.com/v1beta/models/gemini-feature-model:generateContent');
     }
 
     public function test_listing_description_endpoint_returns_ai_suggestion_and_logs_generation(): void

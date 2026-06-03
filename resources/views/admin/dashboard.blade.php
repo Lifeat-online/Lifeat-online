@@ -255,7 +255,7 @@
                         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div>
                                 <h3 class="text-lg font-semibold text-gray-900">AI Provider Control</h3>
-                                <p class="mt-1 text-sm text-gray-500">Testing should stay on OpenRouter with free models where possible. Direct OpenAI and Gemini keys are ready for production once quality and costs are settled.</p>
+                                <p class="mt-1 text-sm text-gray-500">Provider-neutral controls for text, image, and voice AI. Route each feature to cheap, local, balanced, or premium providers without changing feature code.</p>
                                 <a href="{{ route('admin.ai-operations.index') }}" class="mt-3 inline-flex rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white">Open AI Operations</a>
                             </div>
                             <div class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-gray-600">
@@ -357,7 +357,49 @@
                         <div class="mt-6 max-w-md">
                             <label class="mb-1 block text-sm font-medium text-gray-700">Fallback provider order</label>
                             <input class="w-full rounded-md border-gray-300 text-sm" name="fallback_providers" value="{{ implode(', ', $devAiStatus['fallback_providers'] ?? []) }}" placeholder="openrouter, google, openai">
-                            <p class="mt-1 text-xs text-gray-500">Used after the active text provider and its fallback models fail.</p>
+                            <p class="mt-1 text-xs text-gray-500">Global fallback order used by text features that do not have their own route.</p>
+                        </div>
+
+                        <div class="mt-6">
+                            <div class="flex flex-col gap-1">
+                                <h4 class="font-semibold text-gray-900">Text Feature Routes</h4>
+                                <p class="text-sm text-gray-500">Choose the provider, optional model override, and fallback order for each text feature. Blank model values use that provider's default model.</p>
+                            </div>
+                            <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                                @foreach (($devAiStatus['feature_routes'] ?? []) as $route)
+                                    <div class="rounded-lg border border-indigo-100 bg-indigo-50/40 p-4">
+                                        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                            <div>
+                                                <h5 class="font-semibold text-gray-900">{{ $route['label'] }}</h5>
+                                                <p class="text-xs text-gray-500">{{ $route['profile_label'] }}@if ($route['is_custom']) / custom route @endif</p>
+                                            </div>
+                                            <span class="rounded-full bg-white px-2 py-1 text-xs text-indigo-700">{{ ($route['configured'] ?? false) ? 'Ready' : 'Needs key/model' }}</span>
+                                        </div>
+                                        @if ($route['notes'])
+                                            <p class="mt-2 text-xs text-gray-600">{{ $route['notes'] }}</p>
+                                        @endif
+                                        <div class="mt-4 grid gap-3">
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Provider</label>
+                                                <select class="w-full rounded-md border-gray-300 text-sm" name="feature_providers[{{ $route['key'] }}]">
+                                                    @foreach (($devAiStatus['providers'] ?? []) as $provider)
+                                                        <option value="{{ $provider['key'] }}" @selected(($route['provider'] ?? '') === $provider['key'])>{{ $provider['label'] }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Model override</label>
+                                                <input class="w-full rounded-md border-gray-300 text-sm" name="feature_models[{{ $route['key'] }}]" value="{{ $route['model'] }}" placeholder="Use provider default">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium uppercase text-gray-500">Fallback providers</label>
+                                                <input class="w-full rounded-md border-gray-300 text-sm" name="feature_fallback_providers[{{ $route['key'] }}]" value="{{ implode(', ', $route['fallback_providers'] ?? []) }}" placeholder="Use global order">
+                                            </div>
+                                            <p class="text-xs text-gray-500">Resolved now: {{ $route['provider_label'] }} / {{ $route['model'] ?: '-' }}</p>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
                         </div>
 
                         <div class="mt-6 max-w-md">
@@ -367,7 +409,7 @@
                                     <option value="{{ $provider['key'] }}" @selected(($devAiImageStatus['provider'] ?? 'openai') === $provider['key'])>{{ $provider['label'] }}</option>
                                 @endforeach
                             </select>
-                            <p class="mt-1 text-xs text-gray-500">Testing default: OpenRouter. Preferred direct production choices: OpenAI Images or Google Gemini Images.</p>
+                            <p class="mt-1 text-xs text-gray-500">Image generation stays separate from text routing so article images can use OpenRouter, OpenAI, Gemini, NVIDIA NIM, or another configured image provider.</p>
                         </div>
 
                         <div class="mt-6 max-w-md">
@@ -377,7 +419,7 @@
                                     <option value="{{ $provider['key'] }}" @selected(($devVoiceStatus['provider'] ?? 'elevenlabs') === $provider['key'])>{{ $provider['label'] }}</option>
                                 @endforeach
                             </select>
-                            <p class="mt-1 text-xs text-gray-500">ElevenLabs is the default for Jimmy's spoken replies. NVIDIA Speech NIM is available for English/self-hosted testing.</p>
+                            <p class="mt-1 text-xs text-gray-500">Voice is configured independently from text routes so Jimmy can use hosted, local, or self-hosted speech providers.</p>
                         </div>
 
                         <div class="mt-6 grid gap-4 lg:grid-cols-2">
@@ -387,6 +429,7 @@
                                         <div>
                                             <h4 class="font-semibold text-gray-900">{{ $provider['label'] }}</h4>
                                             <p class="text-xs text-gray-500">{{ $provider['type'] }} @if ($provider['configured']) / configured @else / not ready @endif</p>
+                                            <p class="mt-1 text-xs text-gray-500">{{ implode(', ', $provider['capabilities'] ?? []) ?: 'text' }} / {{ $provider['cost_tier'] ?? 'standard' }}</p>
                                         </div>
                                         <span class="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">{{ $provider['source'] }}</span>
                                     </div>
@@ -458,7 +501,7 @@
 
                         <div class="mt-6">
                             <h4 class="font-semibold text-gray-900">Voice Providers</h4>
-                            <p class="mt-1 text-sm text-gray-500">Used by Jimmy's speaker button. Select the active provider above, then configure ElevenLabs or NVIDIA Speech NIM here.</p>
+                            <p class="mt-1 text-sm text-gray-500">Used by Jimmy's speaker button. Select the active provider above, then configure any available speech provider here.</p>
                             <div class="mt-4 grid gap-4 lg:grid-cols-2">
                                 @foreach (($devVoiceStatus['providers'] ?? []) as $provider)
                                     <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 p-4">

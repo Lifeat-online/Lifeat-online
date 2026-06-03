@@ -1,7 +1,7 @@
 # Life@ AI Implementation Opportunities And Roadmap
 
-Status: Phase 1 foundation implemented; Jimmy chat, commercial copy, AI article translation, AI event description, research collector, Editorial Agent brief queue, Jimmy draft-writing stage, and Image Agent implemented
-Last updated: 2026-05-23
+Status: Phase 1 foundation implemented; provider-neutral text feature routing, Jimmy chat, commercial copy, AI article translation, AI event description, research collector, Editorial Agent brief queue, Jimmy draft-writing stage, and Image Agent implemented
+Last updated: 2026-06-04
 
 ## Purpose
 
@@ -38,6 +38,7 @@ Build these once, then reuse them across modules:
 
 - AI provider settings in the Dev/admin area: provider, model, API key, timeout, enabled features, and test prompt.
 - A central `AiGatewayService` that wraps provider calls, retries, logging, safety checks, and cost tracking.
+- Provider-neutral feature routes for text AI so high-volume Jimmy chat, cheap structured helpers, balanced review tasks, and premium writing can use different providers, models, and fallback orders without changing feature code.
 - Prompt templates stored in code or database with version names such as `listing_description_v1`, `fault_category_v1`, and `article_translate_v1`.
 - `ai_generations` table for audit logs: feature, source type, source id, prompt version, provider, model, input hash, output, language, status, cost estimate, and user id.
 - Queue jobs for slower tasks like translation, weekly digests, article quality checks, duplicate detection, embeddings, and vision.
@@ -54,7 +55,7 @@ Life@ should keep provider choice configurable so testing and production can div
 - Excluded by default for editorial/news workflows: DeepSeek, because unpublished local/community content raises privacy and jurisdiction concerns.
 - Local or private deployment option: Ollama/local OpenAI-compatible endpoints for development, demos, or later private-hosted models.
 - Provider settings should live in Dev/admin with provider, model, API key, base URL, status, and test prompt.
-- Feature code should call `AiGatewayService` only. It should never know which provider is active.
+- Feature code should call `AiGatewayService` only with a feature key. It should never know which provider is active, and Dev/admin should be able to route each feature independently.
 - Each AI generation should store provider and model so quality, cost, and failures can be compared later.
 - Model names must stay editable because provider catalogs change faster than application releases.
 

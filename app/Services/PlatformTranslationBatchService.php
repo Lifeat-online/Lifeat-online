@@ -229,9 +229,11 @@ class PlatformTranslationBatchService
 
     private function rateLimitMessage(?string $message = null): string
     {
+        $guidance = 'Wait a minute, then retry with Items per run set to 1-3, or switch to a paid/non-free translation model or provider for bulk translation.';
+
         return trim((string) $message) !== ''
-            ? trim((string) $message).' Wait a minute, then retry with Items per run set to 1-3, or switch to a paid/non-free OpenRouter model for bulk translation.'
-            : 'OpenRouter rate limit reached. Wait a minute, then retry with Items per run set to 1-3, or switch to a paid/non-free OpenRouter model for bulk translation.';
+            ? trim((string) $message).' '.$guidance
+            : 'Translation provider rate limit reached. '.$guidance;
     }
 
     private function queryFor(string $sectionKey): Builder

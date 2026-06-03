@@ -150,8 +150,8 @@ class PlatformInterfaceTranslationService
 
     private function rateLimitMessage(): string
     {
-        return ($this->translator->lastFailureMessage() ?: 'OpenRouter rate limit reached.')
-            .' Wait a minute, then retry with Items per run set to 1-3, or switch to a paid/non-free OpenRouter model for bulk translation.';
+        return ($this->translator->lastFailureMessage() ?: 'Translation provider rate limit reached.')
+            .' Wait a minute, then retry with Items per run set to 1-3, or switch to a paid/non-free translation model or provider for bulk translation.';
     }
 
     public function translationsFor(string $locale): array
