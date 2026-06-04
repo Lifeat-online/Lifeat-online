@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\ActionStationController as AdminActionStationCont
 use App\Http\Controllers\Admin\ArticleBriefController as AdminArticleBriefController;
 use App\Http\Controllers\Admin\ArticleImageController as AdminArticleImageController;
 use App\Http\Controllers\Admin\AiAssistController as AdminAiAssistController;
+use App\Http\Controllers\Admin\AiManagerController as AdminAiManagerController;
 use App\Http\Controllers\Admin\AiOperationsController as AdminAiOperationsController;
 use App\Http\Controllers\Admin\AiSettingsController as AdminAiSettingsController;
 use App\Http\Controllers\Admin\CampaignController as AdminCampaignController;
@@ -377,6 +378,10 @@ Route::middleware(['auth', 'role:admin,editor,staff,support'])->prefix('admin')-
     Route::post('/action-station/settings', [AdminActionStationController::class, 'updateSettings'])->middleware('role:admin,editor')->name('action-station.settings.update');
     Route::post('/action-station/review', [AdminActionStationController::class, 'reviewContent'])->middleware('role:admin,editor')->name('action-station.review');
     Route::post('/action-station/review-all', [AdminActionStationController::class, 'reviewContentQueue'])->middleware('role:admin,editor')->name('action-station.review-all');
+    Route::get('/ai-manager', [AdminAiManagerController::class, 'index'])->middleware('role:admin,editor')->name('ai-manager.index');
+    Route::put('/ai-manager/policy', [AdminAiManagerController::class, 'updatePolicy'])->middleware('role:admin')->name('ai-manager.policy.update');
+    Route::post('/ai-manager/recommendations', [AdminAiManagerController::class, 'generateRecommendations'])->middleware('role:admin,editor')->name('ai-manager.recommendations.store');
+    Route::post('/ai-manager/actions/{aiManagerAction}', [AdminAiManagerController::class, 'updateAction'])->middleware('role:admin,editor')->name('ai-manager.actions.update');
     Route::get('/metrics', AdminMetricsController::class)->name('metrics');
     Route::get('/push-notifications', [AdminPushNotificationTestController::class, 'index'])->middleware('role:admin,editor')->name('push-notifications.index');
     Route::post('/push-notifications', [AdminPushNotificationTestController::class, 'store'])->middleware('role:admin,editor')->name('push-notifications.store');

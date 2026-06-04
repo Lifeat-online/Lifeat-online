@@ -9,6 +9,9 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('admin.action-station.index') }}" class="rounded-md bg-emerald-700 px-4 py-2 text-sm text-white">Action Station</a>
+                @if (Auth::user()->hasRole('admin', 'editor'))
+                    <a href="{{ route('admin.ai-manager.index') }}" class="rounded-md bg-emerald-700 px-4 py-2 text-sm text-white">AI Manager</a>
+                @endif
                 <a href="{{ route('admin.customers.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Customer Lookup</a>
                 <a href="{{ route('admin.finance.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Finance</a>
                 <a href="{{ route('admin.campaigns.ads.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Ad Campaigns</a>
