@@ -202,7 +202,7 @@ class AiOperationsTest extends TestCase
     private function devOwner(): User
     {
         return User::factory()->create([
-            'role' => 'super_admin',
+            'role' => 'dev',
             'email' => 'jameskoen78@gmail.com',
         ]);
     }

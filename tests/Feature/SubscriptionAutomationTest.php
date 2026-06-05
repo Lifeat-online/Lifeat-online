@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Mail\RenewalPaymentReminderMail;
 use App\Mail\SubscriptionExpiryReminderMail;
+use App\Models\Entitlement;
 use App\Models\Listing;
 use App\Models\NotificationLog;
 use App\Models\Order;
@@ -12,6 +13,7 @@ use App\Models\PushCampaign;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\NotificationDispatchService;
+use App\Services\PayFastCheckoutService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
@@ -128,7 +130,154 @@ class SubscriptionAutomationTest extends TestCase
         $response->assertRedirect(route('checkout.index', [
             'package' => $package->slug,
             'listing' => $listing->slug,
+            'renewal_subscription' => $subscription->id,
         ]));
+    }
+
+    public function test_user_can_complete_manual_listing_renewal_from_browser_checkout(): void
+    {
+        $owner = User::factory()->create(['role' => 'business_owner']);
+        $listing = Listing::create([
+            'user_id' => $owner->id,
+            'title' => 'Browser Renewal Listing',
+            'slug' => 'browser-renewal-listing',
+            'status' => 'draft',
+        ]);
+
+        $package = Package::where('slug', 'business-directory-standard-6m')->firstOrFail();
+        $subscription = Subscription::create([
+            'user_id' => $owner->id,
+            'package_id' => $package->id,
+            'subscribable_type' => Listing::class,
+            'subscribable_id' => $listing->id,
+            'status' => 'expired',
+            'starts_at' => now()->subMonths(6),
+            'ends_at' => now()->subDay(),
+            'renews_at' => now()->subDay(),
+            'renewal_mode' => 'manual',
+        ]);
+
+        Entitlement::create([
+            'subscription_id' => $subscription->id,
+            'entitled_type' => Listing::class,
+            'entitled_id' => $listing->id,
+            'entitlement_code' => 'business_directory',
+            'active_from' => $subscription->starts_at,
+            'active_until' => $subscription->ends_at,
+            'status' => 'expired',
+        ]);
+
+        $renewalUrl = route('checkout.index', [
+            'package' => $package->slug,
+            'listing' => $listing->slug,
+            'renewal_subscription' => $subscription->id,
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('checkout.subscriptions.renew', $subscription))
+            ->assertRedirect($renewalUrl);
+
+        $this->actingAs($owner)
+            ->get($renewalUrl)
+            ->assertOk()
+            ->assertSee('Renewing subscription:')
+            ->assertSee('Create Renewal Order')
+            ->assertSee($listing->title);
+
+        $this->actingAs($owner)
+            ->post(route('checkout.start'), [
+                'package_slug' => $package->slug,
+                'listing_slug' => $listing->slug,
+                'renewal_subscription_id' => $subscription->id,
+            ])
+            ->assertRedirect();
+
+        $order = Order::where('renewed_subscription_id', $subscription->id)->firstOrFail();
+
+        $this->actingAs($owner)
+            ->get(route('checkout.show', $order))
+            ->assertOk()
+            ->assertSee('Order Summary')
+            ->assertSee('Renewal');
+
+        $this->actingAs($owner)
+            ->post(route('checkout.payfast.initiate', $order))
+            ->assertRedirect(route('checkout.show', $order));
+
+        $payment = $order->latestPayment();
+        $this->assertNotNull($payment);
+        $this->assertSame(1, $payment->attempts()->count());
+
+        $payload = [
+            'order_number' => $order->order_number,
+            'status' => 'paid',
+            'provider_transaction_id' => 'pf-browser-renewal',
+            'amount_gross' => number_format((float) $order->total, 2, '.', ''),
+            'currency' => $order->currency,
+        ];
+        $payload['signature'] = app(PayFastCheckoutService::class)->generateSignature($payload);
+
+        $this->post(route('checkout.payfast.callback'), $payload)->assertOk();
+
+        $order->refresh();
+        $listing->refresh();
+        $renewedSubscription = $listing->activeSubscription()->firstOrFail();
+
+        $this->assertSame('paid', $order->status);
+        $this->assertSame('paid', $order->latestPayment()->fresh()->status);
+        $this->assertSame($subscription->id, $order->renewed_subscription_id);
+        $this->assertNotSame($subscription->id, $renewedSubscription->id);
+        $this->assertSame('active', $renewedSubscription->status);
+        $this->assertSame('published', $listing->status);
+        $this->assertSame($renewedSubscription->id, $listing->active_subscription_id);
+        $this->assertDatabaseHas('entitlements', [
+            'subscription_id' => $renewedSubscription->id,
+            'entitled_type' => Listing::class,
+            'entitled_id' => $listing->id,
+            'entitlement_code' => 'business_directory',
+            'status' => 'active',
+        ]);
+    }
+
+    public function test_user_cannot_start_checkout_for_another_users_renewal_subscription(): void
+    {
+        $owner = User::factory()->create(['role' => 'business_owner']);
+        $otherUser = User::factory()->create(['role' => 'business_owner']);
+        $listing = Listing::create([
+            'user_id' => $owner->id,
+            'title' => 'Protected Renewal Listing',
+            'slug' => 'protected-renewal-listing',
+            'status' => 'draft',
+        ]);
+
+        $package = Package::where('slug', 'business-directory-standard-6m')->firstOrFail();
+        $subscription = Subscription::create([
+            'user_id' => $owner->id,
+            'package_id' => $package->id,
+            'subscribable_type' => Listing::class,
+            'subscribable_id' => $listing->id,
+            'status' => 'expired',
+            'starts_at' => now()->subMonths(6),
+            'ends_at' => now()->subDay(),
+            'renews_at' => now()->subDay(),
+            'renewal_mode' => 'manual',
+        ]);
+
+        $this->actingAs($otherUser)
+            ->get(route('checkout.subscriptions.renew', $subscription))
+            ->assertForbidden();
+
+        $this->actingAs($otherUser)
+            ->post(route('checkout.start'), [
+                'package_slug' => $package->slug,
+                'listing_slug' => $listing->slug,
+                'renewal_subscription_id' => $subscription->id,
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('orders', [
+            'renewed_subscription_id' => $subscription->id,
+        ]);
     }
 
     public function test_admin_can_open_finance_detail_pages(): void

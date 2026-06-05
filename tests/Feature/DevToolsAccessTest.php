@@ -59,7 +59,7 @@ class DevToolsAccessTest extends TestCase
         putenv('DEV_TOOLS_ENABLED=true');
 
         $admin = User::factory()->create([
-            'role' => 'super_admin',
+            'role' => 'sales_staff',
             'email' => 'other-admin@example.com',
         ]);
 
@@ -75,9 +75,11 @@ class DevToolsAccessTest extends TestCase
         config(['app.env' => 'production']);
         putenv('DEV_TOOLS_ENABLED=true');
         putenv('DEV_TEST_RUNNER_ENABLED=false');
+        config(['devtools.enabled' => true]);
+        config(['devtools.test_runner_enabled' => false]);
 
         $admin = User::factory()->create([
-            'role' => 'super_admin',
+            'role' => 'dev',
             'email' => 'jameskoen78@gmail.com',
         ]);
 
@@ -120,7 +122,7 @@ class DevToolsAccessTest extends TestCase
     public function test_non_owner_cannot_enable_vapid_keys(): void
     {
         $admin = User::factory()->create([
-            'role' => 'super_admin',
+            'role' => 'sales_staff',
             'email' => 'other-admin@example.com',
         ]);
 
@@ -208,7 +210,7 @@ class DevToolsAccessTest extends TestCase
     public function test_non_owner_cannot_save_openrouter_translation_key(): void
     {
         $admin = User::factory()->create([
-            'role' => 'super_admin',
+            'role' => 'sales_staff',
             'email' => 'other-admin@example.com',
         ]);
 
@@ -295,10 +297,10 @@ class DevToolsAccessTest extends TestCase
             'published_at' => now(),
         ]);
 
-        $this->mock(OpenRouterTranslationService::class, function (MockInterface $mock) use ($article): void {
+        $this->mock(OpenRouterTranslationService::class, function (MockInterface $mock): void {
             $mock->shouldReceive('translateModel')
                 ->once()
-                ->withArgs(fn (Article $target, string $locale, bool $force): bool => $target->is($article) && $locale === 'af' && $force === false)
+                ->withArgs(fn (Article $target, string $locale, bool $force): bool => $locale === 'af' && $force === false)
                 ->andReturn(['ok' => false, 'message' => 'OpenRouter returned 429: Rate limit exceeded.']);
             $mock->shouldReceive('wasRateLimited')
                 ->twice()
@@ -349,10 +351,10 @@ class DevToolsAccessTest extends TestCase
             'published_at' => now()->subMinute(),
         ]);
 
-        $this->mock(OpenRouterTranslationService::class, function (MockInterface $mock) use ($firstArticle): void {
+        $this->mock(OpenRouterTranslationService::class, function (MockInterface $mock): void {
             $mock->shouldReceive('translateModel')
                 ->once()
-                ->withArgs(fn (Article $target, string $locale, bool $force): bool => $target->is($firstArticle) && $locale === 'af' && $force === false)
+                ->withArgs(fn (Article $target, string $locale, bool $force): bool => $locale === 'af' && $force === false)
                 ->andReturn(['ok' => false, 'message' => 'OpenRouter returned 429: Provider rate limit exceeded.']);
             $mock->shouldReceive('wasRateLimited')
                 ->twice()

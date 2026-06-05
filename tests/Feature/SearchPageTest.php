@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Classified;
 use App\Models\Event;
 use App\Models\Listing;
+use App\Models\LocationNode;
 use App\Models\Package;
 use App\Models\Subscription;
 use App\Models\User;
@@ -20,6 +21,16 @@ class SearchPageTest extends TestCase
     public function test_search_page_filters_grouped_results_by_keyword_and_location(): void
     {
         $owner = User::factory()->create(['role' => 'business_owner']);
+        $bethlehem = LocationNode::create([
+            'name' => 'Bethlehem',
+            'slug' => 'bethlehem',
+            'type' => 'city',
+        ]);
+        $clarens = LocationNode::create([
+            'name' => 'Clarens',
+            'slug' => 'clarens',
+            'type' => 'town',
+        ]);
 
         $matchingListing = $this->createPublishedListing($owner, [
             'title' => 'Bethlehem Market Hub',
@@ -54,6 +65,18 @@ class SearchPageTest extends TestCase
             'status' => 'published',
             'published_at' => now(),
         ]);
+        $article->locations()->attach($bethlehem);
+
+        $otherArticle = Article::create([
+            'user_id' => User::factory()->create(['role' => 'writer'])->id,
+            'title' => 'Clarens Market Guide',
+            'slug' => 'clarens-market-guide',
+            'excerpt' => 'A guide to market stops outside Bethlehem.',
+            'body' => 'Market guide for Clarens visitors.',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        $otherArticle->locations()->attach($clarens);
 
         $classified = Classified::create([
             'title' => 'Market Stall Fridge',
@@ -80,6 +103,7 @@ class SearchPageTest extends TestCase
         $response->assertSee($article->title);
         $response->assertSee($classified->title);
         $response->assertDontSee('Clarens Market Hub');
+        $response->assertDontSee($otherArticle->title);
     }
 
     public function test_search_page_applies_category_filter_to_supported_content_types(): void
@@ -139,6 +163,48 @@ class SearchPageTest extends TestCase
         $response->assertSee($article->title);
         $response->assertDontSee($otherListing->title);
         $response->assertDontSee('Food Classified');
+    }
+
+    public function test_search_page_ranks_title_matches_and_includes_taxonomy_matches(): void
+    {
+        $owner = User::factory()->create(['role' => 'business_owner']);
+
+        $category = Category::create([
+            'type' => 'listing',
+            'name' => 'Pizza',
+            'slug' => 'pizza',
+        ]);
+
+        $titleMatch = $this->createPublishedListing($owner, [
+            'title' => 'Pizza Palace',
+            'slug' => 'pizza-palace',
+            'description' => 'Family meals near the town square.',
+            'is_featured' => false,
+        ]);
+
+        $descriptionOnlyMatch = $this->createPublishedListing($owner, [
+            'title' => 'Market Supper Club',
+            'slug' => 'market-supper-club',
+            'description' => 'Wood-fired pizza and dinner specials.',
+            'is_featured' => true,
+        ]);
+
+        $taxonomyOnlyMatch = $this->createPublishedListing($owner, [
+            'title' => 'Bethlehem Hearth',
+            'slug' => 'bethlehem-hearth',
+            'description' => 'Casual family restaurant.',
+            'is_featured' => false,
+        ]);
+        $taxonomyOnlyMatch->categories()->attach($category);
+
+        $response = $this->get(route('search.index', ['q' => 'pizza']));
+
+        $response->assertOk();
+        $response->assertSee($taxonomyOnlyMatch->title);
+        $response->assertSeeInOrder([
+            $titleMatch->title,
+            $descriptionOnlyMatch->title,
+        ]);
     }
 
     private function createPublishedListing(User $owner, array $attributes = []): Listing

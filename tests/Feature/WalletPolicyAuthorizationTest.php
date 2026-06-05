@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\PayoutRequest;
 use App\Models\StaffWallet;
 use App\Models\User;
+use App\Models\WalletLedgerEntry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -56,6 +57,10 @@ class WalletPolicyAuthorizationTest extends TestCase
         $this->actingAs($support)
             ->post(route('admin.payout-requests.approve', $payout))
             ->assertForbidden();
+
+        $this->actingAs($support)
+            ->get(route('admin.payout-requests.export'))
+            ->assertForbidden();
     }
 
     public function test_unrelated_staff_cannot_cancel_another_staff_payout_request(): void
@@ -82,6 +87,94 @@ class WalletPolicyAuthorizationTest extends TestCase
             'status' => PayoutRequest::STATUS_APPROVED,
             'reviewed_by_user_id' => $admin->id,
         ]);
+    }
+
+    public function test_admin_can_export_filtered_payout_requests_for_reconciliation(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $reviewer = User::factory()->create(['role' => 'admin', 'name' => 'Finance Reviewer']);
+        $includedStaff = User::factory()->create([
+            'role' => 'staff',
+            'name' => 'Export Included Staff',
+            'email' => 'included-staff@example.test',
+        ]);
+        $excludedStaff = User::factory()->create([
+            'role' => 'staff',
+            'name' => 'Export Excluded Staff',
+            'email' => 'excluded-staff@example.test',
+        ]);
+
+        $includedWallet = StaffWallet::create([
+            'user_id' => $includedStaff->id,
+            'currency' => 'ZAR',
+            'available_balance' => 350,
+            'pending_balance' => 0,
+            'paid_out_total' => 200,
+        ]);
+        $excludedWallet = StaffWallet::create([
+            'user_id' => $excludedStaff->id,
+            'currency' => 'ZAR',
+            'available_balance' => 100,
+            'pending_balance' => 0,
+            'paid_out_total' => 0,
+        ]);
+
+        $includedPayout = PayoutRequest::create([
+            'wallet_id' => $includedWallet->id,
+            'requested_by_user_id' => $includedStaff->id,
+            'reviewed_by_user_id' => $reviewer->id,
+            'amount' => 200,
+            'currency' => 'ZAR',
+            'status' => PayoutRequest::STATUS_PAID,
+            'bank_name' => 'Export Bank',
+            'account_holder' => 'Export Included Staff',
+            'account_number' => '1234567890',
+            'branch_code' => '250655',
+            'payment_reference' => 'EFT-EXPORT-1',
+            'notes' => 'Paid payout export note',
+            'requested_at' => now()->subDays(3),
+            'reviewed_at' => now()->subDays(2),
+            'paid_at' => now()->subDay(),
+        ]);
+        WalletLedgerEntry::create([
+            'wallet_id' => $includedWallet->id,
+            'payout_request_id' => $includedPayout->id,
+            'entry_type' => WalletLedgerEntry::TYPE_PAYOUT_DEBIT,
+            'source_type' => PayoutRequest::class,
+            'source_id' => $includedPayout->id,
+            'gross_amount' => 200,
+            'net_amount' => 200,
+            'currency' => 'ZAR',
+            'description' => 'Payout export debit',
+            'recorded_at' => now()->subDay(),
+        ]);
+
+        PayoutRequest::create([
+            'wallet_id' => $excludedWallet->id,
+            'requested_by_user_id' => $excludedStaff->id,
+            'amount' => 75,
+            'currency' => 'ZAR',
+            'status' => PayoutRequest::STATUS_REQUESTED,
+            'bank_name' => 'Other Bank',
+            'requested_at' => now(),
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('admin.payout-requests.export', [
+            'status' => PayoutRequest::STATUS_PAID,
+            'wallet' => $includedWallet->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+        $csv = $response->streamedContent();
+        $this->assertStringContainsString('Export Included Staff', $csv);
+        $this->assertStringContainsString('included-staff@example.test', $csv);
+        $this->assertStringContainsString('EFT-EXPORT-1', $csv);
+        $this->assertStringContainsString('Export Bank', $csv);
+        $this->assertStringContainsString('200.00', $csv);
+        $this->assertStringNotContainsString('Export Excluded Staff', $csv);
+        $this->assertStringNotContainsString('Other Bank', $csv);
     }
 
     private function requestedPayout(): PayoutRequest

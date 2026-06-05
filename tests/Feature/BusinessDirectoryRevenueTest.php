@@ -145,6 +145,13 @@ class BusinessDirectoryRevenueTest extends TestCase
             'provider' => 'payfast',
             'status' => 'pending',
         ]);
+
+        $showResponse = $this->actingAs($owner)->get(route('checkout.show', $order));
+        $showResponse->assertOk();
+        $showResponse->assertSee('Listing Launch Checklist');
+        $showResponse->assertSee('Next: Checkout and payment');
+        $showResponse->assertSee('Complete the PayFast handoff');
+        $showResponse->assertSee('Prepare PayFast payment');
     }
 
     public function test_user_cannot_start_checkout_for_listing_they_do_not_manage(): void
@@ -304,6 +311,14 @@ class BusinessDirectoryRevenueTest extends TestCase
         ]);
         $attempt = PaymentAttempt::firstOrFail();
         $this->assertNotEmpty($attempt->request_payload_json['signature'] ?? null);
+
+        $showResponse = $this->actingAs($owner)->get(route('checkout.show', $order));
+        $showResponse->assertOk();
+        $showResponse->assertSee('Payment Handoff');
+        $showResponse->assertSee('Attempt History');
+        $showResponse->assertSee('Open latest PayFast handoff');
+        $showResponse->assertDontSee('Simulate Callback');
+        $showResponse->assertDontSee('Signature');
     }
 
     public function test_invoice_send_marks_invoice_emailed_and_issued(): void
@@ -565,6 +580,58 @@ class BusinessDirectoryRevenueTest extends TestCase
         $this->assertSame('published', $listing->status);
         $this->assertSame('paid', $order->latestPayment()->fresh()->status);
         $this->assertDatabaseCount('payments', 1);
+        $this->assertDatabaseCount('subscriptions', 1);
+        $this->assertDatabaseCount('entitlements', 1);
+    }
+
+    public function test_late_failed_payfast_callback_does_not_roll_back_paid_order(): void
+    {
+        $owner = User::factory()->create(['role' => 'business_owner']);
+        $listing = Listing::create([
+            'user_id' => $owner->id,
+            'title' => 'Late Failure Listing',
+            'slug' => 'late-failure-listing',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($owner)->post(route('checkout.start'), [
+            'package_slug' => 'business-directory-standard-6m',
+            'listing_slug' => $listing->slug,
+        ]);
+
+        $order = Order::firstOrFail();
+        $paidPayload = [
+            'order_number' => $order->order_number,
+            'status' => 'paid',
+            'provider_transaction_id' => 'pf-late-failure',
+            'amount_gross' => '500.00',
+            'currency' => 'ZAR',
+        ];
+        $paidPayload['signature'] = app(PayFastCheckoutService::class)->generateSignature($paidPayload);
+        $this->post(route('checkout.payfast.callback'), $paidPayload)->assertOk();
+
+        $failedPayload = [
+            'order_number' => $order->order_number,
+            'status' => 'failed',
+            'provider_transaction_id' => 'pf-late-failure',
+            'failure_reason' => 'Gateway sent a late failure after completion.',
+        ];
+        $failedPayload['signature'] = app(PayFastCheckoutService::class)->generateSignature($failedPayload);
+
+        $this->post(route('checkout.payfast.callback'), $failedPayload)
+            ->assertOk()
+            ->assertJson([
+                'payment_status' => 'paid',
+                'ignored' => 'Payment is already paid.',
+            ]);
+
+        $order->refresh();
+        $listing->refresh();
+
+        $this->assertSame('paid', $order->status);
+        $this->assertSame('paid', $order->latestPayment()->fresh()->status);
+        $this->assertSame('published', $listing->status);
+        $this->assertTrue($listing->hasActiveBusinessEntitlement());
         $this->assertDatabaseCount('subscriptions', 1);
         $this->assertDatabaseCount('entitlements', 1);
     }

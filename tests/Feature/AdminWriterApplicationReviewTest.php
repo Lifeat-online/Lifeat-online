@@ -93,6 +93,70 @@ class AdminWriterApplicationReviewTest extends TestCase
             ->assertHeader('content-type');
     }
 
+    public function test_admin_review_page_handles_missing_banking_proof_as_payout_later(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $application = WriterApplication::create([
+            'first_name' => 'NoBank',
+            'last_name' => 'Applicant',
+            'email' => 'nobank@example.com',
+            'phone' => '082 000 0022',
+            'username' => 'nobank_writer',
+            'profile_bio' => str_repeat('Applicant whose banking proof will only be collected once a payout is due. ', 3),
+            'profile_photo_path' => 'writer-applications/profile-photos/nobank.jpg',
+            'available_on_whatsapp' => true,
+            'sample_article_title' => 'No bank article',
+            'sample_article_body' => str_repeat('This application supports optional banking proof review display. ', 6),
+            'sample_advert_title' => 'No bank advert',
+            'sample_advert_body' => str_repeat('This advert sample supports payout-later review display. ', 3),
+            'id_document_path' => 'writer-applications/id-documents/id.pdf',
+            'proof_of_residence_path' => 'writer-applications/proof-of-residence/home.pdf',
+            'status' => WriterApplication::STATUS_PENDING,
+            'submitted_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.writer-applications.show', $application))
+            ->assertOk()
+            ->assertSee('Documents And Payout Readiness')
+            ->assertSee('Banking proof not collected yet')
+            ->assertSee('payable ledger or staff commission');
+    }
+
+    public function test_approval_notification_explains_writer_workspace_and_payout_timing(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'writer',
+            'email' => 'mail-writer@example.com',
+        ]);
+        $application = WriterApplication::create([
+            'user_id' => $user->id,
+            'first_name' => 'Mail',
+            'last_name' => 'Writer',
+            'email' => 'mail-writer@example.com',
+            'phone' => '082 000 0033',
+            'username' => 'mail_writer',
+            'profile_bio' => str_repeat('Approved writer notification profile. ', 4),
+            'profile_photo_path' => 'writer-applications/profile-photos/mail.jpg',
+            'available_on_whatsapp' => true,
+            'sample_article_title' => 'Mail article',
+            'sample_article_body' => str_repeat('This sample article supports approval notification content. ', 6),
+            'sample_advert_title' => 'Mail advert',
+            'sample_advert_body' => str_repeat('This sample advert supports approval notification content. ', 3),
+            'id_document_path' => 'writer-applications/id-documents/id.pdf',
+            'proof_of_residence_path' => 'writer-applications/proof-of-residence/home.pdf',
+            'status' => WriterApplication::STATUS_APPROVED,
+            'assigned_role' => WriterApplication::ROLE_WRITER,
+            'submitted_at' => now()->subDay(),
+        ]);
+
+        $mail = (new WriterApplicationApprovedNotification($application, 'reset-token'))->toMail($user);
+
+        $this->assertSame('Your Life Platform application has been approved', $mail->subject);
+        $this->assertContains('After signing in, open My Article Submissions to draft your first story, submit it for review, and watch for editor feedback.', $mail->outroLines);
+        $this->assertContains('Writer earnings only appear after an article is approved, published, and added to the word ledger. Banking or payout details are handled later through the payout workflow.', $mail->outroLines);
+    }
+
     public function test_admin_queue_shows_access_summary_for_recently_contacted_application(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

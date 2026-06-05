@@ -104,7 +104,7 @@ class AdminCampaignCreationTest extends TestCase
     public function test_dev_owner_sees_platform_push_sender_on_push_campaign_create_page(): void
     {
         $admin = User::factory()->create([
-            'role' => 'super_admin',
+            'role' => 'dev',
             'email' => 'jameskoen78@gmail.com',
         ]);
 
@@ -116,10 +116,10 @@ class AdminCampaignCreationTest extends TestCase
             ->assertSee(route('admin.push-notifications.store'), false);
     }
 
-    public function test_non_dev_owner_does_not_see_platform_push_sender_on_push_campaign_create_page(): void
+    public function test_regular_admin_does_not_see_platform_push_sender_on_push_campaign_create_page(): void
     {
         $admin = User::factory()->create([
-            'role' => 'super_admin',
+            'role' => 'admin',
             'email' => 'other-admin@example.com',
         ]);
 

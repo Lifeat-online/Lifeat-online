@@ -66,10 +66,10 @@ Current delivery position in the Laravel codebase:
 - Phase 0: largely delivered for roles, settings, audit logging, and scheduled automation baselines
 - Phase 1: broadly delivered for writer workflow, editorial moderation, article discovery taxonomy, and writer payment operations
 - Phase 2: broadly delivered for business packages, checkout, payments, invoices, entitlements, and public directory flows
-- Phase 3: partially delivered with event eligibility, event commerce, renewals, finance recovery tools, support-safe finance visibility, and staff wallet/payout baseline in place, while deeper sales tooling and reporting refinements remain outstanding
-- Phase 4: partially delivered with owner advert and push self-service, package handoff, entitlement activation, admin campaign controls, baseline impression/click tracking, push dispatch logging, and baseline push open counter in place, while creative approval policy depth and richer reporting remain outstanding
+- Phase 3: partially delivered with event eligibility, event commerce, renewals, advert/push renewal payment coverage, finance recovery tools, support-safe finance visibility, and staff wallet/payout baseline plus admin-only manual adjustments, filtered payout reconciliation export, and append-only ledger enforcement in place, while deeper sales reporting refinements remain outstanding
+- Phase 4: partially delivered with owner advert and push self-service, package handoff, entitlement activation, admin campaign controls, baseline impression/click tracking, push dispatch logging, push open counters, campaign tracking event logs, sortable admin performance lists, daily detail-page reporting, aggregate Campaign Report dashboard, and CSV exports in place, while provider receipts, attribution decisions, and campaign ROI reporting remain outstanding
 - Phase 5: partially delivered with classifieds moderation, account/self-service improvements, customer lookup, support notes, and support-role dashboard/access controls in place, while retained non-core public decision work remains outstanding
-- Phase 6: still largely outstanding beyond the current automated test coverage baseline
+- Phase 6: still largely outstanding beyond the current automated test coverage baseline, though focused advert/push renewal callback coverage, manual browser renewal checkout coverage, late PayFast failure-after-paid protection, campaign-report access, Dev-dashboard/platform-push access, operational KPI dashboard coverage, structured operational log events, error-tracking webhook/log baseline, production-readiness database indexes, public read-cache strategy, release-readiness CI/dependency-scan baseline, listing-owner-transfer role-boundary coverage, and writer/councillor/moderation/support boundary coverage have now been added
 
 ## 3. Phase 0: Foundations And Migration Control
 
@@ -308,8 +308,9 @@ Current delivery position in the Laravel codebase:
 ### Delivery Batches
 - E2E suites for checkout and revenue-critical flows
 - webhook integration tests
+- database index and public read-cache baselines plus production query-plan review
 - load testing for 1,000 concurrent users
-- structured logs, alerting, KPI dashboards
+- structured operational log shipping, error tracking, alerting, KPI dashboards
 - DAST/SAST/dependency scans
 - penetration testing and remediation
 - admin handbook, API docs, runbooks, recordings
@@ -334,7 +335,7 @@ Current delivery position in the Laravel codebase:
 |---|---|---|---|---|---|
 | E0.1 | Permissions and policy refactor | 0 | P1 | Delivered baseline | `9.f`, `11.d` |
 | E0.2 | Settings framework | 0 | P1 | Delivered baseline | `9.a` |
-| E0.3 | CI and smoke foundation | 0 | P1 | Partial | `11.b`, `11.c` |
+| E0.3 | CI and smoke foundation | 0 | P1 | Release-readiness workflow baseline | `11.b`, `11.c` |
 | E1.1 | Writer submission workflow | 1 | P1 | Delivered baseline | `1.a`, `2.a` |
 | E1.2 | Article moderation and publishing | 1 | P1 | Delivered baseline | `2.a`, `2.b`, `9.b` |
 | E1.3 | Writer ledger and batch export | 1 | P1 | Delivered baseline | `2.a`, `9.b` |

@@ -14,6 +14,7 @@ use App\Models\OrderItem;
 use App\Models\Package;
 use App\Models\PackageType;
 use App\Models\Payment;
+use App\Models\PaymentAttempt;
 use App\Models\PushCampaign;
 use App\Models\Review;
 use App\Models\Subscription;
@@ -72,7 +73,7 @@ class AccountPageTest extends TestCase
         $ownedOrder = Order::create([
             'user_id' => $owner->id,
             'order_number' => 'ORD-ACC-1',
-            'status' => 'paid',
+            'status' => 'pending_payment',
             'currency' => 'ZAR',
             'subtotal' => 500,
             'vat_amount' => 0,
@@ -90,6 +91,24 @@ class AccountPageTest extends TestCase
             'vat_amount' => 0,
             'total' => 500,
             'issued_at' => now(),
+        ]);
+
+        $ownedPayment = Payment::create([
+            'order_id' => $ownedOrder->id,
+            'user_id' => $owner->id,
+            'provider' => 'payfast',
+            'status' => 'pending',
+            'amount' => 500,
+            'currency' => 'ZAR',
+        ]);
+
+        PaymentAttempt::create([
+            'payment_id' => $ownedPayment->id,
+            'provider' => 'payfast',
+            'status' => 'initiated',
+            'request_payload_json' => ['signature' => 'hidden-from-customer'],
+            'redirect_url' => 'https://sandbox.payfast.co.za/eng/process?m_payment_id=ORD-ACC-1',
+            'attempted_at' => now(),
         ]);
 
         $foreignOrder = Order::create([
@@ -119,15 +138,125 @@ class AccountPageTest extends TestCase
         $indexResponse->assertOk();
         $indexResponse->assertSee('My Invoices');
         $indexResponse->assertSee('INV-ACC-1');
+        $indexResponse->assertSee('Payment Pending');
+        $indexResponse->assertSee('Complete payment');
         $indexResponse->assertDontSee('INV-ACC-2');
 
         $showResponse = $this->actingAs($owner)->get(route('account.invoices.show', $ownedInvoice));
         $showResponse->assertOk();
         $showResponse->assertSee('Invoice INV-ACC-1');
         $showResponse->assertSee('Order:');
+        $showResponse->assertSee('Payment Attempts');
+        $showResponse->assertSee('Initiated');
+        $showResponse->assertSee('Open PayFast handoff');
+        $showResponse->assertDontSee('hidden-from-customer');
 
         $forbiddenResponse = $this->actingAs($owner)->get(route('account.invoices.show', $foreignInvoice));
         $forbiddenResponse->assertForbidden();
+    }
+
+    public function test_listing_workspace_warns_when_package_is_nearing_expiry(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'business_owner',
+        ]);
+        $package = Package::where('slug', 'business-directory-standard-6m')->firstOrFail();
+        $listing = Listing::create([
+            'user_id' => $owner->id,
+            'source_channel' => 'self_service',
+            'title' => 'Expiring Listing',
+            'slug' => 'expiring-listing',
+            'status' => 'published',
+            'package_expires_at' => now()->addDays(10),
+        ]);
+        $subscription = Subscription::create([
+            'user_id' => $owner->id,
+            'package_id' => $package->id,
+            'subscribable_type' => Listing::class,
+            'subscribable_id' => $listing->id,
+            'status' => 'active',
+            'starts_at' => now()->subMonths(5),
+            'ends_at' => now()->addDays(10),
+            'renews_at' => now()->addDays(10),
+            'renewal_mode' => 'manual',
+        ]);
+        $listing->update([
+            'active_subscription_id' => $subscription->id,
+        ]);
+
+        $indexResponse = $this->actingAs($owner)->get(route('account.listings.index'));
+        $indexResponse->assertOk();
+        $indexResponse->assertSee('Package expires soon');
+        $indexResponse->assertSee('Renew package');
+
+        $showResponse = $this->actingAs($owner)->get(route('account.listings.show', $listing));
+        $showResponse->assertOk();
+        $showResponse->assertSee('Package expires soon');
+        $showResponse->assertSee('Renewal recommended');
+        $showResponse->assertSee('Renew this package');
+    }
+
+    public function test_listing_workspace_shows_owner_launch_checklist_across_onboarding_states(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'business_owner',
+        ]);
+
+        $starterListing = Listing::create([
+            'user_id' => $owner->id,
+            'source_channel' => 'self_service',
+            'title' => 'Starter Listing',
+            'slug' => 'starter-listing',
+            'status' => 'draft',
+        ]);
+
+        $starterResponse = $this->actingAs($owner)->get(route('account.listings.show', $starterListing));
+        $starterResponse->assertOk();
+        $starterResponse->assertSee('Listing Launch Checklist');
+        $starterResponse->assertSee('1 of 5 steps complete.');
+        $starterResponse->assertSee('Next: Profile basics');
+        $starterResponse->assertSee('Add a description, city, category, contact option');
+
+        $category = Category::create([
+            'type' => 'listing',
+            'name' => 'Retail',
+            'slug' => 'retail',
+        ]);
+        $package = Package::where('slug', 'business-directory-standard-6m')->firstOrFail();
+        $activeListing = Listing::create([
+            'user_id' => $owner->id,
+            'source_channel' => 'self_service',
+            'title' => 'Active Listing',
+            'slug' => 'active-listing',
+            'status' => 'published',
+            'description' => 'A complete public business profile.',
+            'city' => 'Bethlehem',
+            'phone' => '0580000000',
+            'featured_image' => 'listings/featured/active.jpg',
+            'published_at' => now(),
+            'package_expires_at' => now()->addMonths(6),
+        ]);
+        $activeListing->categories()->attach($category);
+        $subscription = Subscription::create([
+            'user_id' => $owner->id,
+            'package_id' => $package->id,
+            'subscribable_type' => Listing::class,
+            'subscribable_id' => $activeListing->id,
+            'status' => 'active',
+            'starts_at' => now()->subDay(),
+            'ends_at' => now()->addMonths(6),
+            'renewal_mode' => 'manual',
+        ]);
+        $activeListing->update([
+            'active_subscription_id' => $subscription->id,
+        ]);
+
+        $activeResponse = $this->actingAs($owner)->get(route('account.listings.show', $activeListing));
+        $activeResponse->assertOk();
+        $activeResponse->assertSee('4 of 5 steps complete.');
+        $activeResponse->assertSee('Next: Growth tools');
+        $activeResponse->assertSee('Use the workspace to add an event, advert campaign, push campaign, or voucher');
+        $activeResponse->assertSee('View public listing');
     }
 
     public function test_account_submission_history_shows_owned_items_and_supports_type_filter(): void
@@ -800,6 +929,7 @@ class AccountPageTest extends TestCase
             'headline' => 'Promote our business',
             'body' => 'Campaign body copy.',
             'destination_url' => 'https://business.example.com/offer',
+            'placement' => 'banner',
             'status' => 'ready',
         ]);
 
@@ -827,6 +957,7 @@ class AccountPageTest extends TestCase
             'headline' => 'Updated headline',
             'body' => 'Updated body copy.',
             'destination_url' => 'https://business.example.com/new-offer',
+            'placement' => 'banner',
             'status' => 'draft',
         ]);
 
@@ -849,6 +980,90 @@ class AccountPageTest extends TestCase
 
         $forbiddenResponse = $this->actingAs($owner)->get(route('account.listings.ad-campaigns.edit', [$foreignListing, $campaign]));
         $forbiddenResponse->assertForbidden();
+    }
+
+    public function test_owner_ad_campaign_rejects_event_from_another_listing(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'business_owner',
+        ]);
+
+        $listing = Listing::create([
+            'user_id' => $owner->id,
+            'source_channel' => 'self_service',
+            'title' => 'Scoped Advert Listing',
+            'slug' => 'scoped-advert-listing',
+            'status' => 'published',
+        ]);
+
+        $foreignListing = Listing::create([
+            'user_id' => $owner->id,
+            'source_channel' => 'self_service',
+            'title' => 'Foreign Event Listing',
+            'slug' => 'foreign-event-listing',
+            'status' => 'published',
+        ]);
+
+        $foreignEvent = Event::create([
+            'listing_id' => $foreignListing->id,
+            'user_id' => $owner->id,
+            'title' => 'Foreign Event',
+            'slug' => 'foreign-event',
+            'start_at' => now()->addWeek(),
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $packageType = PackageType::firstOrCreate([
+            'slug' => 'business_directory',
+        ], [
+            'name' => 'Business Directory',
+            'description' => 'Directory packages',
+        ]);
+
+        $package = Package::firstOrCreate([
+            'slug' => 'business-directory-standard-6m',
+        ], [
+            'package_type_id' => $packageType->id,
+            'name' => 'Business Directory Standard',
+            'description' => 'Standard package',
+            'billing_model' => 'fixed',
+            'is_self_service' => false,
+            'duration_days' => 180,
+            'status' => 'active',
+        ]);
+
+        $subscription = Subscription::create([
+            'user_id' => $owner->id,
+            'package_id' => $package->id,
+            'subscribable_type' => Listing::class,
+            'subscribable_id' => $listing->id,
+            'status' => 'active',
+            'starts_at' => now(),
+            'ends_at' => now()->addDays(30),
+        ]);
+
+        $listing->update(['active_subscription_id' => $subscription->id]);
+
+        $response = $this
+            ->actingAs($owner)
+            ->from(route('account.listings.ad-campaigns.create', $listing))
+            ->post(route('account.listings.ad-campaigns.store', $listing), [
+                'title' => 'Cross Listing Advert',
+                'headline' => 'This should not attach',
+                'body' => 'Campaign body copy.',
+                'event_id' => $foreignEvent->id,
+                'placement' => 'banner',
+                'status' => 'ready',
+            ]);
+
+        $response
+            ->assertRedirect(route('account.listings.ad-campaigns.create', $listing))
+            ->assertSessionHasErrors('event_id');
+
+        $this->assertDatabaseMissing('ad_campaigns', [
+            'title' => 'Cross Listing Advert',
+        ]);
     }
 
     public function test_owner_can_manage_push_campaigns_from_owned_listing(): void
@@ -1012,5 +1227,93 @@ class AccountPageTest extends TestCase
 
         $forbiddenResponse = $this->actingAs($owner)->get(route('account.listings.push-campaigns.edit', [$foreignListing, $campaign]));
         $forbiddenResponse->assertForbidden();
+    }
+
+    public function test_owner_push_campaign_rejects_event_from_another_listing(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'business_owner',
+        ]);
+
+        $listing = Listing::create([
+            'user_id' => $owner->id,
+            'source_channel' => 'self_service',
+            'title' => 'Scoped Push Listing',
+            'slug' => 'scoped-push-listing',
+            'status' => 'published',
+            'city' => 'Bethlehem',
+            'region' => 'Free State',
+        ]);
+
+        $foreignListing = Listing::create([
+            'user_id' => $owner->id,
+            'source_channel' => 'self_service',
+            'title' => 'Foreign Push Event Listing',
+            'slug' => 'foreign-push-event-listing',
+            'status' => 'published',
+        ]);
+
+        $foreignEvent = Event::create([
+            'listing_id' => $foreignListing->id,
+            'user_id' => $owner->id,
+            'title' => 'Foreign Push Event',
+            'slug' => 'foreign-push-event',
+            'start_at' => now()->addWeek(),
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $packageType = PackageType::firstOrCreate([
+            'slug' => 'business_directory',
+        ], [
+            'name' => 'Business Directory',
+            'description' => 'Directory packages',
+        ]);
+
+        $package = Package::firstOrCreate([
+            'slug' => 'business-directory-standard-6m',
+        ], [
+            'package_type_id' => $packageType->id,
+            'name' => 'Business Directory Standard',
+            'description' => 'Standard package',
+            'billing_model' => 'fixed',
+            'is_self_service' => false,
+            'duration_days' => 180,
+            'status' => 'active',
+        ]);
+
+        $subscription = Subscription::create([
+            'user_id' => $owner->id,
+            'package_id' => $package->id,
+            'subscribable_type' => Listing::class,
+            'subscribable_id' => $listing->id,
+            'status' => 'active',
+            'starts_at' => now(),
+            'ends_at' => now()->addDays(30),
+        ]);
+
+        $listing->update(['active_subscription_id' => $subscription->id]);
+
+        $response = $this
+            ->actingAs($owner)
+            ->from(route('account.listings.push-campaigns.create', $listing))
+            ->post(route('account.listings.push-campaigns.store', $listing), [
+                'title' => 'Cross Listing Push',
+                'headline' => 'This should not attach',
+                'message' => 'Join us this weekend for a limited special.',
+                'event_id' => $foreignEvent->id,
+                'audience_scope' => 'listing_city',
+                'target_city' => 'Bethlehem',
+                'target_region' => 'Free State',
+                'status' => 'ready',
+            ]);
+
+        $response
+            ->assertRedirect(route('account.listings.push-campaigns.create', $listing))
+            ->assertSessionHasErrors('event_id');
+
+        $this->assertDatabaseMissing('push_campaigns', [
+            'title' => 'Cross Listing Push',
+        ]);
     }
 }

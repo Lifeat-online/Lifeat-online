@@ -21,7 +21,7 @@ class AiPhaseOneTest extends TestCase
     public function test_dev_owner_can_save_ai_provider_settings_for_mainstream_providers(): void
     {
         $admin = User::factory()->create([
-            'role' => 'super_admin',
+            'role' => 'dev',
             'email' => 'jameskoen78@gmail.com',
         ]);
 
@@ -228,7 +228,7 @@ class AiPhaseOneTest extends TestCase
     public function test_dev_owner_can_run_ai_writer_process_with_saved_nvidia_provider(): void
     {
         $admin = User::factory()->create([
-            'role' => 'super_admin',
+            'role' => 'dev',
             'email' => 'jameskoen78@gmail.com',
         ]);
 
@@ -313,7 +313,7 @@ class AiPhaseOneTest extends TestCase
     public function test_dev_owner_can_save_nvidia_speech_nim_voice_settings(): void
     {
         $admin = User::factory()->create([
-            'role' => 'super_admin',
+            'role' => 'dev',
             'email' => 'jameskoen78@gmail.com',
         ]);
 

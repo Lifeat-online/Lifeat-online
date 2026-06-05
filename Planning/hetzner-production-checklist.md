@@ -10,14 +10,17 @@ Use this checklist before a production launch or major Hetzner/Coolify redeploy.
 - `APP_KEY` is set and backed up securely.
 - `APP_PREVIOUS_KEYS` is configured before any key rotation.
 - `LOG_CHANNEL` and log retention are appropriate for the Hetzner/Coolify container setup.
+- `lifeat.operational.*` structured log events are retained or shipped for payment, callback, subscription, campaign dispatch, voucher, and finance troubleshooting.
 - Trusted proxy handling is confirmed for the Hetzner/Coolify ingress/proxy.
 - `php artisan production:check` passes, or each reported warning has a documented launch decision.
+- `/health` returns JSON with no `down` status after deployment, and any `degraded` checks have an owner and launch decision.
 
 ## Database
 
 - Production database service is provisioned and connected.
 - `DB_CONNECTION`, host, port, database, username, and password are set in Coolify environment variables.
 - Migrations have been tested against a production-like database.
+- Production-readiness index migration has been applied and reviewed for long-running lock risk on the target database size.
 - Automated backups are enabled in Hetzner/Coolify or the chosen managed database provider.
 - `BACKUPS_ENABLED=true`, `BACKUP_PROVIDER`, and `BACKUP_RETENTION_DAYS` are set in Coolify environment variables.
 - A restore drill has been completed against a non-production database, then documented with `BACKUP_RESTORE_DRILL_COMPLETED=true` and `BACKUP_LAST_RESTORE_DRILL_DATE=YYYY-MM-DD`.
@@ -39,6 +42,21 @@ Use this checklist before a production launch or major Hetzner/Coolify redeploy.
 - App service variables include `BROADCAST_CONNECTION=reverb`, `REVERB_APP_ID`, `REVERB_APP_KEY`, `REVERB_APP_SECRET`, `REVERB_HOST`, `REVERB_PORT=443`, `REVERB_SCHEME=https`, and matching `VITE_REVERB_*` values before rebuilding frontend assets.
 - Failed queue jobs are monitored.
 - Mail, subscription reminders, expiry sweeps, and push dispatch jobs are covered.
+- `php artisan monitoring:health --fail-on-warning` is available to a cron, deployment gate, or external worker if the observability provider supports command probes.
+
+## Cache Strategy
+
+- `CACHE_STORE` is a production-safe shared store, preferably Redis or database-backed if Redis is not available.
+- `LIFEAT_SETTINGS_CACHE_TTL`, `LIFEAT_CATALOG_CACHE_TTL`, and `LIFEAT_PUBLIC_CACHE_TTL` are set intentionally for the launch traffic profile.
+- Cache-hit behavior is reviewed during load testing for settings, package catalogues, category filters, public stats, and popular listing/event locations.
+
+## Error Tracking
+
+- `ERROR_TRACKING_ENABLED=true` is set before public launch.
+- `ERROR_TRACKING_DRIVER` is set to `webhook`, or another production-grade external provider after integration.
+- `ERROR_TRACKING_WEBHOOK_URL` points to the production observability provider when the webhook driver is used.
+- `ERROR_TRACKING_IGNORE_STATUSES`, sample rate, trace inclusion, release, and environment values are reviewed for production noise and privacy.
+- Test exceptions reach the external alert destination without including request bodies, query strings, signatures, API keys, tokens, passphrases, or credentials.
 
 ## Storage And Uploads
 
@@ -71,13 +89,15 @@ Use this checklist before a production launch or major Hetzner/Coolify redeploy.
 
 - In-app git update tooling is removed; Coolify/git deployment is the deployment authority.
 - `/dev/tests/run` is disabled in production unless deliberately enabled with `DEV_TOOLS_ENABLED=true` and `DEV_TEST_RUNNER_ENABLED=true`.
-- Admin bootstrap route has a production disable/removal decision.
+- Browser admin-bootstrap route is absent; first-admin provisioning uses `php artisan admin:create` from the deployment shell, writes an audit log for account creation/promotion, and has a reviewed credential-handoff runbook.
 - Session cookie security is reviewed.
 - Rate limits are reviewed for auth, PayFast callbacks, voucher redemption, and public forms.
 - Audit logging is reviewed for sensitive admin actions.
 
 ## Release
 
+- The `Release Readiness` GitHub Actions workflow passes for the release commit, including PHP tests, Laravel route/cache/view smoke checks, frontend build, and Composer/npm dependency audits.
+- Branch protection requires the release-readiness workflow before merging to `master` or any future protected release branch.
 - `npm run build` passes.
 - PHPUnit passes on PHP 8.4+.
 - `php artisan route:list` is reviewed for unexpected public/admin routes.
@@ -85,4 +105,5 @@ Use this checklist before a production launch or major Hetzner/Coolify redeploy.
 - `php artisan config:cache`, `route:cache`, and `view:cache` are tested.
 - Migration rollback strategy is documented.
 - Hetzner/Coolify deployment health is checked after release.
+- External uptime monitoring checks `/up` for a simple 200 response and `/health` for database, storage, disk, queue, payment, and notification degradation.
 - Smoke tests cover home, directory, checkout, admin login, finance dashboard, and payment callback validation.

@@ -529,7 +529,7 @@ class AskLifeTest extends TestCase
     {
         return User::query()->where('email', 'jameskoen78@gmail.com')->first()
             ?? User::factory()->create([
-                'role' => 'super_admin',
+                'role' => 'dev',
                 'email' => 'jameskoen78@gmail.com',
             ]);
     }

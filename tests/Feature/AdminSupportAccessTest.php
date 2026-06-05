@@ -188,7 +188,7 @@ class AdminSupportAccessTest extends TestCase
     public function test_dev_owner_sees_dev_tab_sections_on_dashboard(): void
     {
         $admin = User::factory()->create([
-            'role' => 'super_admin',
+            'role' => 'dev',
             'name' => 'Admin Dev User',
             'email' => 'jameskoen78@gmail.com',
         ]);
@@ -212,7 +212,7 @@ class AdminSupportAccessTest extends TestCase
     public function test_non_owner_admin_does_not_see_dev_tab_sections_on_dashboard(): void
     {
         $admin = User::factory()->create([
-            'role' => 'super_admin',
+            'role' => 'admin',
             'name' => 'Admin Regular User',
             'email' => 'other-admin@example.com',
         ]);

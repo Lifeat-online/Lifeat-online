@@ -34,6 +34,24 @@ class AdminPushNotificationTest extends TestCase
             ->assertSee('Send Push');
     }
 
+    public function test_dev_owner_can_open_push_notification_section(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'dev',
+            'email' => 'jameskoen78@gmail.com',
+        ]);
+
+        $this->mock(WebPushDeliveryService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+
+        $this->actingAs($admin)
+            ->get(route('admin.push-notifications.test'))
+            ->assertOk()
+            ->assertSee('Push Notifications')
+            ->assertSee('Send Push');
+    }
+
     public function test_admin_can_send_push_notification_to_all_active_subscriptions(): void
     {
         $admin = User::factory()->create(['role' => 'super_admin']);

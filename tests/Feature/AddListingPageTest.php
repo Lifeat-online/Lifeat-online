@@ -42,10 +42,21 @@ class AddListingPageTest extends TestCase
             'listing' => $listing->slug,
             'package' => 'business-directory-self-service-6m',
         ]));
+        $response->assertSessionHas('status', 'Listing starter created. Confirm your package and create the order to continue activation.');
 
         $this->assertSame($user->id, $listing->user_id);
         $this->assertSame('self_service', $listing->source_channel);
         $this->assertSame('draft', $listing->status);
         $this->assertSame('Bethlehem', $listing->city);
+
+        $checkoutResponse = $this->actingAs($user)->get(route('checkout.index', [
+            'listing' => $listing->slug,
+            'package' => 'business-directory-self-service-6m',
+        ]));
+
+        $checkoutResponse->assertOk();
+        $checkoutResponse->assertSee('Listing Launch Checklist');
+        $checkoutResponse->assertSee('Next: Profile basics');
+        $checkoutResponse->assertSee('Choose package');
     }
 }

@@ -457,6 +457,217 @@ class MallStandaloneCommerceTest extends TestCase
         ]);
     }
 
+    public function test_mall_admin_can_manage_store_scoped_product_categories(): void
+    {
+        [$store, $product] = $this->createStoreWithProduct(price: '80.00', stock: 3);
+        [$otherStore] = $this->createStoreWithProduct(price: '60.00', stock: 4);
+        $usedCategory = MallProductCategory::create([
+            'mall_store_id' => $store->id,
+            'name' => 'Pantry',
+            'slug' => 'pantry',
+            'sort_order' => 2,
+        ]);
+        $product->categories()->attach($usedCategory);
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)->get(route('mall.admin.product-categories.index'))
+            ->assertOk()
+            ->assertSee('Product Categories')
+            ->assertSee('Pantry')
+            ->assertSee('New Category');
+
+        $this->actingAs($admin)->get(route('mall.admin.product-categories.create', ['store_id' => $store->id]))
+            ->assertOk()
+            ->assertSee('New Product Category')
+            ->assertSee($store->name);
+
+        $this->actingAs($admin)->post(route('mall.admin.product-categories.store'), [
+            'mall_store_id' => $store->id,
+            'name' => 'Fresh Picks',
+            'sort_order' => 7,
+        ])->assertRedirect(route('mall.admin.product-categories.index'));
+
+        $created = MallProductCategory::where('name', 'Fresh Picks')->firstOrFail();
+        $this->assertSame($store->id, $created->mall_store_id);
+        $this->assertSame('fresh-picks', $created->slug);
+
+        $this->actingAs($admin)->post(route('mall.admin.product-categories.store'), [
+            'mall_store_id' => $store->id,
+            'name' => 'Fresh Picks',
+            'sort_order' => 8,
+        ])->assertRedirect(route('mall.admin.product-categories.index'));
+
+        $this->assertDatabaseHas('mall_product_categories', [
+            'mall_store_id' => $store->id,
+            'name' => 'Fresh Picks',
+            'slug' => 'fresh-picks-2',
+            'sort_order' => 8,
+        ]);
+
+        $this->actingAs($admin)->put(route('mall.admin.product-categories.update', $created->id), [
+            'mall_store_id' => $store->id,
+            'name' => 'Fresh Pantry',
+            'sort_order' => 3,
+        ])->assertRedirect(route('mall.admin.product-categories.index'));
+
+        $this->assertDatabaseHas('mall_product_categories', [
+            'id' => $created->id,
+            'mall_store_id' => $store->id,
+            'name' => 'Fresh Pantry',
+            'slug' => 'fresh-pantry',
+            'sort_order' => 3,
+        ]);
+
+        $this->actingAs($admin)
+            ->from(route('mall.admin.product-categories.edit', $usedCategory->id))
+            ->put(route('mall.admin.product-categories.update', $usedCategory->id), [
+                'mall_store_id' => $otherStore->id,
+                'name' => 'Pantry',
+                'sort_order' => 2,
+            ])
+            ->assertRedirect(route('mall.admin.product-categories.edit', $usedCategory->id))
+            ->assertSessionHasErrors('mall_store_id');
+
+        $this->assertSame($store->id, $usedCategory->fresh()->mall_store_id);
+
+        $this->actingAs($admin)
+            ->from(route('mall.admin.product-categories.edit', $usedCategory->id))
+            ->delete(route('mall.admin.product-categories.destroy', $usedCategory->id))
+            ->assertRedirect(route('mall.admin.product-categories.edit', $usedCategory->id));
+
+        $this->assertDatabaseHas('mall_product_categories', ['id' => $usedCategory->id]);
+
+        $this->actingAs($admin)->delete(route('mall.admin.product-categories.destroy', $created->id))
+            ->assertRedirect(route('mall.admin.product-categories.index'));
+
+        $this->assertDatabaseMissing('mall_product_categories', ['id' => $created->id]);
+    }
+
+    public function test_vendor_product_category_assignment_stays_inside_their_store(): void
+    {
+        [$store, $product] = $this->createStoreWithProduct(price: '80.00', stock: 3);
+        [$otherStore] = $this->createStoreWithProduct(price: '60.00', stock: 4);
+        $ownCategory = MallProductCategory::create([
+            'mall_store_id' => $store->id,
+            'name' => 'Own Shelf',
+            'slug' => 'own-shelf',
+        ]);
+        $otherCategory = MallProductCategory::create([
+            'mall_store_id' => $otherStore->id,
+            'name' => 'Other Shelf',
+            'slug' => 'other-shelf',
+        ]);
+        $vendor = User::findOrFail($store->owner_user_id);
+
+        $this->actingAs($vendor)->put(route('mall.vendor.products.update', $product), [
+            'name' => 'Vendor Product',
+            'price' => '95.00',
+            'compare_price' => '120.00',
+            'sku' => 'VEN-1',
+            'stock_qty' => 9,
+            'parcel_weight_kg' => '1.250',
+            'short_description' => 'Vendor product copy.',
+            'description' => 'Full product copy.',
+            'manage_stock' => '1',
+            'is_featured' => '1',
+            'is_active' => '1',
+            'category_ids' => [$ownCategory->id, $otherCategory->id],
+        ])->assertRedirect(route('mall.vendor.products.index'));
+
+        $this->assertDatabaseHas('mall_product_mall_product_category', [
+            'mall_product_id' => $product->id,
+            'mall_product_category_id' => $ownCategory->id,
+        ]);
+        $this->assertDatabaseMissing('mall_product_mall_product_category', [
+            'mall_product_id' => $product->id,
+            'mall_product_category_id' => $otherCategory->id,
+        ]);
+    }
+
+    public function test_vendor_can_manage_their_own_product_categories(): void
+    {
+        [$store, $product] = $this->createStoreWithProduct(price: '80.00', stock: 3);
+        [$otherStore] = $this->createStoreWithProduct(price: '60.00', stock: 4);
+        $usedCategory = MallProductCategory::create([
+            'mall_store_id' => $store->id,
+            'name' => 'Pantry',
+            'slug' => 'pantry',
+            'sort_order' => 2,
+        ]);
+        $otherCategory = MallProductCategory::create([
+            'mall_store_id' => $otherStore->id,
+            'name' => 'Other Pantry',
+            'slug' => 'other-pantry',
+        ]);
+        $product->categories()->attach($usedCategory);
+        $vendor = User::findOrFail($store->owner_user_id);
+
+        $this->actingAs($vendor)->get(route('mall.vendor.products.index'))
+            ->assertOk()
+            ->assertSee('Manage Categories');
+
+        $this->actingAs($vendor)->get(route('mall.vendor.product-categories.index'))
+            ->assertOk()
+            ->assertSee('Product Categories')
+            ->assertSee('Pantry')
+            ->assertDontSee('Other Pantry')
+            ->assertSee('New Category');
+
+        $this->actingAs($vendor)->get(route('mall.vendor.product-categories.create'))
+            ->assertOk()
+            ->assertSee('New Product Category')
+            ->assertSee($store->name);
+
+        $this->actingAs($vendor)->post(route('mall.vendor.product-categories.store'), [
+            'name' => 'Fresh Picks',
+            'sort_order' => 7,
+        ])->assertRedirect(route('mall.vendor.product-categories.index'));
+
+        $created = MallProductCategory::where('name', 'Fresh Picks')->firstOrFail();
+        $this->assertSame($store->id, $created->mall_store_id);
+        $this->assertSame('fresh-picks', $created->slug);
+
+        $this->actingAs($vendor)->post(route('mall.vendor.product-categories.store'), [
+            'name' => 'Fresh Picks',
+            'sort_order' => 8,
+        ])->assertRedirect(route('mall.vendor.product-categories.index'));
+
+        $this->assertDatabaseHas('mall_product_categories', [
+            'mall_store_id' => $store->id,
+            'name' => 'Fresh Picks',
+            'slug' => 'fresh-picks-2',
+            'sort_order' => 8,
+        ]);
+
+        $this->actingAs($vendor)->put(route('mall.vendor.product-categories.update', $created->id), [
+            'name' => 'Fresh Pantry',
+            'sort_order' => 3,
+        ])->assertRedirect(route('mall.vendor.product-categories.index'));
+
+        $this->assertDatabaseHas('mall_product_categories', [
+            'id' => $created->id,
+            'mall_store_id' => $store->id,
+            'name' => 'Fresh Pantry',
+            'slug' => 'fresh-pantry',
+            'sort_order' => 3,
+        ]);
+
+        $this->actingAs($vendor)->get(route('mall.vendor.product-categories.edit', $otherCategory->id))
+            ->assertNotFound();
+
+        $this->actingAs($vendor)
+            ->from(route('mall.vendor.product-categories.edit', $usedCategory->id))
+            ->delete(route('mall.vendor.product-categories.destroy', $usedCategory->id))
+            ->assertRedirect(route('mall.vendor.product-categories.edit', $usedCategory->id));
+
+        $this->assertDatabaseHas('mall_product_categories', ['id' => $usedCategory->id]);
+
+        $this->actingAs($vendor)->delete(route('mall.vendor.product-categories.destroy', $created->id))
+            ->assertRedirect(route('mall.vendor.product-categories.index'));
+
+        $this->assertDatabaseMissing('mall_product_categories', ['id' => $created->id]);
+    }
+
     private function createStoreWithProduct(string $price = '25.00', int $stock = 10): array
     {
         $owner = User::factory()->create();

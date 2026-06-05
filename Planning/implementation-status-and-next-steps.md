@@ -29,7 +29,7 @@ The main gap that this file closes:
 Implemented and working in the Laravel application:
 - Phase 0 foundations: roles/permissions support, editable settings, audit logging
 - Phase 1 writer workflow foundations and writer payment foundations
-- Phase 2 and 3 commercial foundations for packages, checkout, invoices, payments, renewals, finance operations, notification logging, reminders, and finance drill-downs
+- Phase 2 and 3 commercial foundations for packages, checkout, invoices, payments, renewals, manual browser renewal checkout, advert/push renewal activation coverage, finance operations, notification logging, reminders, and finance drill-downs
 - public homepage, business directory, events, articles, search, and classifieds discovery pages
 - public writer/staff signup flow with admin review, approval onboarding, access email, resend, cooldown, contact-state filters, and queue summary
 - advertiser acquisition funnel (advertise-with-us, add-listing start flow)
@@ -39,9 +39,9 @@ Implemented and working in the Laravel application:
 - admin ad campaign and push campaign management (list, detail, approve, pause, resume, manual dispatch, delivery history)
 
 Still outstanding:
-- campaign analytics refinement (beyond current counters): first-class reporting views, time-bucketed metrics, and any required attribution model decisions
-- push open-rate tracking refinement (beyond current pixel counter): open logs, tokenised tracking, and any provider-side delivery receipt integration
-- Phase 6: test coverage expansion, monitoring and alerting, load testing, security hardening, pen-test, and documentation
+- campaign analytics refinement beyond the new report/export baseline: final attribution model decisions for conversion handoff and campaign ROI reporting
+- push open-rate tracking refinement beyond the new tokenized open-event baseline: provider-side delivery receipt integration and per-recipient token issuance for the eventual provider flow
+- Phase 6: browser/end-to-end test coverage expansion, external monitoring and alert routing beyond the new `/health`, `monitoring:health`, operational KPI dashboard, structured operational log baseline, error-tracking webhook/log baseline, database index baseline, public read-cache baseline, and release-readiness CI/dependency-scan baseline, plus load testing, security hardening, pen-test, branch protection/rollback drills, and documentation
 
 ## 2. Implemented Public Pages
 
@@ -215,19 +215,18 @@ Remaining optional refinements for the writer/staff application flow:
 The three most actionable next targets in priority order:
 
 **Option A — Campaign operations & reporting depth (E4.3 / E4.5)**
-The biggest remaining monetisation gap is not purchase or dispatch, but measurement and operational oversight beyond baseline counters.
-- time-bucketed performance reporting (impressions/clicks/openerate per day/week)
-- admin reporting screens that aggregate and rank campaigns
-- decide whether to persist per-view/per-click/per-open logs (vs counters only)
-- optional tokenised open tracking for higher-quality metrics
+The biggest remaining monetisation gap is not purchase or dispatch, but campaign attribution quality beyond the new report/export baseline.
+- final attribution model decisions for views, clicks, opens, and conversion handoff
+- campaign ROI reporting once the conversion model is agreed
+- provider-side delivery receipt integration if the production push provider exposes it
 Clause trace: `5.c`, `5.d`, `6.b`, `9.d`, `11.e`
 
 **Option B — Phase 6 hardening (E6.1)**
-Now that wallet, payouts, and baseline campaign tracking exist, the next risk reduction is hardening and deeper integration coverage.
-- PayFast webhook idempotency integration tests
+Now that wallet, payouts, baseline campaign tracking, and advert/push renewal payment coverage exist, the next risk reduction is hardening and deeper integration coverage.
+- PayFast webhook idempotency and terminal-state integration tests, including late failure-after-paid callbacks
 - checkout E2E (package selection → payment → entitlement activation → attribution credit)
-- subscription expiry and renewal E2E
-- role-boundary and permission-denial security tests
+- remaining browser E2E for checkout package selection, staff-assisted sale, voucher redemption, and admin approvals beyond the focused manual renewal checkout coverage
+- launch-only permission/audit checks that appear after any future admin, support, moderation, or role-change actions are added
 Clause trace: `8.a`, `8.c`, `11.b`, `11.d`
 
 **Option C — Retained-flow scope decisions (Phase 5)**
@@ -239,7 +238,12 @@ Clause trace: `10.a`, `10.d`
 
 ### 4.2 Recommended Order
 
-Recommended sequence:
+Current recommendation:
+1. **Option B** (Phase 6 hardening) - expands confidence and release readiness now that campaign report/export depth is in place
+2. **Option A** residuals (campaign attribution/provider receipts) - closes remaining Phase 4 analytics quality gaps
+3. **Option C** (retained-flow decisions) - reduces late-scope risk
+
+Previous sequence before campaign report/export work:
 1. **Option A** (campaign reporting depth) — closes remaining Phase 4 operational gaps
 2. **Option B** (Phase 6 hardening) — expands confidence and release readiness
 3. **Option C** (retained-flow decisions) — reduces late-scope risk
@@ -249,19 +253,19 @@ Recommended sequence:
 The following areas are still in the planning set and not yet fully delivered:
 
 **Phase 3 outstanding:**
-- staff wallet and payout flows — delivered baseline; remaining work is mainly UX polish and any accounting/reporting refinements (`3.d`)
+- staff wallet and payout flows — delivered baseline plus admin-only manual adjustments, filtered payout reconciliation export, and append-only ledger enforcement; remaining work is mainly any final accounting/reporting refinements (`3.d`)
 
 **Phase 4 outstanding:**
-- campaign analytics depth beyond baseline counters (time series, reporting views, logs) (`5.c`, `5.d`, `6.b`, `9.d`)
+- campaign analytics depth beyond the new report/export baseline: provider receipts, attribution decisions, and campaign ROI reporting (`5.c`, `5.d`, `6.b`, `9.d`)
 
 **Phase 5 outstanding:**
 - retained non-core flows: services decision path and vouchers (deferred decision)
 
 **Phase 6 outstanding:**
-- E6.1: test coverage expansion (E2E, webhook integration, security boundary tests)
-- E6.2: load and performance validation (1,000 concurrent users, p95 budgets)
-- E6.3: monitoring and alerting stack (uptime, queue health, KPI dashboards)
-- E6.4: security hardening (DAST, SAST, dependency scans, pen-test)
+- E6.1: test coverage expansion (remaining browser E2E beyond manual renewal checkout, provider-payment edge cases if production PayFast settlement/reversal states expand beyond current replay and late-failure protection, and permission/audit checks for any future launch-only admin actions)
+- E6.2: load and performance validation (database index and public read-cache baselines are in place; still needs production query-plan review, cache-hit/load evidence, 1,000 concurrent users evidence, and p95 budgets)
+- E6.3: monitoring and alerting stack (structured operational log events are now emitted by critical payment, callback, subscription, campaign dispatch, voucher, and finance flows, and exceptions can be sent to a redacted webhook/log error-tracking sink; still needs external uptime checks, production error-tracking webhook configuration, HTTP error alerts, slow-page monitoring, log shipping/retention decisions, alert routing, and production observability dashboarding beyond the new `/health`, `monitoring:health`, and admin operational KPI baseline)
+- E6.4: security hardening (Composer/npm dependency scans now have a GitHub Actions baseline; still needs DAST, SAST, pen-test, remediation evidence, and scan-result triage)
 - E6.5: documentation and training (admin handbook, runbooks, release checklist, training recordings)
 
 ## 6. Documentation Rule Going Forward

@@ -181,7 +181,7 @@ class TransportModuleTest extends TestCase
     public function test_dev_owner_can_create_driver_without_transport_manager_primary_role(): void
     {
         $devOwner = User::factory()->create([
-            'role' => 'member',
+            'role' => 'super_admin',
             'email' => 'jameskoen78@gmail.com',
         ]);
 

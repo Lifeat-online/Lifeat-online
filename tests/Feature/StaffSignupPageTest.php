@@ -72,6 +72,10 @@ class StaffSignupPageTest extends TestCase
 
         $this->followRedirects($response)
             ->assertSee('Application received')
-            ->assertSee('lebo@example.com');
+            ->assertSee('lebo@example.com')
+            ->assertSee('Access email')
+            ->assertSee('set your password, open the writer workspace, submit articles, and track earnings')
+            ->assertSee('Payment expectations')
+            ->assertSee('payable article ledger');
     }
 }

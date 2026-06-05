@@ -82,7 +82,7 @@ The mall subsystem must use its own prefixed database tables, models, services, 
 - [x] Add admin commission report.
 - [x] Add admin store edit/update page for status, featuring, categories, profile copy, and payout settings.
 - [x] Add admin product index/edit/update pages for moderation, featured/window control, stock, and pricing.
-- [ ] Add admin product category management screens.
+- [x] Add admin product category management screens.
 
 ## Phase 8 - Mall Fulfillment
 
@@ -108,14 +108,14 @@ The mall subsystem must use its own prefixed database tables, models, services, 
 - [x] Add vendor new-order notification email.
 - [x] Add abandoned pending order sweep.
 - [x] Add storage directories.
-- [ ] Add bespoke mall placeholder image assets if the existing Life@ illustration fallbacks are not sufficient.
+- [x] Add bespoke mall placeholder image assets if the existing Life@ illustration fallbacks are not sufficient. Decision: existing Life@ illustration and logo fallbacks are sufficient for launch.
 
 ## Follow-Up Backlog
 
 - [x] Add opt-in demo mall seeder for browser QA.
-- [ ] Add vendor-facing product category management screens.
+- [x] Add vendor-facing product category management screens.
 - [x] Confirm current PUDO API locker/rate/shipment rules from PUDO/The Courier Guy Locker API docs; production still needs real account credentials in environment variables.
-- [ ] Decide whether to install `intervention/image` for server-side image resizing; current implementation stores uploaded images directly and does not require it.
+- [x] Decide whether to install `intervention/image` for server-side image resizing. Decision: do not install it for the launch mall slice; current implementation stores uploaded images directly, and responsive media processing remains under the broader production image optimization work.
 - [ ] Enable `MALL_PAYFAST_VALIDATE_ITN_WITH_SERVER=true` in production once the deployed `notify_url` is public HTTPS.
 - [x] Add initial browser/UI verification with seeded demo store across storefront, basket, login handoff, and checkout summary.
 - [ ] Add browser/UI verification for vendor and admin management screens.
@@ -150,3 +150,6 @@ The mall subsystem must use its own prefixed database tables, models, services, 
 - 2026-05-30: Implemented PUDO/The Courier Guy Locker API integration for mall fulfillment. Added configurable API base URL/key/auth header, locker lookup, live `/rates` quote for Door-to-Locker delivery, shipment creation through `/shipments` after PayFast confirms payment, fulfillment meta snapshots for PUDO quote/shipment data, and checkout UI for selecting a PUDO locker and previewing the live rate.
 - 2026-05-30: Focused mall tests passed again: 10 tests, 117 assertions with faked PUDO `/rates` and `/shipments` API calls. Focused transport tests passed: 7 tests, 104 assertions. Browser QA confirmed PUDO selection shows the locker API controls under PUDO, uses `Live rate`, keeps hidden locker fields, has no console errors, and has no page-level horizontal overflow.
 - 2026-05-30: Fixed taxi/transport manager access for the dev owner. The `dev` capability is now recognized for transport manager routes and links, existing users can be granted transport manager access without changing their primary role, focused transport tests passed again: 9 tests, 118 assertions, and browser QA confirmed `/transport/manager` opens without a 403.
+- 2026-06-05: Added admin product category management screens with store-scoped create, edit, delete, filtering, unique slug generation, in-use category protections, and mall admin navigation. Vendor product category assignment now filters submitted category IDs to the vendor's own store. Focused mall tests passed again: 12 tests, 149 assertions.
+- 2026-06-05: Added vendor-facing product category management screens with active-store-scoped create, edit, delete, filtering, unique slug generation, in-use category protections, vendor navigation links, and cross-store category route protection. Focused mall tests passed again: 13 tests, 176 assertions.
+- 2026-06-05: Audited mall fallback assets and server-side image processing dependencies. Mall stores/products already fall back to `public/branding/life-logo-light.svg`, `public/illustrations/directory-burst.svg`, and `public/illustrations/community-mosaic.svg`; no bespoke mall placeholder assets or `intervention/image` dependency are needed for the launch mall slice.

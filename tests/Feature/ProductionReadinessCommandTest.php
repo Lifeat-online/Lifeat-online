@@ -27,6 +27,7 @@ class ProductionReadinessCommandTest extends TestCase
             ->expectsOutputToContain('[UPLOAD_STORAGE_BACKEND] Set UPLOAD_STORAGE_BACKEND to mounted_volume before launch, or refactor uploads to dedicated object-storage disks.')
             ->expectsOutputToContain('[BACKUPS_ENABLED] Automated production database backups must be enabled.')
             ->expectsOutputToContain('[BACKUP_RESTORE_DRILL_COMPLETED] A production-like backup restore drill must be completed before accepting real payments.')
+            ->expectsOutputToContain('[ERROR_TRACKING_ENABLED] ERROR_TRACKING_ENABLED must be true before public launch.')
             ->assertExitCode(1);
     }
 

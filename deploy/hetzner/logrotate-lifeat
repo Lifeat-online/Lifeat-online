@@ -1,0 +1,14 @@
+/var/log/lifeat/*.log {
+    daily
+    missingok
+    rotate 30
+    compress
+    delaycompress
+    notifempty
+    create 0640 www-data www-data
+    sharedscripts
+    postrotate
+        # Reload php-fpm / nginx if needed; backup scripts are stateless.
+        true
+    endscript
+}

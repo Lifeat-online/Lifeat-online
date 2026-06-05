@@ -7,9 +7,13 @@ use App\Models\Payment;
 use App\Models\PayoutRequest;
 use App\Models\StaffWallet;
 use App\Models\User;
+use App\Models\AuditLog;
 use App\Models\WalletLedgerEntry;
 use App\Services\StaffCommissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
+use LogicException;
 use Tests\TestCase;
 
 class StaffWalletLifecycleTest extends TestCase
@@ -126,6 +130,170 @@ class StaffWalletLifecycleTest extends TestCase
             ->count());
     }
 
+    public function test_admin_can_record_manual_wallet_adjustments_with_audit_log(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $staff = User::factory()->create(['role' => 'staff']);
+        $wallet = StaffWallet::create([
+            'user_id' => $staff->id,
+            'currency' => 'ZAR',
+            'available_balance' => 100,
+            'pending_balance' => 0,
+            'paid_out_total' => 0,
+        ]);
+
+        $this->actingAs($admin)->post(route('admin.wallet.adjustments.store', $wallet), [
+            'direction' => 'credit',
+            'amount' => 75.25,
+            'reason' => 'Approved accounting correction credit',
+        ])->assertRedirect(route('admin.wallet.show', $wallet));
+
+        $wallet->refresh();
+        $this->assertSame('175.25', $wallet->available_balance);
+
+        $this->assertDatabaseHas('wallet_ledger_entries', [
+            'wallet_id' => $wallet->id,
+            'entry_type' => WalletLedgerEntry::TYPE_ADJUSTMENT,
+            'source_type' => StaffWallet::class,
+            'source_id' => $wallet->id,
+            'net_amount' => 75.25,
+            'description' => 'Manual admin adjustment: Approved accounting correction credit',
+        ]);
+
+        $this->actingAs($admin)->post(route('admin.wallet.adjustments.store', $wallet), [
+            'direction' => 'debit',
+            'amount' => 25,
+            'reason' => 'Approved accounting correction debit',
+        ])->assertRedirect(route('admin.wallet.show', $wallet));
+
+        $wallet->refresh();
+        $this->assertSame('150.25', $wallet->available_balance);
+
+        $this->assertDatabaseHas('wallet_ledger_entries', [
+            'wallet_id' => $wallet->id,
+            'entry_type' => WalletLedgerEntry::TYPE_ADJUSTMENT,
+            'source_type' => StaffWallet::class,
+            'source_id' => $wallet->id,
+            'net_amount' => -25,
+            'description' => 'Manual admin adjustment: Approved accounting correction debit',
+        ]);
+
+        $audit = AuditLog::where('action', 'staff_wallet.adjusted')
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->assertSame($admin->id, $audit->actor_user_id);
+        $this->assertSame(StaffWallet::class, $audit->subject_type);
+        $this->assertSame($wallet->id, $audit->subject_id);
+        $this->assertSame('175.25', $audit->before_json['available_balance']);
+        $this->assertSame('150.25', $audit->after_json['available_balance']);
+        $this->assertSame('debit', $audit->after_json['direction']);
+        $this->assertEquals(25.0, $audit->after_json['amount']);
+    }
+
+    public function test_wallet_adjustment_debit_cannot_exceed_available_balance(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $staff = User::factory()->create(['role' => 'staff']);
+        $wallet = StaffWallet::create([
+            'user_id' => $staff->id,
+            'currency' => 'ZAR',
+            'available_balance' => 40,
+            'pending_balance' => 0,
+            'paid_out_total' => 0,
+        ]);
+
+        $this->actingAs($admin)->post(route('admin.wallet.adjustments.store', $wallet), [
+            'direction' => 'debit',
+            'amount' => 45,
+            'reason' => 'Attempted over debit correction',
+        ])->assertStatus(422);
+
+        $wallet->refresh();
+        $this->assertSame('40.00', $wallet->available_balance);
+        $this->assertSame(0, WalletLedgerEntry::where('wallet_id', $wallet->id)->count());
+        $this->assertSame(0, AuditLog::where('action', 'staff_wallet.adjusted')->count());
+    }
+
+    public function test_support_cannot_record_manual_wallet_adjustment(): void
+    {
+        $support = User::factory()->create(['role' => 'support']);
+        $staff = User::factory()->create(['role' => 'staff']);
+        $wallet = StaffWallet::create([
+            'user_id' => $staff->id,
+            'currency' => 'ZAR',
+            'available_balance' => 100,
+            'pending_balance' => 0,
+            'paid_out_total' => 0,
+        ]);
+
+        $this->actingAs($support)->post(route('admin.wallet.adjustments.store', $wallet), [
+            'direction' => 'credit',
+            'amount' => 10,
+            'reason' => 'Support should not adjust wallets',
+        ])->assertForbidden();
+
+        $wallet->refresh();
+        $this->assertSame('100.00', $wallet->available_balance);
+        $this->assertSame(0, WalletLedgerEntry::where('wallet_id', $wallet->id)->count());
+    }
+
+    public function test_wallet_ledger_entries_are_append_only_through_model_events(): void
+    {
+        $entry = $this->manualLedgerEntry();
+
+        try {
+            $entry->update(['net_amount' => 999]);
+            $this->fail('Wallet ledger entries should not be updateable through Eloquent.');
+        } catch (LogicException $exception) {
+            $this->assertStringContainsString('append-only', $exception->getMessage());
+        }
+
+        try {
+            $entry->delete();
+            $this->fail('Wallet ledger entries should not be deleteable through Eloquent.');
+        } catch (LogicException $exception) {
+            $this->assertStringContainsString('append-only', $exception->getMessage());
+        }
+
+        $this->assertDatabaseHas('wallet_ledger_entries', [
+            'id' => $entry->id,
+            'net_amount' => 15,
+            'description' => 'Immutable ledger baseline',
+        ]);
+    }
+
+    public function test_wallet_ledger_entries_are_append_only_at_database_level(): void
+    {
+        $entry = $this->manualLedgerEntry();
+
+        try {
+            DB::table('wallet_ledger_entries')
+                ->where('id', $entry->id)
+                ->update(['net_amount' => 999]);
+
+            $this->fail('Wallet ledger entries should not be updateable through raw database queries.');
+        } catch (QueryException $exception) {
+            $this->assertStringContainsString('append-only', $exception->getMessage());
+        }
+
+        try {
+            DB::table('wallet_ledger_entries')
+                ->where('id', $entry->id)
+                ->delete();
+
+            $this->fail('Wallet ledger entries should not be deleteable through raw database queries.');
+        } catch (QueryException $exception) {
+            $this->assertStringContainsString('append-only', $exception->getMessage());
+        }
+
+        $this->assertDatabaseHas('wallet_ledger_entries', [
+            'id' => $entry->id,
+            'net_amount' => 15,
+            'description' => 'Immutable ledger baseline',
+        ]);
+    }
+
     private function staffAttributedPayment(User $staff, User $owner): Payment
     {
         $order = Order::create([
@@ -146,6 +314,30 @@ class StaffWalletLifecycleTest extends TestCase
             'status' => 'pending',
             'amount' => 500,
             'currency' => 'ZAR',
+        ]);
+    }
+
+    private function manualLedgerEntry(): WalletLedgerEntry
+    {
+        $staff = User::factory()->create(['role' => 'staff']);
+        $wallet = StaffWallet::create([
+            'user_id' => $staff->id,
+            'currency' => 'ZAR',
+            'available_balance' => 15,
+            'pending_balance' => 0,
+            'paid_out_total' => 0,
+        ]);
+
+        return WalletLedgerEntry::create([
+            'wallet_id' => $wallet->id,
+            'entry_type' => WalletLedgerEntry::TYPE_ADJUSTMENT,
+            'source_type' => StaffWallet::class,
+            'source_id' => $wallet->id,
+            'gross_amount' => 15,
+            'net_amount' => 15,
+            'currency' => 'ZAR',
+            'description' => 'Immutable ledger baseline',
+            'recorded_at' => now(),
         ]);
     }
 }
