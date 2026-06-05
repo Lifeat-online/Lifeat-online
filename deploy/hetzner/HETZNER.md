@@ -230,9 +230,21 @@ Minishlink/WebPush pipeline that powers end-user push campaigns.
 The Laravel-side glue lives in `App\Services\OperatorPushNotifier`
 (registered as a singleton, auto-resolved by the container). It pulls
 the VAPID keys from `WEBPUSH_VAPID_PUBLIC_KEY` /
-`WEBPUSH_VAPID_PRIVATE_KEY` and sends to all active
-`BrowserPushSubscription` records whose `user_id` is in the operator
-roster (configured via `OPS_ALERT_USER_IDS` env, comma-separated).
+`WEBPUSH_VAPID_PRIVATE_KEY` and sends to every active
+`BrowserPushSubscription` whose user qualifies for the alert.
+
+**Operator roster rules:**
+
+- The explicit `OPS_ALERT_USER_IDS` env (comma-separated IDs) is
+  always included (escape hatch for the on-call rotation).
+- Every user with role `dev` or `developer` is implicitly included
+  on every alert. On this platform **`dev` is treated as admin** —
+  they get every admin-side notification.
+- Users with role `admin` or `super_admin` receive admin-category
+  alerts (new user signups, staff applications, action-station
+  movements, financial mutations, payout requests, etc.).
+- Users with role `support` receive degraded-only and queue alerts
+  in addition to the admin categories they can already see in-app.
 
 ```php
 // Anywhere in app code
@@ -250,6 +262,9 @@ minutes (capped at 4 re-sends per alert fingerprint).
 
 #### 7.0.1 Wiring at a glance
 
+**Operational / system alerts** (delivered to the dev roster via push
+within seconds of the source firing):
+
 | Alert source                       | Trigger                              | Push target            |
 |-----------------------------------|--------------------------------------|------------------------|
 | `scripts/backup/*.sh` (all)       | exit code != 0                       | `backup:failed`        |
@@ -260,6 +275,32 @@ minutes (capped at 4 re-sends per alert fingerprint).
 | Cron `ops:check-queue-depth`       | depth > 500 jobs in default queue    | `queue:backlog`        |
 | Deploy pipeline (Coolify)          | container start fails                | `deploy:failed`        |
 | `php artisan backup:prune`        | pruning removes > 50 archives        | `backup:prune:large`   |
+
+**Business / admin events** (delivered to `dev`/`developer` and any
+`admin`/`super_admin` roster members; the in-app notifications page
+remains authoritative for everyone else):
+
+| Event                                                | Trigger                                         | Push target                |
+|------------------------------------------------------|-------------------------------------------------|----------------------------|
+| New user signup                                      | `Registered` event on `User` model             | `user:registered`          |
+| New staff signup (role in {staff, support, sales})   | `Registered` event where role matches           | `user:staff_registered`    |
+| New writer application                               | `WriterApplication` model `created` event        | `writer:applied`           |
+| New mall vendor application                          | `MallStore` status transitioned to `pending`    | `mall:vendor_applied`      |
+| New payout request submitted                         | `PayoutRequest` `created`                       | `finance:payout_requested` |
+| Payment refunded                                     | `PaymentRefund` `created`                       | `finance:refund`           |
+| Payout request marked paid                           | `PayoutRequest` status -> `paid`                | `finance:payout_paid`      |
+| New classified submitted (requires moderation)      | `Classified` status `pending_review`            | `classified:pending`       |
+| New review awaiting moderation                       | `Review` status `pending`                       | `review:pending`           |
+| Action-station movement (dev / super_admin only)     | `AiManagerAction` created with severity >= warn | `action:movement`          |
+| Autonomous AI manager escalated                      | `AiManagerAction` severity `critical`            | `action:escalated`         |
+| New transport incident / dispute                     | `TransportRequestStatusEvent` type `incident`   | `transport:incident`       |
+| Civic fault report in councillor area                | `CivicFaultReport` `created`                    | `civic:fault`              |
+
+Devs receive every row in the second table. Admins receive every row
+in the second table (they already get most of them via the in-app
+bell; the push is a parallel channel so they don't have to be in the
+admin tab). The first table goes to the full operator roster
+(dev + admin + support + the explicit `OPS_ALERT_USER_IDS`).
 
 #### 7.0.2 Where the data lives
 
@@ -275,11 +316,34 @@ minutes (capped at 4 re-sends per alert fingerprint).
 # Dry-run a push to the operator roster
 php artisan ops:send-test-push --user=1
 
+# Dry-run a push to all dev/admin users
+php artisan ops:send-test-push --roster=admin
+
+# Preview which users will receive a given target without sending
+php artisan ops:resolve-recipients user:registered --format=table
+
 # Tail the structured log for alert events
 tail -f storage/logs/lifeat-*.log | grep -i operator.alert
 ```
 
 See `PUSH-ALERTS.md` for the full operator-facing spec.
+
+#### 7.0.4 Roster resolution
+
+`OperatorPushNotifier::recipientsFor(string $target): Collection` is
+the single source of truth. Resolution order:
+
+1. Always include users explicitly listed in `OPS_ALERT_USER_IDS`.
+2. Always include every `dev` / `developer` (admins of the platform).
+3. If the target is in the **business** table (e.g.
+   `user:registered`, `finance:payout_requested`, `action:movement`),
+   include every `admin` / `super_admin`.
+4. If the target is in the **operational** table (e.g.
+   `backup:failed`, `disk:critical`, `queue:backlog`), include
+   `support` in addition to the dev/admin roster.
+5. Filter out users who have never subscribed to Web Push
+   (`browser_push_subscriptions` has no active row for them) — they
+   stay on email for the daily digest only.
 
 ### 7.1 The 5-minute triage
 

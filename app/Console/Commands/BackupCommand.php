@@ -65,6 +65,21 @@ class BackupCommand extends Command
             $exit = max($exit, $this->runScript("{$scriptsPath}/rotate-backups.sh", $envString));
         }
 
+        if ($exit !== self::SUCCESS && (bool) config('ops.enabled', false)) {
+            try {
+                app(\App\Services\OperatorPushNotifier::class)->send(
+                    target: 'backup:failed',
+                    title: 'Backup failed',
+                    body: sprintf('backup:run exited with code %d. Check /var/log/lifeat/backup-*.log on the host.', $exit),
+                    severity: 'critical',
+                    url: 'https://lifeat.online/admin/dashboard',
+                    data: ['exit_code' => $exit, 'ran' => $ran, 'type' => $type],
+                );
+            } catch (\Throwable $e) {
+                $this->warn('Could not dispatch backup:failed push: '.$e->getMessage());
+            }
+        }
+
         return $exit;
     }
 

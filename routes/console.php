@@ -447,3 +447,17 @@ Schedule::command('backup:run --type=storage')
     ->withoutOverlapping(60)
     ->onOneServer()
     ->environments(['production', 'staging']);
+
+Schedule::command('ops:check-disk')
+    ->hourly()
+    ->name('ops-check-disk')
+    ->withoutOverlapping(10)
+    ->onOneServer()
+    ->environments(['production', 'staging']);
+
+Schedule::command('ops:check-queue-depth')
+    ->everyFifteenMinutes()
+    ->name('ops-check-queue-depth')
+    ->withoutOverlapping(5)
+    ->onOneServer()
+    ->environments(['production', 'staging']);
