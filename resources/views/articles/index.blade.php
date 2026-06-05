@@ -80,7 +80,7 @@
                             <select id="category" name="category" style="width: 100%;">
                                 <option value="">All categories</option>
                                 @foreach ($categories as $category)
-                                    <option value="{{ $category->slug }}" @selected($filters['category'] === $category->slug)>{{ $category->name }}</option>
+                                    <option value="{{ $category['slug'] }}" @selected($filters['category'] === $category['slug'])>{{ $category['name'] }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -89,7 +89,7 @@
                             <select id="tag" name="tag" style="width: 100%;">
                                 <option value="">All tags</option>
                                 @foreach ($tags as $tag)
-                                    <option value="{{ $tag->slug }}" @selected($filters['tag'] === $tag->slug)>{{ $tag->name }}</option>
+                                    <option value="{{ $tag['slug'] }}" @selected($filters['tag'] === $tag['slug'])>{{ $tag['name'] }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -98,7 +98,7 @@
                             <select id="location" name="location" style="width: 100%;">
                                 <option value="">All locations</option>
                                 @foreach ($locations as $location)
-                                    <option value="{{ $location->slug }}" @selected($filters['location'] === $location->slug)>{{ $location->name }}</option>
+                                    <option value="{{ $location['slug'] }}" @selected($filters['location'] === $location['slug'])>{{ $location['name'] }}</option>
                                 @endforeach
                             </select>
                         </div>

@@ -2,14 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Public\SubmitWriterApplicationRequest;
 use App\Models\WriterApplication;
-use App\Support\Validation\UploadRules;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Validation\Rule;
 
 class WriterApplicationController extends Controller
 {
@@ -20,9 +18,9 @@ class WriterApplicationController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(SubmitWriterApplicationRequest $request): RedirectResponse
     {
-        $data = $this->validated($request);
+        $data = $request->validated();
 
         $application = WriterApplication::create([
             'user_id' => $request->user()?->id,
@@ -63,47 +61,6 @@ class WriterApplicationController extends Controller
         ]);
     }
 
-    private function validated(Request $request): array
-    {
-        $user = $request->user();
-
-        return $request->validate([
-            'first_name' => ['required', 'string', 'max:120'],
-            'last_name' => ['required', 'string', 'max:120'],
-            'email' => [
-                'required',
-                'string',
-                'email',
-                'max:255',
-                Rule::unique('users', 'email')->ignore($user?->id),
-                Rule::unique('writer_applications', 'email')->where(fn (Builder $query) => $query->whereIn('status', $this->activeStatuses())),
-            ],
-            'phone' => ['required', 'string', 'max:50'],
-            'username' => [
-                'required',
-                'string',
-                'max:50',
-                'alpha_dash',
-                Rule::unique('users', 'username')->ignore($user?->id),
-                Rule::unique('writer_applications', 'username')->where(fn (Builder $query) => $query->whereIn('status', $this->activeStatuses())),
-            ],
-            'profile_bio' => ['required', 'string', 'min:80', 'max:4000'],
-            'available_on_whatsapp' => ['nullable', 'boolean'],
-            'sample_article_title' => ['required', 'string', 'max:255'],
-            'sample_article_body' => ['required', 'string', 'min:300', 'max:12000'],
-            'sample_advert_title' => ['required', 'string', 'max:255'],
-            'sample_advert_body' => ['required', 'string', 'min:120', 'max:4000'],
-            'bank_name' => ['nullable', 'string', 'max:255'],
-            'account_holder_name' => ['nullable', 'string', 'max:255'],
-            'account_number' => ['nullable', 'string', 'max:60'],
-            'branch_code' => ['nullable', 'string', 'max:30'],
-            'profile_photo_upload' => UploadRules::requiredPublicImage(4096),
-            'id_document_upload' => UploadRules::requiredPrivateDocument(),
-            'banking_document_upload' => UploadRules::optionalPrivateDocument(),
-            'proof_of_residence_upload' => UploadRules::requiredPrivateDocument(),
-        ]);
-    }
-
     private function storeUpload(UploadedFile $file, string $directory): string
     {
         return $file->store($directory, 'public');
@@ -112,14 +69,5 @@ class WriterApplicationController extends Controller
     private function storePrivateUpload(UploadedFile $file, string $directory): string
     {
         return $file->store($directory, 'local');
-    }
-
-    private function activeStatuses(): array
-    {
-        return [
-            WriterApplication::STATUS_PENDING,
-            WriterApplication::STATUS_UNDER_REVIEW,
-            WriterApplication::STATUS_APPROVED,
-        ];
     }
 }

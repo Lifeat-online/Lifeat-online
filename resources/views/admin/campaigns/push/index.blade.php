@@ -6,6 +6,7 @@
                 @if (auth()->user()?->hasRole('admin', 'editor', 'staff'))
                     <a href="{{ route('admin.campaigns.push.create') }}" class="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white">Add push campaign</a>
                 @endif
+                <a href="{{ route('admin.campaigns.report') }}" class="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700">Campaign Report</a>
                 <a href="{{ route('admin.campaigns.ads.index') }}" class="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700">View Ad Campaigns</a>
             </div>
         </div>
@@ -13,7 +14,7 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto space-y-6 sm:px-6 lg:px-8">
-            <form method="get" action="{{ route('admin.campaigns.push.index') }}" class="grid gap-4 rounded-lg bg-white p-4 shadow-sm md:grid-cols-4">
+            <form method="get" action="{{ route('admin.campaigns.push.index') }}" class="grid gap-4 rounded-lg bg-white p-4 shadow-sm md:grid-cols-5">
                 <input class="rounded-md border-gray-300 text-sm" name="q" placeholder="Search by title or listing…" value="{{ $filters['q'] }}">
                 <select class="rounded-md border-gray-300 text-sm" name="status">
                     <option value="">All statuses</option>
@@ -25,6 +26,11 @@
                     <option value="">Sent & unsent</option>
                     <option value="no" @selected($filters['sent'] === 'no')>Unsent only</option>
                     <option value="yes" @selected($filters['sent'] === 'yes')>Sent only</option>
+                </select>
+                <select class="rounded-md border-gray-300 text-sm" name="sort">
+                    @foreach ($sortOptions as $value => $label)
+                        <option value="{{ $value }}" @selected($filters['sort'] === $value)>{{ $label }}</option>
+                    @endforeach
                 </select>
                 <button class="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white" type="submit">Apply</button>
             </form>
@@ -62,6 +68,7 @@
                                 <th class="px-4 py-3 text-left">Status</th>
                                 <th class="px-4 py-3 text-left">Scheduled</th>
                                 <th class="px-4 py-3 text-left">Sent At</th>
+                                <th class="px-4 py-3 text-left">Performance</th>
                                 <th class="px-4 py-3 text-left">Audience</th>
                                 <th class="px-4 py-3 text-left">Actions</th>
                             </tr>
@@ -85,6 +92,11 @@
                                     </td>
                                     <td class="px-4 py-3 text-gray-600">{{ optional($campaign->schedule_at)->format('j M Y H:i') ?: '-' }}</td>
                                     <td class="px-4 py-3 text-gray-600">{{ optional($campaign->sent_at)->format('j M Y H:i') ?: '-' }}</td>
+                                    <td class="px-4 py-3 text-gray-600">
+                                        <div>{{ number_format($campaign->push_delivery_count ?? 0) }} deliveries</div>
+                                        <div>{{ number_format($campaign->open_count) }} opens</div>
+                                        <div class="text-xs text-gray-400">{{ $campaign->openRate() }}% open rate</div>
+                                    </td>
                                     <td class="px-4 py-3 text-gray-600">{{ ucfirst(str_replace('_', ' ', $campaign->audience_scope)) }}</td>
                                     <td class="px-4 py-3">
                                         <a class="text-indigo-600" href="{{ route('admin.campaigns.push.show', $campaign) }}">View</a>
@@ -92,7 +104,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="px-4 py-6 text-center text-gray-500">No push campaigns found.</td>
+                                    <td colspan="10" class="px-4 py-6 text-center text-gray-500">No push campaigns found.</td>
                                 </tr>
                             @endforelse
                         </tbody>

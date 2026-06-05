@@ -9,7 +9,10 @@
         @include('mall.vendor.partials.nav')
         <div class="mall-toolbar">
             <h1>Products</h1>
-            <a class="mall-button" href="{{ route('mall.vendor.products.create') }}">New Product</a>
+            <div class="mall-form-row">
+                <a class="mall-button secondary" href="{{ route('mall.vendor.product-categories.index') }}">Manage Categories</a>
+                <a class="mall-button" href="{{ route('mall.vendor.products.create') }}">New Product</a>
+            </div>
         </div>
         @if (session('status')) <div class="mall-alert">{{ session('status') }}</div> @endif
         <section class="mall-card">

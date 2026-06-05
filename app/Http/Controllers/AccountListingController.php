@@ -2,18 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Account\RespondToReviewRequest;
+use App\Http\Requests\Account\StoreListingPhotoRequest;
+use App\Http\Requests\Account\UpdateListingRequest;
 use App\Models\Category;
 use App\Models\Listing;
 use App\Models\ListingPhoto;
 use App\Models\Review;
-use App\Support\Validation\UploadRules;
+use App\Support\Onboarding\ListingOnboardingChecklist;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 
 class AccountListingController extends Controller
 {
@@ -40,7 +43,7 @@ class AccountListingController extends Controller
         ]);
     }
 
-    public function show(Request $request, Listing $listing): View
+    public function show(Request $request, Listing $listing, ListingOnboardingChecklist $onboarding): View
     {
         Gate::authorize('manage', $listing);
 
@@ -70,6 +73,7 @@ class AccountListingController extends Controller
             'latestOrder' => $latestOrder,
             'latestInvoice' => $latestInvoice,
             'latestPayment' => $latestPayment,
+            'onboardingChecklist' => $onboarding->forListing($listing, $latestOrder),
         ]);
     }
 
@@ -85,30 +89,34 @@ class AccountListingController extends Controller
         ]);
     }
 
-    public function update(Request $request, Listing $listing): RedirectResponse
+    public function update(UpdateListingRequest $request, Listing $listing): RedirectResponse
     {
         Gate::authorize('manage', $listing);
 
-        $data = $this->validated($request);
+        $data = $request->validated();
         $data = $this->handleUploads($request, $data, $listing);
 
-        $listing->update($data);
-        $listing->categories()->sync($request->input('category_ids', []));
+        $listing->update(Arr::except($data, [
+            'category_ids',
+            'featured_image_upload',
+            'logo_upload',
+            'remove_featured_image',
+            'remove_logo',
+        ]));
+        $listing->categories()->sync($data['category_ids'] ?? []);
 
         return redirect()
             ->route('account.listings.edit', $listing)
             ->with('status', 'Listing profile updated.');
     }
 
-    public function respondToReview(Request $request, Listing $listing, Review $review): RedirectResponse
+    public function respondToReview(RespondToReviewRequest $request, Listing $listing, Review $review): RedirectResponse
     {
         Gate::authorize('manage', $listing);
         abort_unless($review->listing_id === $listing->id, 404);
         abort_unless($review->status === 'approved', 403);
 
-        $data = $request->validate([
-            'owner_response' => ['required', 'string', 'max:3000'],
-        ]);
+        $data = $request->validated();
 
         $review->update([
             'owner_response' => $data['owner_response'],
@@ -121,14 +129,11 @@ class AccountListingController extends Controller
             ->with('status', 'Review response saved.');
     }
 
-    public function storePhoto(Request $request, Listing $listing): RedirectResponse
+    public function storePhoto(StoreListingPhotoRequest $request, Listing $listing): RedirectResponse
     {
         Gate::authorize('manage', $listing);
 
-        $data = $request->validate([
-            'photo_upload' => UploadRules::requiredPublicImage(),
-            'caption' => ['nullable', 'string', 'max:255'],
-        ]);
+        $data = $request->validated();
 
         $listing->photos()->create([
             'image_path' => $this->storeImage($request->file('photo_upload'), 'listings/gallery'),
@@ -165,31 +170,6 @@ class AccountListingController extends Controller
         return redirect()
             ->route('account.listings.show', $listing)
             ->with('status', 'Primary listing photo updated.');
-    }
-
-    private function validated(Request $request): array
-    {
-        return $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'excerpt' => ['nullable', 'string'],
-            'description' => ['nullable', 'string'],
-            'website_url' => ['nullable', 'url'],
-            'email' => ['nullable', 'email'],
-            'phone' => ['nullable', 'string', 'max:255'],
-            'address_line' => ['nullable', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:255'],
-            'region' => ['nullable', 'string', 'max:255'],
-            'country' => ['nullable', 'string', 'max:255'],
-            'postal_code' => ['nullable', 'string', 'max:255'],
-            'featured_image_upload' => UploadRules::optionalPublicImage(),
-            'logo_upload' => UploadRules::optionalPublicImage(),
-            'remove_featured_image' => ['nullable', 'boolean'],
-            'remove_logo' => ['nullable', 'boolean'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'category_ids' => ['nullable', 'array'],
-            'category_ids.*' => ['integer', Rule::exists('categories', 'id')->where('type', 'listing')],
-        ]);
     }
 
     private function handleUploads(Request $request, array $data, Listing $listing): array

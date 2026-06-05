@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Public\StoreFaultReportRequest;
 use App\Models\CivicFaultPhoto;
 use App\Models\CivicFaultReport;
 use App\Notifications\CivicFaultReportedNotification;
@@ -40,25 +41,9 @@ class CivicFaultReportController extends Controller
         return response()->json($result);
     }
 
-    public function store(Request $request, CouncillorAssignmentService $assignmentService)
+    public function store(StoreFaultReportRequest $request, CouncillorAssignmentService $assignmentService)
     {
-        $clientUuid = trim((string) $request->input('client_uuid', ''));
-        if ($clientUuid === '' || $clientUuid === 'undefined' || $clientUuid === 'null' || ! Str::isUuid($clientUuid)) {
-            $request->merge(['client_uuid' => null]);
-        }
-
-        $validated = $request->validate([
-            'client_uuid' => ['nullable', 'uuid'],
-            'category' => ['required', Rule::in(array_keys(CivicFaultReport::categories()))],
-            'severity' => ['required', Rule::in(array_keys(CivicFaultReport::severities()))],
-            'description' => ['required', 'string', 'max:500'],
-            'latitude' => ['required', 'numeric', 'between:-90,90'],
-            'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'address_label' => ['nullable', 'string', 'max:255'],
-            'photos' => ['nullable', 'array', 'max:5'],
-            'photos.*' => UploadRules::requiredPublicImage(),
-            'consent' => ['accepted'],
-        ]);
+        $validated = $request->validated();
 
         $user = Auth::user();
 

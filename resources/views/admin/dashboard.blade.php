@@ -16,6 +16,7 @@
                 <a href="{{ route('admin.finance.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Finance</a>
                 <a href="{{ route('admin.campaigns.ads.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Ad Campaigns</a>
                 <a href="{{ route('admin.campaigns.push.index') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Push Campaigns</a>
+                <a href="{{ route('admin.campaigns.report') }}" class="rounded-md bg-slate-700 px-4 py-2 text-sm text-white">Campaign Report</a>
                 @if (Auth::user()->hasRole('admin', 'editor'))
                     <a href="{{ route('admin.push-notifications.index') }}" class="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white">Send Push</a>
                     <a href="{{ route('admin.article-briefs.index') }}" class="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white">Brief Review</a>
@@ -42,15 +43,37 @@
         $isAdmin = $dashboardRoleFlags['isAdmin'] ?? false;
         $isSupport = $dashboardRoleFlags['isSupport'] ?? false;
         $canAccessDevDashboard = $dashboardRoleFlags['canAccessDevDashboard'] ?? false;
+        $canReviewApplications = $dashboardRoleFlags['canReviewApplications'] ?? false;
+        $canCreateContent = $dashboardRoleFlags['canCreateContent'] ?? false;
         $devToolsAvailable = in_array((string) config('app.env'), ['local', 'testing'], true)
-            || filter_var((string) env('DEV_TOOLS_ENABLED', 'false'), FILTER_VALIDATE_BOOL)
+            || (bool) config('devtools.enabled', false)
             || $canAccessDevDashboard;
         $devTestRunnerAvailable = in_array((string) config('app.env'), ['local', 'testing'], true)
             || (
                 $devToolsAvailable
-                && filter_var((string) env('DEV_TEST_RUNNER_ENABLED', 'false'), FILTER_VALIDATE_BOOL)
+                && (bool) config('devtools.test_runner_enabled', false)
             );
         $devMetricSections = [
+            [
+                'title' => 'Operational KPIs',
+                'description' => 'Launch-critical business, finance, and queue health signals.',
+                'cards' => [
+                    ['label' => 'Paid Revenue', 'key' => 'kpis.revenue.paid_total_display', 'href' => route('admin.finance.payments.index', ['status' => 'paid'])],
+                    ['label' => 'Active Listings', 'key' => 'kpis.listings.active', 'href' => $canCreateContent ? route('admin.listings.index', ['status' => 'published']) : null],
+                    ['label' => 'Expiring Subscriptions', 'key' => 'kpis.subscriptions.expiring_7d', 'href' => route('admin.finance.subscriptions.index', ['status' => 'active', 'ending_within_days' => 7])],
+                    ['label' => 'Approval Queue Total', 'key' => 'kpis.approval_queues.total', 'href' => route('admin.action-station.index')],
+                ],
+            ],
+            [
+                'title' => 'Finance Exposure',
+                'description' => 'Revenue exceptions, writer payout exposure, and staff wallet liability.',
+                'cards' => [
+                    ['label' => 'Failed Payments', 'key' => 'kpis.payments.failed', 'href' => route('admin.finance.payments.index', ['status' => 'failed'])],
+                    ['label' => 'Writer Pending', 'key' => 'kpis.writer_payouts.pending_amount_display', 'href' => $canReviewApplications ? route('admin.writer-payments.index') : null],
+                    ['label' => 'Staff Wallet Liability', 'key' => 'kpis.staff_wallets.available_liability_display', 'href' => route('admin.wallet.index')],
+                    ['label' => 'Active Payout Requests', 'key' => 'kpis.staff_wallets.active_payout_requests', 'href' => route('admin.payout-requests.index')],
+                ],
+            ],
             [
                 'title' => 'Civic Faults',
                 'description' => 'Live fault reporting and moderation signals across the platform.',
@@ -68,7 +91,7 @@
                     ['label' => 'Ads Ready', 'key' => 'advertising.ads_ready', 'href' => route('admin.campaigns.ads.index', ['status' => 'ready'])],
                     ['label' => 'Push Pending', 'key' => 'advertising.push_pending', 'href' => route('admin.campaigns.push.index', ['sent' => 'no'])],
                     ['label' => 'Integrations Active', 'key' => 'integrations.active', 'href' => route('admin.integrations.index')],
-                    ['label' => 'Vouchers', 'key' => 'core.vouchers', 'href' => route('admin.vouchers.index')],
+                    ['label' => 'Vouchers', 'key' => 'core.vouchers', 'href' => $canCreateContent ? route('admin.vouchers.index') : null],
                 ],
             ],
         ];
@@ -114,6 +137,66 @@
             @endif
 
             <section data-tab-panel="overview" class="space-y-6">
+                <div class="rounded-lg bg-white p-6 shadow-sm">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900">Operational KPIs</h3>
+                            <p class="mt-1 text-sm text-gray-500">Revenue, listings, subscriptions, queues, payouts, and wallet liability at a glance.</p>
+                        </div>
+                        <a href="{{ route('admin.metrics') }}" class="text-sm font-medium text-indigo-600">JSON metrics</a>
+                    </div>
+                    <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        <a href="{{ route('admin.finance.payments.index', ['status' => 'paid']) }}" class="rounded-lg bg-slate-50 p-4 transition hover:bg-slate-100">
+                            <p class="text-sm text-gray-500">Paid Revenue</p>
+                            <p class="mt-2 text-2xl font-semibold text-gray-900">{{ $operationalKpis['revenue']['paid_total_display'] }}</p>
+                            <p class="mt-1 text-xs text-gray-500">30d {{ $operationalKpis['revenue']['paid_last_30d_display'] }}</p>
+                        </a>
+                        <a href="{{ route('admin.listings.index', ['status' => 'published']) }}" class="rounded-lg bg-slate-50 p-4 transition hover:bg-slate-100">
+                            <p class="text-sm text-gray-500">Active Listings</p>
+                            <p class="mt-2 text-2xl font-semibold text-gray-900">{{ $operationalKpis['listings']['active'] }}</p>
+                            <p class="mt-1 text-xs text-gray-500">{{ $operationalKpis['listings']['published_without_active_subscription'] }} published need entitlement review</p>
+                        </a>
+                        <a href="{{ route('admin.finance.subscriptions.index', ['status' => 'active', 'ending_within_days' => 7]) }}" class="rounded-lg bg-slate-50 p-4 transition hover:bg-slate-100">
+                            <p class="text-sm text-gray-500">Expiring Subscriptions</p>
+                            <p class="mt-2 text-2xl font-semibold {{ $operationalKpis['subscriptions']['expiring_7d'] > 0 ? 'text-amber-700' : 'text-gray-900' }}">{{ $operationalKpis['subscriptions']['expiring_7d'] }}</p>
+                            <p class="mt-1 text-xs text-gray-500">{{ $operationalKpis['subscriptions']['expired_pending_sweep'] }} expired still await sweep</p>
+                        </a>
+                        <a href="{{ route('admin.action-station.index') }}" class="rounded-lg bg-slate-50 p-4 transition hover:bg-slate-100">
+                            <p class="text-sm text-gray-500">Approval Queues</p>
+                            <p class="mt-2 text-2xl font-semibold {{ $operationalKpis['approval_queues']['total'] > 0 ? 'text-amber-700' : 'text-gray-900' }}">{{ $operationalKpis['approval_queues']['total'] }}</p>
+                            <p class="mt-1 text-xs text-gray-500">Applications, campaigns, content, faults</p>
+                        </a>
+                        <a href="{{ route('admin.finance.payments.index', ['status' => 'failed']) }}" class="rounded-lg bg-slate-50 p-4 transition hover:bg-slate-100">
+                            <p class="text-sm text-gray-500">Failed Payments</p>
+                            <p class="mt-2 text-2xl font-semibold {{ $operationalKpis['payments']['failed'] > 0 ? 'text-amber-700' : 'text-gray-900' }}">{{ $operationalKpis['payments']['failed'] }}</p>
+                            <p class="mt-1 text-xs text-gray-500">{{ $operationalKpis['payments']['stale_pending_orders'] }} stale pending orders</p>
+                        </a>
+                        @if ($canReviewApplications)
+                            <a href="{{ route('admin.writer-payments.index') }}" class="rounded-lg bg-slate-50 p-4 transition hover:bg-slate-100">
+                                <p class="text-sm text-gray-500">Writer Payouts</p>
+                                <p class="mt-2 text-2xl font-semibold text-gray-900">{{ $operationalKpis['writer_payouts']['pending_amount_display'] }}</p>
+                                <p class="mt-1 text-xs text-gray-500">{{ $operationalKpis['writer_payouts']['pending_ledgers'] }} pending ledger entries</p>
+                            </a>
+                        @else
+                            <div class="rounded-lg bg-slate-50 p-4">
+                                <p class="text-sm text-gray-500">Writer Payouts</p>
+                                <p class="mt-2 text-2xl font-semibold text-gray-900">{{ $operationalKpis['writer_payouts']['pending_amount_display'] }}</p>
+                                <p class="mt-1 text-xs text-gray-500">{{ $operationalKpis['writer_payouts']['pending_ledgers'] }} pending ledger entries</p>
+                            </div>
+                        @endif
+                        <a href="{{ route('admin.wallet.index') }}" class="rounded-lg bg-slate-50 p-4 transition hover:bg-slate-100">
+                            <p class="text-sm text-gray-500">Staff Wallet Liability</p>
+                            <p class="mt-2 text-2xl font-semibold text-gray-900">{{ $operationalKpis['staff_wallets']['available_liability_display'] }}</p>
+                            <p class="mt-1 text-xs text-gray-500">{{ $operationalKpis['staff_wallets']['active_payout_amount_display'] }} requested/approved</p>
+                        </a>
+                        <a href="{{ route('admin.payout-requests.index') }}" class="rounded-lg bg-slate-50 p-4 transition hover:bg-slate-100">
+                            <p class="text-sm text-gray-500">Active Payout Requests</p>
+                            <p class="mt-2 text-2xl font-semibold {{ $operationalKpis['staff_wallets']['active_payout_requests'] > 0 ? 'text-amber-700' : 'text-gray-900' }}">{{ $operationalKpis['staff_wallets']['active_payout_requests'] }}</p>
+                            <p class="mt-1 text-xs text-gray-500">Staff payout queue</p>
+                        </a>
+                    </div>
+                </div>
+
                 @if ($isSupport)
                     <div class="rounded-lg bg-white p-6 shadow-sm">
                         <h3 class="text-lg font-semibold text-gray-900">Support Priorities</h3>
@@ -804,7 +887,7 @@
                         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                             <div>
                                 <h3 class="text-lg font-semibold">Developer Control Center</h3>
-                                <p class="mt-2 max-w-3xl text-sm text-slate-300">Private Dev dashboard for jameskoen78@gmail.com. Monitor live platform activity, inspect access controls, run guarded tools, and review the runtime details needed to manage this server effectively.</p>
+                                <p class="mt-2 max-w-3xl text-sm text-slate-300">Private Dev dashboard for platform developers and super admins. Monitor live platform activity, inspect access controls, run guarded tools, and review the runtime details needed to manage this server effectively.</p>
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 @foreach ($devQuickLinks as $link)

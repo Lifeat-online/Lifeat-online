@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\PaymentAttempt;
 use App\Models\Setting;
+use App\Support\Logging\OperationalLog;
 use Illuminate\Support\Arr;
 
 class PayFastCheckoutService
@@ -31,7 +32,7 @@ class PayFastCheckoutService
             ? 'https://sandbox.payfast.co.za/eng/process'
             : 'https://www.payfast.co.za/eng/process';
 
-        return $payment->attempts()->create([
+        $attempt = $payment->attempts()->create([
             'provider' => 'payfast',
             'status' => 'initiated',
             'request_payload_json' => $payload,
@@ -41,6 +42,19 @@ class PayFastCheckoutService
             'redirect_url' => $baseUrl.'?'.http_build_query($payload),
             'attempted_at' => now(),
         ]);
+
+        OperationalLog::info('payment.payfast_initiated', [
+            'order_id' => $order->id,
+            'order_number' => $order->order_number,
+            'payment_id' => $payment->id,
+            'payment_attempt_id' => $attempt->id,
+            'provider' => 'payfast',
+            'mode' => $this->isSandbox() ? 'sandbox' : 'live',
+            'amount' => (float) $payment->amount,
+            'currency' => $payment->currency,
+        ]);
+
+        return $attempt;
     }
 
     public function verifyCallback(array $payload): bool

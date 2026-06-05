@@ -58,7 +58,7 @@ if [ "${DB_CONNECTION:-sqlite}" = "sqlite" ]; then
 fi
 
 php /app/artisan storage:link --force || true
-php /app/artisan optimize:clear || true
+php /app/artisan optimize || true
 
 if [ "${RUN_MIGRATIONS:-true}" != "false" ]; then
     php /app/artisan migrate --force

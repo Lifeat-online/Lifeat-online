@@ -8,6 +8,8 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto space-y-6 sm:px-6 lg:px-8">
+            @include('writer.articles._onboarding-checklist', ['writerOnboarding' => $writerOnboarding])
+
             <div class="grid gap-4 md:grid-cols-3">
                 <div class="rounded-lg bg-white p-6 shadow-sm">
                     <p class="text-sm font-medium text-gray-500">Pending</p>
@@ -24,6 +26,11 @@
             </div>
 
             <div class="rounded-lg bg-white p-6 shadow-sm">
+                <div class="mb-5 rounded-md bg-amber-50 p-4 text-sm text-amber-950">
+                    <strong>Payout expectations</strong>
+                    <p class="mt-1">Earnings appear after an article is approved and published. Pending ledger entries are reviewed by finance, batched entries are being prepared for payment, and paid entries show completed writer payouts.</p>
+                </div>
+
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">

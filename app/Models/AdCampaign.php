@@ -85,6 +85,11 @@ class AdCampaign extends Model
         return $this->morphMany(OrderItem::class, 'purchasable');
     }
 
+    public function trackingEvents(): MorphMany
+    {
+        return $this->morphMany(CampaignTrackingEvent::class, 'trackable');
+    }
+
     public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class, 'subscribable_id')

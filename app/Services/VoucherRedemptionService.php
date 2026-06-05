@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\Voucher;
 use App\Models\VoucherRedemption;
+use App\Support\Logging\OperationalLog;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Validation\ValidationException;
 
@@ -24,6 +25,11 @@ class VoucherRedemptionService
             $voucher = Voucher::query()->lockForUpdate()->findOrFail($voucher->id);
 
             if (! $voucher->isCurrentlyActive()) {
+                OperationalLog::warning('voucher.claim_rejected', $this->voucherContext($voucher, [
+                    'customer_user_id' => $customer?->id,
+                    'rejection_reason' => 'not_currently_active',
+                ]));
+
                 throw ValidationException::withMessages([
                     'voucher' => 'This voucher is not currently available.',
                 ]);
@@ -38,11 +44,21 @@ class VoucherRedemptionService
                     ->first();
 
                 if ($existing) {
+                    OperationalLog::info('voucher.claim_reused', $this->voucherContext($voucher, [
+                        'customer_user_id' => $customer->id,
+                        'voucher_redemption_id' => $existing->id,
+                    ]));
+
                     return $existing;
                 }
             }
 
             if ($voucher->remainingUses() <= 0) {
+                OperationalLog::warning('voucher.claim_rejected', $this->voucherContext($voucher, [
+                    'customer_user_id' => $customer?->id,
+                    'rejection_reason' => 'usage_limit_reached',
+                ]));
+
                 throw ValidationException::withMessages([
                     'voucher' => 'This voucher has reached its usage limit.',
                 ]);
@@ -79,18 +95,31 @@ class VoucherRedemptionService
             });
         }
 
+        if ($created) {
+            OperationalLog::info('voucher.claimed', $this->voucherContext($redemption->voucher, [
+                'customer_user_id' => $customer?->id,
+                'voucher_redemption_id' => $redemption->id,
+            ]));
+        }
+
         return $redemption;
     }
 
     public function consume(string $code, User $staffUser, string $ip = '', string $userAgent = ''): VoucherRedemption
     {
-        return $this->db->transaction(function () use ($code, $staffUser, $ip, $userAgent) {
+        $redemption = $this->db->transaction(function () use ($code, $staffUser, $ip, $userAgent) {
             $redemption = VoucherRedemption::query()
                 ->where('code', $code)
                 ->lockForUpdate()
                 ->first();
 
             if (! $redemption) {
+                OperationalLog::warning('voucher.consume_rejected', [
+                    'code_hash' => OperationalLog::hashValue($code),
+                    'staff_user_id' => $staffUser->id,
+                    'rejection_reason' => 'code_not_found',
+                ]);
+
                 throw ValidationException::withMessages([
                     'code' => 'Voucher code not found.',
                 ]);
@@ -99,12 +128,27 @@ class VoucherRedemptionService
             $redemption->loadMissing('voucher.listing.owner', 'customer');
 
             if ($redemption->status !== 'claimed') {
+                OperationalLog::warning('voucher.consume_rejected', $this->voucherContext($redemption->voucher, [
+                    'voucher_redemption_id' => $redemption->id,
+                    'customer_user_id' => $redemption->user_id,
+                    'staff_user_id' => $staffUser->id,
+                    'redemption_status' => $redemption->status,
+                    'rejection_reason' => 'not_claimed',
+                ]));
+
                 throw ValidationException::withMessages([
                     'code' => 'This voucher has already been used or is no longer valid.',
                 ]);
             }
 
             if ($redemption->voucher->end_at && $redemption->voucher->end_at->isPast()) {
+                OperationalLog::warning('voucher.consume_rejected', $this->voucherContext($redemption->voucher, [
+                    'voucher_redemption_id' => $redemption->id,
+                    'customer_user_id' => $redemption->user_id,
+                    'staff_user_id' => $staffUser->id,
+                    'rejection_reason' => 'expired',
+                ]));
+
                 throw ValidationException::withMessages([
                     'code' => 'This voucher has expired.',
                 ]);
@@ -120,6 +164,16 @@ class VoucherRedemptionService
 
             return $redemption->fresh(['voucher.listing', 'customer', 'consumedBy']);
         });
+
+        OperationalLog::info('voucher.consumed', $this->voucherContext($redemption->voucher, [
+            'voucher_redemption_id' => $redemption->id,
+            'customer_user_id' => $redemption->user_id,
+            'staff_user_id' => $staffUser->id,
+            'consumed_at' => $redemption->consumed_at,
+            'code_hash' => OperationalLog::hashValue($code),
+        ]));
+
+        return $redemption;
     }
 
     private function thresholdToNotify(int $used, int $limit, int $lastNotified): ?int
@@ -137,5 +191,20 @@ class VoucherRedemptionService
             ->first();
 
         return $eligible ? (int) $eligible : null;
+    }
+
+    private function voucherContext(Voucher $voucher, array $extra = []): array
+    {
+        return array_merge([
+            'voucher_id' => $voucher->id,
+            'listing_id' => $voucher->listing_id,
+            'created_by_user_id' => $voucher->created_by_user_id,
+            'status' => $voucher->status,
+            'voucher_type' => $voucher->voucher_type,
+            'usage_limit' => $voucher->usage_limit,
+            'redemptions_count' => $voucher->redemptions_count,
+            'start_at' => $voucher->start_at,
+            'end_at' => $voucher->end_at,
+        ], $extra);
     }
 }

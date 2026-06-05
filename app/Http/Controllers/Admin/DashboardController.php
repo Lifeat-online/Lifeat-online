@@ -23,6 +23,7 @@ use App\Models\ResearchSource;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Models\WriterApplication;
+use App\Support\Caching\PublicReadCache;
 use App\Services\AiGatewayService;
 use App\Services\AiImageService;
 use App\Services\OpenRouterTranslationService;
@@ -30,6 +31,7 @@ use App\Services\GoogleMapsService;
 use App\Services\PlatformTranslationBatchService;
 use App\Services\VapidKeySetupService;
 use App\Services\VoiceGatewayService;
+use App\Support\Monitoring\OperationalKpiReport;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -38,13 +40,13 @@ use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
-    public function __invoke(VapidKeySetupService $vapidKeys, OpenRouterTranslationService $translations, PlatformTranslationBatchService $translationBatch, GoogleMapsService $maps, AiGatewayService $ai, AiImageService $images, VoiceGatewayService $voice): View
+    public function __invoke(VapidKeySetupService $vapidKeys, OpenRouterTranslationService $translations, PlatformTranslationBatchService $translationBatch, GoogleMapsService $maps, AiGatewayService $ai, AiImageService $images, VoiceGatewayService $voice, OperationalKpiReport $kpis): View
     {
         $user = Auth::user();
         $supportThreshold = Carbon::now()->addDays(7);
 
         $isAdmin = $user->hasRole('super_admin');
-        $canAccessDevDashboard = strtolower((string) $user->email) === 'jameskoen78@gmail.com';
+        $canAccessDevDashboard = $user->hasRole('dev', 'developer', 'super_admin');
 
         return view('admin.dashboard', [
             'dashboardRoleFlags' => [
@@ -61,26 +63,7 @@ class DashboardController extends Controller
                 'articles' => Article::count(),
                 'writerApplications' => WriterApplication::count(),
             ],
-            'supportCounts' => [
-                'orders' => Order::count(),
-                'payments' => Payment::count(),
-                'subscriptions' => Subscription::count(),
-                'notifications' => NotificationLog::count(),
-                'refunds' => PaymentRefund::count(),
-                'failedPayments' => Payment::where('status', 'failed')->count(),
-                'pendingNotifications' => NotificationLog::whereIn('status', ['pending', 'queued', 'failed'])->count(),
-                'expiringSubscriptions' => Subscription::where('status', 'active')
-                    ->whereNotNull('ends_at')
-                    ->whereBetween('ends_at', [Carbon::now(), $supportThreshold])
-                    ->count(),
-                'pushDeliveries' => NotificationLog::where('channel', 'push')->count(),
-                'pendingPushCampaigns' => PushCampaign::whereNull('sent_at')
-                    ->whereIn('status', ['active', 'scheduled'])
-                    ->count(),
-                'adCampaignsPendingApproval' => AdCampaign::where('status', 'ready')->count(),
-                'adCampaignsActive' => AdCampaign::where('status', 'active')->count(),
-                'pendingPayoutRequests' => PayoutRequest::whereIn('status', PayoutRequest::activeStatuses())->count(),
-            ],
+            'supportCounts' => PublicReadCache::adminSupportCounts(),
             'supportQueues' => [
                 'failedPayments' => Payment::with(['order.user'])
                     ->where('status', 'failed')
@@ -100,6 +83,7 @@ class DashboardController extends Controller
                     ->limit(5)
                     ->get(),
             ],
+            'operationalKpis' => $kpis->run(),
             'latestListings' => Listing::latest()->limit(5)->get(),
             'latestEvents' => Event::latest()->limit(5)->get(),
             'latestArticles' => Article::latest()->limit(5)->get(),

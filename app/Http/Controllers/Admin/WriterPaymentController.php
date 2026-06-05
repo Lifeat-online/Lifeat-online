@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ArticleWordLedger;
+use App\Models\NumberSequence;
 use App\Models\WriterPaymentBatch;
 use App\Models\WriterPaymentBatchItem;
 use App\Services\AuditLogService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class WriterPaymentController extends Controller
@@ -41,26 +43,32 @@ class WriterPaymentController extends Controller
             ->whereIn('id', $ids)
             ->get();
 
-        $batch = WriterPaymentBatch::create([
-            'reference' => 'WPB-'.now()->format('YmdHis'),
-            'created_by_user_id' => $request->user()->id,
-            'status' => 'exported',
-            'item_count' => $ledgers->count(),
-            'gross_amount' => $ledgers->sum(fn (ArticleWordLedger $ledger) => (float) $ledger->gross_amount),
-            'exported_at' => now(),
-        ]);
-
-        foreach ($ledgers as $ledger) {
-            WriterPaymentBatchItem::create([
-                'writer_payment_batch_id' => $batch->id,
-                'article_word_ledger_id' => $ledger->id,
-                'gross_amount' => $ledger->gross_amount,
+        $batch = DB::transaction(function () use ($ledgers, $request) {
+            $batch = WriterPaymentBatch::create([
+                'reference' => NumberSequence::next('writer_payment_batch', 'WPB'),
+                'created_by_user_id' => $request->user()->id,
+                'status' => 'exported',
+                'item_count' => $ledgers->count(),
+                'gross_amount' => $ledgers->sum(fn (ArticleWordLedger $ledger) => (float) $ledger->gross_amount),
+                'exported_at' => now(),
             ]);
 
-            $ledger->update([
-                'status' => 'batched',
-            ]);
-        }
+            foreach ($ledgers as $ledger) {
+                $locked = ArticleWordLedger::whereKey($ledger->id)->lockForUpdate()->first();
+
+                WriterPaymentBatchItem::create([
+                    'writer_payment_batch_id' => $batch->id,
+                    'article_word_ledger_id' => $locked->id,
+                    'gross_amount' => $locked->gross_amount,
+                ]);
+
+                $locked->update([
+                    'status' => 'batched',
+                ]);
+            }
+
+            return $batch;
+        });
 
         $audit->log($request, 'writer_payment_batch.created', $batch, [], [
             'status' => $batch->status,
@@ -111,19 +119,27 @@ class WriterPaymentController extends Controller
             ->pluck('id')
             ->all();
 
-        $batch->update([
-            'status' => 'paid',
-            'paid_at' => now(),
-        ]);
-
-        foreach ($batch->items as $item) {
-            $item->ledger->update([
+        DB::transaction(function () use ($batch) {
+            $lockedBatch = WriterPaymentBatch::whereKey($batch->id)->lockForUpdate()->first();
+            $lockedBatch->update([
                 'status' => 'paid',
                 'paid_at' => now(),
             ]);
-        }
 
-        $audit->log($request, 'writer_payment_batch.marked_paid', $batch, $before, [
+            foreach ($lockedBatch->items()->with('ledger')->get() as $item) {
+                if (! $item->ledger) {
+                    continue;
+                }
+
+                $lockedLedger = ArticleWordLedger::whereKey($item->ledger->id)->lockForUpdate()->first();
+                $lockedLedger->update([
+                    'status' => 'paid',
+                    'paid_at' => now(),
+                ]);
+            }
+        });
+
+        $audit->log($request, 'writer_payment_batch.marked_paid', $batch->fresh(), $before, [
             'status' => $batch->fresh()->status,
             'paid_at' => optional($batch->fresh()->paid_at)?->toDateTimeString(),
             'ledger_ids' => $ledgerIds,

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\SubscriptionActivated;
 use App\Models\AdCampaign;
 use App\Models\Entitlement;
 use App\Models\Event;
@@ -17,10 +18,15 @@ class BusinessDirectoryActivationService
     public function activateForPayment(Payment $payment): void
     {
         $payment->loadMissing(['order.items.package.type']);
+        $activatedSubscriptions = [];
 
-        DB::transaction(function () use ($payment) {
+        DB::transaction(function () use ($payment, &$activatedSubscriptions) {
             foreach ($payment->order->items as $item) {
-                $this->activateOrderItem($item, $payment);
+                $subscription = $this->activateOrderItem($item, $payment);
+
+                if ($subscription) {
+                    $activatedSubscriptions[] = $subscription;
+                }
             }
 
             $payment->order->update([
@@ -33,40 +39,43 @@ class BusinessDirectoryActivationService
                 'issued_at' => now(),
             ]);
         });
+
+        foreach ($activatedSubscriptions as $subscription) {
+            SubscriptionActivated::dispatch($subscription->fresh(['entitlements', 'subscribable']), $payment->fresh());
+        }
     }
 
-    private function activateOrderItem(OrderItem $item, Payment $payment): void
+    private function activateOrderItem(OrderItem $item, Payment $payment): ?Subscription
     {
         if (! $item->package) {
-            return;
+            return null;
         }
 
         if ($item->package->type?->slug === 'business_directory') {
-            $this->activateBusinessDirectoryItem($item, $payment);
-            return;
+            return $this->activateBusinessDirectoryItem($item, $payment);
         }
 
         if ($item->package->type?->slug === 'event_package') {
-            $this->activateEventPackageItem($item, $payment);
-            return;
+            return $this->activateEventPackageItem($item, $payment);
         }
 
         if ($item->package->type?->slug === 'advert_package') {
-            $this->activateAdvertPackageItem($item, $payment);
-            return;
+            return $this->activateAdvertPackageItem($item, $payment);
         }
 
         if ($item->package->type?->slug === 'push_campaign') {
-            $this->activatePushCampaignItem($item, $payment);
+            return $this->activatePushCampaignItem($item, $payment);
         }
+
+        return null;
     }
 
-    private function activateBusinessDirectoryItem(OrderItem $item, Payment $payment): void
+    private function activateBusinessDirectoryItem(OrderItem $item, Payment $payment): ?Subscription
     {
         $listing = $item->purchasable;
 
         if (! $listing instanceof Listing) {
-            return;
+            return null;
         }
 
         $startsAt = $item->starts_at ?: now();
@@ -102,18 +111,20 @@ class BusinessDirectoryActivationService
             'package_expires_at' => $endsAt,
             'source_channel' => $item->package->is_self_service ? 'self_service' : ($listing->source_channel ?: 'staff_assisted'),
         ]);
+
+        return $subscription;
     }
 
-    private function activateEventPackageItem(OrderItem $item, Payment $payment): void
+    private function activateEventPackageItem(OrderItem $item, Payment $payment): ?Subscription
     {
         $event = $item->purchasable;
 
         if (! $event instanceof Event) {
-            return;
+            return null;
         }
 
         if (! $event->listing || ! $event->listing->hasActiveBusinessEntitlement()) {
-            return;
+            return null;
         }
 
         $startsAt = $item->starts_at ?: now();
@@ -148,18 +159,20 @@ class BusinessDirectoryActivationService
             'active_subscription_id' => $subscription->id,
             'package_expires_at' => $endsAt,
         ]);
+
+        return $subscription;
     }
 
-    private function activateAdvertPackageItem(OrderItem $item, Payment $payment): void
+    private function activateAdvertPackageItem(OrderItem $item, Payment $payment): ?Subscription
     {
         $campaign = $item->purchasable;
 
         if (! $campaign instanceof AdCampaign) {
-            return;
+            return null;
         }
 
         if (! $campaign->listing || ! $campaign->listing->hasActiveBusinessEntitlement()) {
-            return;
+            return null;
         }
 
         $startsAt = $item->starts_at ?: now();
@@ -194,18 +207,20 @@ class BusinessDirectoryActivationService
             'active_subscription_id' => $subscription->id,
             'package_expires_at' => $endsAt,
         ]);
+
+        return $subscription;
     }
 
-    private function activatePushCampaignItem(OrderItem $item, Payment $payment): void
+    private function activatePushCampaignItem(OrderItem $item, Payment $payment): ?Subscription
     {
         $campaign = $item->purchasable;
 
         if (! $campaign instanceof PushCampaign) {
-            return;
+            return null;
         }
 
         if (! $campaign->listing || ! $campaign->listing->hasActiveBusinessEntitlement()) {
-            return;
+            return null;
         }
 
         $startsAt = $item->starts_at ?: now();
@@ -240,5 +255,7 @@ class BusinessDirectoryActivationService
             'active_subscription_id' => $subscription->id,
             'package_expires_at' => $endsAt,
         ]);
+
+        return $subscription;
     }
 }

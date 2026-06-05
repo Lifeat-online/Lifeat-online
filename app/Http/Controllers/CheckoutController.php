@@ -13,13 +13,21 @@ use App\Models\Package;
 use App\Models\PushCampaign;
 use App\Models\Setting;
 use App\Models\Subscription;
+use App\Models\NumberSequence;
+use App\Exceptions\CallbackRejectionException;
 use App\Services\NotificationDispatchService;
 use App\Services\PayFastCheckoutService;
+use App\Services\SubscriptionRenewalService;
+use App\Support\Caching\PublicReadCache;
+use App\Support\Logging\OperationalLog;
+use App\Support\Onboarding\ListingOnboardingChecklist;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Response;
 use Illuminate\Http\RedirectResponse;
+use App\Http\Requests\Checkout\StartCheckoutRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -61,13 +69,19 @@ class CheckoutController extends Controller
         return view('checkout.basket', compact('package', 'listing', 'event', 'campaign', 'pushCampaign'));
     }
 
-    public function index(Request $request): View
+    public function index(Request $request, ListingOnboardingChecklist $onboarding): View
     {
         $selectedPackage = null;
         $selectedListing = null;
         $selectedEvent = null;
         $selectedCampaign = null;
         $selectedPushCampaign = null;
+        $selectedRenewalSubscription = null;
+
+        if ($request->filled('renewal_subscription')) {
+            $selectedRenewalSubscription = Subscription::with(['package', 'subscribable'])->findOrFail($request->integer('renewal_subscription'));
+            Gate::authorize('manage', $selectedRenewalSubscription);
+        }
 
         if ($request->filled('listing')) {
             $selectedListing = Listing::where('slug', $request->string('listing'))->first();
@@ -90,31 +104,45 @@ class CheckoutController extends Controller
             $selectedEvent = $selectedPushCampaign?->event;
         }
 
+        if ($selectedRenewalSubscription) {
+            $entity = $selectedRenewalSubscription->subscribable;
+
+            if ($entity instanceof Event) {
+                $selectedEvent ??= $entity->loadMissing('listing');
+                $selectedListing ??= $selectedEvent->listing;
+            } elseif ($entity instanceof AdCampaign) {
+                $selectedCampaign ??= $entity->loadMissing(['listing', 'event']);
+                $selectedListing ??= $selectedCampaign->listing;
+                $selectedEvent ??= $selectedCampaign->event;
+            } elseif ($entity instanceof PushCampaign) {
+                $selectedPushCampaign ??= $entity->loadMissing(['listing', 'event']);
+                $selectedListing ??= $selectedPushCampaign->listing;
+                $selectedEvent ??= $selectedPushCampaign->event;
+            } elseif ($entity instanceof Listing) {
+                $selectedListing ??= $entity;
+            }
+        }
+
         $packageType = $selectedPushCampaign
             ? 'push_campaign'
             : ($selectedCampaign ? 'advert_package' : ($selectedEvent ? 'event_package' : 'business_directory'));
 
-        $packages = Package::with('type', 'prices')
-            ->active()
-            ->whereHas('type', fn ($query) => $query->where('slug', $packageType))
-            ->get();
+        $packages = PublicReadCache::activePackagesForType($packageType);
 
         if ($request->filled('package')) {
             $selectedPackage = $packages->firstWhere('slug', $request->string('package')->toString());
         }
 
-        return view('checkout.index', compact('packages', 'selectedPackage', 'selectedListing', 'selectedEvent', 'selectedCampaign', 'selectedPushCampaign', 'packageType'));
+        $listingOnboarding = $selectedListing && $request->user()?->can('manage', $selectedListing)
+            ? $onboarding->forListing($selectedListing)
+            : null;
+
+        return view('checkout.index', compact('packages', 'selectedPackage', 'selectedListing', 'selectedEvent', 'selectedCampaign', 'selectedPushCampaign', 'selectedRenewalSubscription', 'packageType', 'listingOnboarding'));
     }
 
-    public function start(Request $request): RedirectResponse
+    public function start(StartCheckoutRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'package_slug' => ['required', 'string', 'exists:packages,slug'],
-            'listing_slug' => ['nullable', 'string', 'exists:listings,slug'],
-            'event_slug' => ['nullable', 'string', 'exists:events,slug'],
-            'campaign_slug' => ['nullable', 'string', 'exists:ad_campaigns,slug'],
-            'push_campaign_slug' => ['nullable', 'string', 'exists:push_campaigns,slug'],
-        ]);
+        $validated = $request->validated();
 
         $package = Package::with('type', 'prices')->active()->where('slug', $validated['package_slug'])->firstOrFail();
         $listing = ! empty($validated['listing_slug']) ? Listing::where('slug', $validated['listing_slug'])->firstOrFail() : null;
@@ -126,6 +154,20 @@ class CheckoutController extends Controller
             throw ValidationException::withMessages([
                 'listing_slug' => 'A listing, event, advert campaign, or push campaign is required to start checkout.',
             ]);
+        }
+
+        $renewalSubscription = ! empty($validated['renewal_subscription_id'])
+            ? Subscription::with(['package.type', 'package.prices', 'subscribable'])->findOrFail($validated['renewal_subscription_id'])
+            : null;
+
+        if ($renewalSubscription) {
+            Gate::authorize('manage', $renewalSubscription);
+
+            if ((int) $renewalSubscription->package_id !== (int) $package->id) {
+                throw ValidationException::withMessages([
+                    'package_slug' => 'Renewal checkout must use the existing subscription package.',
+                ]);
+            }
         }
 
         if ($event) {
@@ -178,51 +220,78 @@ class CheckoutController extends Controller
             ]);
         }
 
+        if ($renewalSubscription) {
+            $order = app(SubscriptionRenewalService::class)->createRenewalOrder($renewalSubscription);
+
+            return redirect()->route('checkout.show', $order);
+        }
+
         $amount = (float) $price->amount;
         $vatPercentage = (float) Setting::getValue('billing.vat_percentage', 15);
         $vatAmount = $price->vat_inclusive ? round($amount - ($amount / (1 + ($vatPercentage / 100))), 2) : round($amount * ($vatPercentage / 100), 2);
         $subtotal = $price->vat_inclusive ? round($amount - $vatAmount, 2) : $amount;
         $total = $price->vat_inclusive ? $amount : round($amount + $vatAmount, 2);
 
-        $order = Order::create([
-            'user_id' => $request->user()->id,
-            'order_number' => $this->nextOrderNumber(),
-            'status' => 'pending_payment',
-            'currency' => $price->currency,
-            'subtotal' => $subtotal,
-            'vat_amount' => $vatAmount,
-            'total' => $total,
-        ]);
+        $order = DB::transaction(function () use ($request, $package, $pushCampaign, $campaign, $event, $listing, $price, $subtotal, $vatAmount, $total) {
+            $order = Order::create([
+                'user_id' => $request->user()->id,
+                'order_number' => NumberSequence::next('order', 'ORD'),
+                'status' => 'pending_payment',
+                'currency' => $price->currency,
+                'subtotal' => $subtotal,
+                'vat_amount' => $vatAmount,
+                'total' => $total,
+            ]);
 
-        OrderItem::create([
+            OrderItem::create([
+                'order_id' => $order->id,
+                'package_id' => $package->id,
+                'purchasable_type' => $pushCampaign ? PushCampaign::class : ($campaign ? AdCampaign::class : ($event ? Event::class : Listing::class)),
+                'purchasable_id' => $pushCampaign?->id ?? $campaign?->id ?? $event?->id ?? $listing?->id,
+                'name_snapshot' => $package->name,
+                'unit_price' => $price->amount,
+                'quantity' => 1,
+                'billing_model' => $package->billing_model,
+                'starts_at' => now(),
+                'ends_at' => now()->copy()->addDays($package->duration_days),
+            ]);
+
+            $invoicePrefix = (string) Setting::getValue('billing.invoice_prefix', 'INV');
+
+            Invoice::create([
+                'order_id' => $order->id,
+                'invoice_number' => NumberSequence::next('invoice', $invoicePrefix),
+                'invoice_prefix_snapshot' => $invoicePrefix,
+                'status' => 'draft',
+                'currency' => $price->currency,
+                'subtotal' => $subtotal,
+                'vat_amount' => $vatAmount,
+                'total' => $total,
+            ]);
+
+            Payment::create([
+                'order_id' => $order->id,
+                'user_id' => $request->user()->id,
+                'provider' => 'payfast',
+                'status' => 'pending',
+                'amount' => $total,
+                'currency' => $price->currency,
+            ]);
+
+            return $order;
+        });
+
+        OperationalLog::info('checkout.order_created', [
             'order_id' => $order->id,
+            'order_number' => $order->order_number,
+            'user_id' => $request->user()->id,
             'package_id' => $package->id,
-            'purchasable_type' => $pushCampaign ? PushCampaign::class : ($campaign ? AdCampaign::class : ($event ? Event::class : Listing::class)),
-            'purchasable_id' => $pushCampaign?->id ?? $campaign?->id ?? $event?->id ?? $listing?->id,
-            'name_snapshot' => $package->name,
-            'unit_price' => $price->amount,
-            'quantity' => 1,
-            'billing_model' => $package->billing_model,
-            'starts_at' => now(),
-            'ends_at' => now()->copy()->addDays($package->duration_days),
-        ]);
-
-        Invoice::create([
-            'order_id' => $order->id,
-            'invoice_number' => $this->nextInvoiceNumber(),
-            'invoice_prefix_snapshot' => (string) Setting::getValue('billing.invoice_prefix', 'LIFE'),
-            'status' => 'draft',
-            'currency' => $price->currency,
-            'subtotal' => $subtotal,
-            'vat_amount' => $vatAmount,
-            'total' => $total,
-        ]);
-
-        Payment::create([
-            'order_id' => $order->id,
-            'user_id' => $request->user()->id,
-            'provider' => 'payfast',
-            'status' => 'pending',
+            'package_slug' => $package->slug,
+            'package_type' => $package->type?->slug,
+            'listing_id' => $listing?->id,
+            'event_id' => $event?->id,
+            'ad_campaign_id' => $campaign?->id,
+            'push_campaign_id' => $pushCampaign?->id,
             'amount' => $total,
             'currency' => $price->currency,
         ]);
@@ -230,17 +299,27 @@ class CheckoutController extends Controller
         return redirect()->route('checkout.show', $order);
     }
 
-    public function show(Request $request, Order $order): View
+    public function show(Request $request, Order $order, ListingOnboardingChecklist $onboarding): View
     {
         Gate::authorize('manage', $order);
 
-        $order->load(['items.package', 'items.purchasable', 'payments', 'invoices']);
+        $order->load(['items.package', 'items.purchasable', 'payments.attempts', 'invoices', 'renewedSubscription.package']);
+        $payment = $order->payments->sortByDesc('id')->first();
+        $paymentAttempts = $order->payments
+            ->flatMap(fn ($payment) => $payment->attempts)
+            ->sortByDesc('attempted_at')
+            ->values();
+        $listing = $order->items
+            ->map(fn ($item) => $item->purchasable)
+            ->first(fn ($purchasable) => $purchasable instanceof Listing);
 
         return view('checkout.show', [
             'order' => $order,
-            'payment' => $order->latestPayment(),
+            'payment' => $payment,
             'invoice' => $order->latestInvoice(),
-            'latestAttempt' => $order->latestPayment()?->attempts()->latest()->first(),
+            'latestAttempt' => $paymentAttempts->first(),
+            'paymentAttempts' => $paymentAttempts,
+            'listingOnboarding' => $listing ? $onboarding->forListing($listing, $order) : null,
         ]);
     }
 
@@ -265,7 +344,7 @@ class CheckoutController extends Controller
             route('checkout.show', $order)
         );
 
-        return redirect()->route('checkout.show', $order)->with('status', 'PayFast initiation payload generated for this order.')
+        return redirect()->route('checkout.show', $order)->with('status', 'PayFast payment handoff prepared for this order.')
             ->with('payfast_attempt_id', $attempt->id);
     }
 
@@ -289,13 +368,23 @@ class CheckoutController extends Controller
             'status' => 'pending_payment',
         ]);
 
-        $payFastCheckoutService->initiate(
+        $attempt = $payFastCheckoutService->initiate(
             $order->loadMissing('user'),
             $payment,
             route('checkout.payfast.callback'),
             route('checkout.show', $order),
             route('checkout.show', $order)
         );
+
+        OperationalLog::info('payment.retry_created', [
+            'order_id' => $order->id,
+            'order_number' => $order->order_number,
+            'payment_id' => $payment->id,
+            'payment_attempt_id' => $attempt->id,
+            'user_id' => $order->user_id,
+            'amount' => (float) $payment->amount,
+            'currency' => $payment->currency,
+        ]);
 
         return redirect()->route('checkout.show', $order)->with('status', 'A new payment attempt has been created for this order.');
     }
@@ -317,7 +406,7 @@ class CheckoutController extends Controller
         }
         $invoice->markEmailed();
 
-        return redirect()->route('checkout.show', $order)->with('status', 'Invoice marked as sent.');
+        return redirect()->route('checkout.show', $order)->with('status', 'Invoice email sent.');
     }
 
     public function renewSubscription(Request $request, Subscription $subscription): RedirectResponse
@@ -332,6 +421,7 @@ class CheckoutController extends Controller
             return redirect()->route('checkout.index', [
                 'package' => $subscription->package?->slug,
                 'event' => $entity->slug,
+                'renewal_subscription' => $subscription->id,
             ]);
         }
 
@@ -339,6 +429,7 @@ class CheckoutController extends Controller
             return redirect()->route('checkout.index', [
                 'package' => $subscription->package?->slug,
                 'campaign' => $entity->slug,
+                'renewal_subscription' => $subscription->id,
             ]);
         }
 
@@ -346,6 +437,7 @@ class CheckoutController extends Controller
             return redirect()->route('checkout.index', [
                 'package' => $subscription->package?->slug,
                 'push_campaign' => $entity->slug,
+                'renewal_subscription' => $subscription->id,
             ]);
         }
 
@@ -353,6 +445,7 @@ class CheckoutController extends Controller
             return redirect()->route('checkout.index', [
                 'package' => $subscription->package?->slug,
                 'listing' => $entity->slug,
+                'renewal_subscription' => $subscription->id,
             ]);
         }
 
@@ -376,12 +469,29 @@ class CheckoutController extends Controller
         $payment = $order->latestPayment() ?? $order->payments()->latest('id')->firstOrFail();
         $normalizedStatus = strtolower($validated['status']);
         $latestAttempt = $payment->attempts()->latest()->first();
+        $callbackContext = [
+            'order_id' => $order->id,
+            'order_number' => $order->order_number,
+            'payment_id' => $payment->id,
+            'payment_attempt_id' => $latestAttempt?->id,
+            'provider' => $payment->provider,
+            'callback_status' => $normalizedStatus,
+            'current_payment_status' => $payment->status,
+            'current_order_status' => $order->status,
+            'provider_transaction_id' => $validated['provider_transaction_id'] ?? null,
+            'callback_amount' => $validated['amount_gross'] ?? $validated['amount'] ?? null,
+            'callback_currency' => $validated['currency'] ?? null,
+        ];
+
+        OperationalLog::info('payment.callback_received', $callbackContext);
 
         if (! app(PayFastCheckoutService::class)->verifyCallback($validated)) {
             $latestAttempt?->update([
                 'status' => 'invalid_signature',
                 'response_payload_json' => $validated,
             ]);
+
+            OperationalLog::warning('payment.callback_invalid_signature', $callbackContext);
 
             return response()->json([
                 'ok' => false,
@@ -393,75 +503,125 @@ class CheckoutController extends Controller
             $providerTransactionId = (string) ($validated['provider_transaction_id'] ?? '');
 
             if ($providerTransactionId === '') {
+                OperationalLog::warning('payment.callback_rejected', array_merge($callbackContext, [
+                    'rejection_reason' => 'missing_provider_transaction_id',
+                ]));
+
                 throw ValidationException::withMessages([
                     'provider_transaction_id' => 'A paid PayFast callback requires a transaction reference.',
                 ]);
             }
 
-            $duplicatePayment = Payment::where('provider_transaction_id', $providerTransactionId)
-                ->whereKeyNot($payment->id)
-                ->first();
+            try {
+                DB::transaction(function () use ($order, $payment, $latestAttempt, $providerTransactionId, $validated, $callbackContext) {
+                    $duplicatePayment = Payment::where('provider_transaction_id', $providerTransactionId)
+                        ->whereKeyNot($payment->id)
+                        ->lockForUpdate()
+                        ->first();
 
-            if ($duplicatePayment) {
-                $latestAttempt?->update([
-                    'status' => 'duplicate_transaction',
-                    'response_payload_json' => $validated,
-                ]);
+                    if ($duplicatePayment) {
+                        $latestAttempt?->update([
+                            'status' => 'duplicate_transaction',
+                            'response_payload_json' => $validated,
+                        ]);
 
+                        OperationalLog::warning('payment.callback_rejected', array_merge($callbackContext, [
+                            'rejection_reason' => 'duplicate_transaction',
+                            'duplicate_payment_id' => $duplicatePayment->id,
+                        ]));
+
+                        throw new CallbackRejectionException('Duplicate PayFast transaction reference.', Response::HTTP_CONFLICT);
+                    }
+
+                    $callbackAmount = $validated['amount_gross'] ?? $validated['amount'] ?? null;
+                    if ($callbackAmount !== null && abs((float) $callbackAmount - (float) $payment->amount) > 0.01) {
+                        $latestAttempt?->update([
+                            'status' => 'amount_mismatch',
+                            'response_payload_json' => $validated,
+                        ]);
+
+                        OperationalLog::warning('payment.callback_rejected', array_merge($callbackContext, [
+                            'rejection_reason' => 'amount_mismatch',
+                            'expected_amount' => (float) $payment->amount,
+                        ]));
+
+                        throw new CallbackRejectionException('Callback amount does not match the pending payment.', Response::HTTP_UNPROCESSABLE_ENTITY);
+                    }
+
+                    if (! empty($validated['currency']) && strtoupper($validated['currency']) !== strtoupper($payment->currency)) {
+                        $latestAttempt?->update([
+                            'status' => 'currency_mismatch',
+                            'response_payload_json' => $validated,
+                        ]);
+
+                        OperationalLog::warning('payment.callback_rejected', array_merge($callbackContext, [
+                            'rejection_reason' => 'currency_mismatch',
+                            'expected_currency' => $payment->currency,
+                        ]));
+
+                        throw new CallbackRejectionException('Callback currency does not match the pending payment.', Response::HTTP_UNPROCESSABLE_ENTITY);
+                    }
+
+                    $payment->update([
+                        'status' => 'paid',
+                        'paid_at' => now(),
+                        'provider_transaction_id' => $providerTransactionId,
+                        'failure_reason' => null,
+                    ]);
+                    $latestAttempt?->update([
+                        'status' => 'completed',
+                        'response_payload_json' => $validated,
+                    ]);
+                });
+
+                OperationalLog::info('payment.callback_paid', array_merge($callbackContext, [
+                    'payment_status' => 'paid',
+                    'order_status' => $order->fresh()->status,
+                ]));
+            } catch (CallbackRejectionException $exception) {
                 return response()->json([
                     'ok' => false,
-                    'error' => 'Duplicate PayFast transaction reference.',
-                ], Response::HTTP_CONFLICT);
+                    'error' => $exception->getMessage(),
+                ], $exception->getCode());
             }
-
-            $callbackAmount = $validated['amount_gross'] ?? $validated['amount'] ?? null;
-            if ($callbackAmount !== null && abs((float) $callbackAmount - (float) $payment->amount) > 0.01) {
-                $latestAttempt?->update([
-                    'status' => 'amount_mismatch',
-                    'response_payload_json' => $validated,
-                ]);
-
-                return response()->json([
-                    'ok' => false,
-                    'error' => 'Callback amount does not match the pending payment.',
-                ], Response::HTTP_UNPROCESSABLE_ENTITY);
-            }
-
-            if (! empty($validated['currency']) && strtoupper($validated['currency']) !== strtoupper($payment->currency)) {
-                $latestAttempt?->update([
-                    'status' => 'currency_mismatch',
-                    'response_payload_json' => $validated,
-                ]);
-
-                return response()->json([
-                    'ok' => false,
-                    'error' => 'Callback currency does not match the pending payment.',
-                ], Response::HTTP_UNPROCESSABLE_ENTITY);
-            }
-
-            $payment->update([
-                'status' => 'paid',
-                'paid_at' => now(),
-                'provider_transaction_id' => $providerTransactionId,
-                'failure_reason' => null,
-            ]);
-            $latestAttempt?->update([
-                'status' => 'completed',
-                'response_payload_json' => $validated,
-            ]);
         } elseif (in_array($normalizedStatus, ['failed', 'cancelled', 'canceled'], true)) {
-            $payment->update([
-                'status' => 'failed',
-                'failure_reason' => $validated['failure_reason'] ?: 'Payment failed or was cancelled.',
-            ]);
-            $latestAttempt?->update([
-                'status' => 'failed',
-                'response_payload_json' => $validated,
-            ]);
+            if ($payment->status === 'paid' || $order->status === 'paid') {
+                OperationalLog::info('payment.callback_ignored', array_merge($callbackContext, [
+                    'ignored_reason' => 'already_paid',
+                    'payment_status' => $payment->fresh()->status,
+                    'order_status' => $order->fresh()->status,
+                ]));
 
-            $order->update([
-                'status' => 'cancelled',
-            ]);
+                return response()->json([
+                    'ok' => true,
+                    'order_number' => $order->order_number,
+                    'payment_status' => $payment->fresh()->status,
+                    'ignored' => 'Payment is already paid.',
+                ]);
+            }
+
+            DB::transaction(function () use ($order, $payment, $latestAttempt, $validated) {
+                $payment->update([
+                    'status' => 'failed',
+                    'failure_reason' => $validated['failure_reason'] ?: 'Payment failed or was cancelled.',
+                ]);
+                $latestAttempt?->update([
+                    'status' => 'failed',
+                    'response_payload_json' => $validated,
+                ]);
+
+                $order->update([
+                    'status' => 'cancelled',
+                ]);
+            });
+
+            OperationalLog::warning('payment.callback_failed', array_merge($callbackContext, [
+                'payment_status' => $payment->fresh()->status,
+                'order_status' => $order->fresh()->status,
+                'failure_reason' => $validated['failure_reason'] ?? null,
+            ]));
+        } else {
+            OperationalLog::warning('payment.callback_unhandled_status', $callbackContext);
         }
 
         return response()->json([
@@ -469,17 +629,5 @@ class CheckoutController extends Controller
             'order_number' => $order->order_number,
             'payment_status' => $payment->fresh()->status,
         ]);
-    }
-
-    private function nextOrderNumber(): string
-    {
-        return 'ORD-'.now()->format('YmdHis').'-'.Str::upper(Str::random(4));
-    }
-
-    private function nextInvoiceNumber(): string
-    {
-        $prefix = (string) Setting::getValue('billing.invoice_prefix', 'LIFE');
-
-        return $prefix.'-'.now()->format('YmdHis').'-'.Str::upper(Str::random(4));
     }
 }

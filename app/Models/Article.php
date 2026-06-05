@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Caching\PublicReadCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -52,6 +53,12 @@ class Article extends Model
             'published_at' => 'datetime',
             'featured_image_is_ai_generated' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saved(fn () => PublicReadCache::flushPublic());
+        static::deleted(fn () => PublicReadCache::flushPublic());
     }
 
     public function getRouteKeyName(): string

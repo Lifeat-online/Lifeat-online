@@ -267,7 +267,7 @@
                         <select id="category" name="category">
                             <option value="">All categories</option>
                             @foreach ($categories as $category)
-                                <option value="{{ $category->slug }}" @selected($filters['category'] === $category->slug)>{{ $category->localizedValue('name') }}</option>
+                                <option value="{{ $category['slug'] }}" @selected($filters['category'] === $category['slug'])>{{ $category['name'] }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -314,7 +314,7 @@
 
             <div class="chip-row">
                 @foreach ($popularLocations as $location)
-                    <a class="chip-link" href="{{ route('directory.index', ['location' => $location->city]) }}">{{ $location->city }} ({{ $location->listings_count }})</a>
+                    <a class="chip-link" href="{{ route('directory.index', ['location' => $location['city']]) }}">{{ $location['city'] }} ({{ $location['listings_count'] }})</a>
                 @endforeach
             </div>
         </div>
@@ -369,9 +369,9 @@
                     </div>
                     <div class="sidebar-list">
                         @foreach ($featuredCategories as $category)
-                            <a class="sidebar-link" href="{{ route('directory.index', ['category' => $category->slug]) }}">
-                                <span>{{ $category->localizedValue('name') }}</span>
-                                <span class="muted">{{ $category->visible_listings_count }}</span>
+                            <a class="sidebar-link" href="{{ route('directory.index', ['category' => $category['slug']]) }}">
+                                <span>{{ $category['name'] }}</span>
+                                <span class="muted">{{ $category['visible_listings_count'] }}</span>
                             </a>
                         @endforeach
                     </div>

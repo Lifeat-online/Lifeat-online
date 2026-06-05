@@ -11,6 +11,20 @@
 
     <div class="py-12">
         <div class="max-w-5xl mx-auto space-y-6 sm:px-6 lg:px-8">
+            @if ($errors->any())
+                <div class="rounded-md bg-red-50 p-4 text-sm text-red-700">
+                    <ul class="list-disc pl-5">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            @if (session('status'))
+                <div class="rounded-md bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
+            @endif
+
             <div class="grid gap-4 sm:grid-cols-3">
                 <div class="rounded-lg bg-white p-6 shadow-sm text-center">
                     <p class="text-sm text-gray-500">Available</p>
@@ -25,6 +39,31 @@
                     <p class="mt-2 text-3xl font-bold text-gray-700">{{ $wallet->currency }} {{ number_format($wallet->paid_out_total, 2) }}</p>
                 </div>
             </div>
+
+            @can('adjust', $wallet)
+                <div class="rounded-lg bg-white p-6 shadow-sm">
+                    <h3 class="text-lg font-semibold text-gray-900">Manual Adjustment</h3>
+                    <form method="POST" action="{{ route('admin.wallet.adjustments.store', $wallet) }}" class="mt-4 grid gap-4 md:grid-cols-[0.8fr,1fr,2fr,auto] md:items-end">
+                        @csrf
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700" for="direction">Direction</label>
+                            <select id="direction" name="direction" class="mt-1 block w-full rounded-md border-gray-300 text-sm" required>
+                                <option value="credit" @selected(old('direction') === 'credit')>Credit</option>
+                                <option value="debit" @selected(old('direction') === 'debit')>Debit</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700" for="amount">Amount</label>
+                            <input id="amount" name="amount" type="number" min="0.01" max="9999999.99" step="0.01" value="{{ old('amount') }}" class="mt-1 block w-full rounded-md border-gray-300 text-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700" for="reason">Reason</label>
+                            <input id="reason" name="reason" maxlength="500" value="{{ old('reason') }}" class="mt-1 block w-full rounded-md border-gray-300 text-sm" placeholder="Accounting correction, duplicate payout recovery, or approved manual credit" required>
+                        </div>
+                        <button type="submit" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Record adjustment</button>
+                    </form>
+                </div>
+            @endcan
 
             <div class="rounded-lg bg-white p-6 shadow-sm">
                 <div class="flex items-center justify-between">

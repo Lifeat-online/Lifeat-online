@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Events\PaymentPaid;
 use App\Services\BusinessDirectoryActivationService;
 use App\Services\StaffCommissionService;
+use App\Support\Logging\OperationalLog;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class Payment extends Model
 {
@@ -36,9 +39,33 @@ class Payment extends Model
     protected static function booted(): void
     {
         static::saved(function (Payment $payment) {
+            if ($payment->wasChanged('status')) {
+                OperationalLog::info('payment.status_changed', [
+                    'payment_id' => $payment->id,
+                    'order_id' => $payment->order_id,
+                    'user_id' => $payment->user_id,
+                    'provider' => $payment->provider,
+                    'previous_status' => $payment->getOriginal('status'),
+                    'status' => $payment->status,
+                    'amount' => (float) $payment->amount,
+                    'currency' => $payment->currency,
+                    'provider_transaction_id' => $payment->provider_transaction_id,
+                    'paid_at' => $payment->paid_at,
+                ]);
+            }
+
             if ($payment->status === 'paid' && $payment->wasChanged('status')) {
-                app(BusinessDirectoryActivationService::class)->activateForPayment($payment);
-                app(StaffCommissionService::class)->creditForPayment($payment);
+                if (DB::transactionLevel() > 0) {
+                    DB::afterCommit(function () use ($payment): void {
+                        PaymentPaid::dispatch($payment->fresh());
+                        app(BusinessDirectoryActivationService::class)->activateForPayment($payment);
+                        app(StaffCommissionService::class)->creditForPayment($payment);
+                    });
+                } else {
+                    PaymentPaid::dispatch($payment->fresh());
+                    app(BusinessDirectoryActivationService::class)->activateForPayment($payment);
+                    app(StaffCommissionService::class)->creditForPayment($payment);
+                }
             }
         });
     }

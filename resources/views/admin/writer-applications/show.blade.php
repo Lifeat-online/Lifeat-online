@@ -79,7 +79,8 @@
                     </div>
 
                     <div class="rounded-lg bg-white p-6 shadow-sm">
-                        <h3 class="text-lg font-semibold text-gray-900">Banking And Documents</h3>
+                        <h3 class="text-lg font-semibold text-gray-900">Documents And Payout Readiness</h3>
+                        <p class="mt-1 text-sm text-gray-500">Banking details may be empty at application stage. Collect or verify payout banking details later when approved work creates a payable ledger or staff commission.</p>
                         <div class="mt-4 grid gap-4 md:grid-cols-2 text-sm">
                             <div>
                                 <p class="text-gray-500">Bank</p>
@@ -108,9 +109,15 @@
                             <a href="{{ route('admin.writer-applications.documents.show', [$application, 'id']) }}" target="_blank" class="rounded-lg border border-gray-200 p-4 text-sm text-indigo-600">
                                 Open ID document
                             </a>
-                            <a href="{{ route('admin.writer-applications.documents.show', [$application, 'banking']) }}" target="_blank" class="rounded-lg border border-gray-200 p-4 text-sm text-indigo-600">
-                                Open banking proof
-                            </a>
+                            @if ($application->banking_document_path)
+                                <a href="{{ route('admin.writer-applications.documents.show', [$application, 'banking']) }}" target="_blank" class="rounded-lg border border-gray-200 p-4 text-sm text-indigo-600">
+                                    Open banking proof
+                                </a>
+                            @else
+                                <div class="rounded-lg border border-gray-200 p-4 text-sm text-gray-500">
+                                    Banking proof not collected yet
+                                </div>
+                            @endif
                             <a href="{{ route('admin.writer-applications.documents.show', [$application, 'residence']) }}" target="_blank" class="rounded-lg border border-gray-200 p-4 text-sm text-indigo-600">
                                 Open proof of residence
                             </a>

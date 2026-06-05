@@ -1,6 +1,34 @@
 @extends('layouts.public')
 
 @section('title', $listing->localizedValue('title').' | Directory')
+@section('meta_description', $listing->localizedValue('excerpt') ?: ($listing->localizedValue('description') ?: 'Find '.$listing->localizedValue('title').' in the Life@ business directory.'))
+@section('canonical_url', route('directory.show', $listing))
+@if ($listing->featured_image)
+    @section('og_image', url('/media/'.ltrim($listing->featured_image, '/')))
+@elseif ($listing->logo_path)
+    @section('og_image', url('/media/'.ltrim($listing->logo_path, '/')))
+@endif
+
+@push('head')
+    <script type="application/ld+json">{!! json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'LocalBusiness',
+        'name' => $listing->localizedValue('title'),
+        'description' => $listing->localizedValue('excerpt') ?: $listing->localizedValue('description'),
+        'url' => route('directory.show', $listing),
+        'image' => $listing->featured_image ? url('/media/'.ltrim($listing->featured_image, '/')) : ($listing->logo_path ? url('/media/'.ltrim($listing->logo_path, '/')) : asset('pwa/icon-512.png')),
+        'telephone' => $listing->phone,
+        'email' => $listing->email,
+        'address' => array_filter([
+            '@type' => 'PostalAddress',
+            'streetAddress' => $listing->address_line,
+            'addressLocality' => $listing->city,
+            'addressRegion' => $listing->region,
+            'addressCountry' => $listing->country,
+            'postalCode' => $listing->postal_code,
+        ]),
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
+@endpush
 
 @push('styles')
     <style>

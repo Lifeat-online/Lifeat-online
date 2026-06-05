@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Caching\PublicReadCache;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,6 +32,12 @@ class Package extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::saved(fn () => PublicReadCache::flushCatalog());
+        static::deleted(fn () => PublicReadCache::flushCatalog());
+    }
+
     public function type(): BelongsTo
     {
         return $this->belongsTo(PackageType::class, 'package_type_id');
@@ -48,9 +55,10 @@ class Package extends Model
                 $query->whereNull('effective_from')->orWhere('effective_from', '<=', now());
             })
             ->where(function ($query) {
-                $query->whereNull('effective_to')->orWhere('effective_to', '>=', now());
+                $query->whereNull('effective_to')->orWhere('effective_to', '>', now());
             })
             ->latest('effective_from')
+            ->latest('id')
             ->first();
     }
 

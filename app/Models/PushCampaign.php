@@ -97,6 +97,11 @@ class PushCampaign extends Model
         return $this->morphMany(NotificationLog::class, 'notifiable');
     }
 
+    public function trackingEvents(): MorphMany
+    {
+        return $this->morphMany(CampaignTrackingEvent::class, 'trackable');
+    }
+
     public function linkedListingHasActiveEntitlement(): bool
     {
         return $this->listing?->hasActiveBusinessEntitlement() ?? false;

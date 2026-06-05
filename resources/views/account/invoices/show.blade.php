@@ -32,6 +32,10 @@
             <article class="card">
                 <h3>Order and Payment</h3>
                 <p><strong>Order:</strong> {{ $order->order_number }}</p>
+                <p><strong>Order type:</strong> {{ $order->renewedSubscription ? 'Subscription renewal' : 'New package purchase' }}</p>
+                @if ($order->renewedSubscription)
+                    <p><strong>Renewing:</strong> {{ $order->renewedSubscription->package?->name ?: 'Package' }}</p>
+                @endif
                 <p><strong>Order status:</strong> {{ ucfirst($order->status) }}</p>
                 <p><strong>Payment status:</strong> {{ ucfirst($payment?->status ?: 'pending') }}</p>
                 @if ($payment?->provider_transaction_id)
@@ -40,8 +44,33 @@
                 @if ($payment?->failure_reason)
                     <p><strong>Failure reason:</strong> {{ $payment->failure_reason }}</p>
                 @endif
+                @if ($payment && in_array($payment->status, ['pending', 'failed'], true))
+                    <p><a class="button" href="{{ route('checkout.show', $order) }}">Complete payment</a></p>
+                @endif
             </article>
         </div>
+    </section>
+
+    <section class="section">
+        <article class="card">
+            <h3>Payment Attempts</h3>
+            @forelse ($paymentAttempts as $attempt)
+                <p>
+                    <strong>{{ ucfirst($attempt->status) }}</strong><br>
+                    <span class="muted">
+                        {{ ucfirst($attempt->provider) }}
+                        @if ($attempt->attempted_at)
+                            - {{ $attempt->attempted_at->format('j M Y H:i') }}
+                        @endif
+                    </span>
+                    @if ($attempt->redirect_url && $attempt->status === 'initiated')
+                        <br><a class="button-link" href="{{ $attempt->redirect_url }}" rel="noopener">Open PayFast handoff</a>
+                    @endif
+                </p>
+            @empty
+                <div class="empty-state">No payment attempts have been generated yet.</div>
+            @endforelse
+        </article>
     </section>
 
     <section class="section">

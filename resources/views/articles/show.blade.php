@@ -1,12 +1,28 @@
 @extends('layouts.public')
 
 @section('title', ($article->seo_title ?: $article->localizedTitle()).' | Articles')
+@section('meta_description', $article->seo_description ?: ($article->localizedExcerpt() ?: 'Read '.$article->localizedTitle().' on Life@.'))
+@section('canonical_url', route('articles.show', $article))
+@section('og_type', 'article')
+@if ($article->featured_image)
+    @section('og_image', url('/media/'.ltrim($article->featured_image, '/')))
+@endif
 
 @push('head')
-    @if ($article->seo_description)
-        <meta name="description" content="{{ $article->seo_description }}">
-        <meta property="og:description" content="{{ $article->seo_description }}">
-    @endif
+    <script type="application/ld+json">{!! json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'NewsArticle',
+        'headline' => $article->localizedTitle(),
+        'description' => $article->seo_description ?: $article->localizedExcerpt(),
+        'datePublished' => $article->published_at?->toAtomString(),
+        'dateModified' => $article->updated_at?->toAtomString(),
+        'author' => [
+            '@type' => 'Person',
+            'name' => $article->author?->name ?: 'Life@ editorial team',
+        ],
+        'mainEntityOfPage' => route('articles.show', $article),
+        'image' => $article->featured_image ? [url('/media/'.ltrim($article->featured_image, '/'))] : [asset('pwa/icon-512.png')],
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
 @endpush
 
 @section('content')

@@ -35,7 +35,6 @@ class StaffAdvertisingApiController extends Controller
                 'owner' => $listing->owner ? [
                     'id' => $listing->owner->id,
                     'name' => $listing->owner->name,
-                    'email' => $listing->owner->email,
                 ] : null,
                 'ad_campaigns_count' => $listing->ad_campaigns_count,
                 'push_campaigns_count' => $listing->push_campaigns_count,
@@ -69,7 +68,6 @@ class StaffAdvertisingApiController extends Controller
                 'owner' => $listing->owner ? [
                     'id' => $listing->owner->id,
                     'name' => $listing->owner->name,
-                    'email' => $listing->owner->email,
                 ] : null,
             ],
             'events' => $listing->events->map(fn (Event $event) => [

@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Listing;
 use App\Models\Package;
-use App\Models\Setting;
+use App\Support\Caching\PublicReadCache;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,17 +14,15 @@ class AddListingController extends Controller
 {
     public function index(): View
     {
-        $directoryPackages = Package::with(['type', 'prices'])
-            ->active()
-            ->whereHas('type', fn ($query) => $query->where('slug', 'business_directory'))
-            ->orderBy('is_self_service')
-            ->get();
+        $directoryPackages = PublicReadCache::activePackagesForType('business_directory', 'self_service');
+        $staffAssistedPackage = $directoryPackages->first(fn (array $package): bool => ! $package['is_self_service']);
+        $selfServicePackage = $directoryPackages->first(fn (array $package): bool => $package['is_self_service']);
 
         return view('add-listing.index', [
             'directoryPackages' => $directoryPackages,
             'pricing' => [
-                'directory_standard_6m' => (float) Setting::getValue('pricing.business_directory_6m', 500),
-                'directory_self_service_6m' => (float) Setting::getValue('pricing.business_directory_self_service_6m', 750),
+                'directory_standard_6m' => $this->packageAmount($staffAssistedPackage, 500),
+                'directory_self_service_6m' => $this->packageAmount($selfServicePackage, 750),
             ],
         ]);
     }
@@ -56,7 +54,7 @@ class AddListingController extends Controller
         return redirect()->route('checkout.index', [
             'listing' => $listing->slug,
             'package' => $package->slug,
-        ])->with('status', 'Listing starter created. Choose your package to continue.');
+        ])->with('status', 'Listing starter created. Confirm your package and create the order to continue activation.');
     }
 
     private function uniqueListingSlug(string $title): string
@@ -71,5 +69,10 @@ class AddListingController extends Controller
         }
 
         return $slug;
+    }
+
+    private function packageAmount(?array $package, float $fallback): float
+    {
+        return (float) ($package['current_price']['amount'] ?? $fallback);
     }
 }

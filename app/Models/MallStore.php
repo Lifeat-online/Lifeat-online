@@ -12,6 +12,14 @@ use Illuminate\Support\Facades\Storage;
 
 class MallStore extends Model
 {
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_SUSPENDED = 'suspended';
+
+    public const STATUS_CLOSED = 'closed';
+
     protected $fillable = [
         'owner_user_id',
         'name',
@@ -38,6 +46,8 @@ class MallStore extends Model
             'is_featured' => 'boolean',
             'pickup_latitude' => 'decimal:7',
             'pickup_longitude' => 'decimal:7',
+            'payfast_merchant_id' => 'encrypted',
+            'payfast_merchant_key' => 'encrypted',
         ];
     }
 

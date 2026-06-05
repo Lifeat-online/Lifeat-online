@@ -37,25 +37,25 @@
         </div>
         <div class="choice-grid">
             @foreach ($directoryPackages as $package)
-                @php($price = $package->currentPrice())
-                <article class="choice-card {{ $package->is_self_service ? '' : 'choice-card-featured' }}">
+                @php($price = $package['current_price'] ?? null)
+                <article class="choice-card {{ $package['is_self_service'] ? '' : 'choice-card-featured' }}">
                     <div class="icon-chip">
-                        <x-icon name="{{ $package->is_self_service ? 'building' : 'sparkles' }}" class="w-5 h-5" />
+                        <x-icon name="{{ $package['is_self_service'] ? 'building' : 'sparkles' }}" class="w-5 h-5" />
                     </div>
                     <div>
-                        <h4 style="margin:0;">{{ $package->name }}</h4>
-                        <p class="muted" style="margin:0.5rem 0 0;">{{ $package->description }}</p>
+                        <h4 style="margin:0;">{{ $package['name'] }}</h4>
+                        <p class="muted" style="margin:0.5rem 0 0;">{{ $package['description'] }}</p>
                     </div>
-                    <p class="stat-number" style="font-size:1.9rem; margin:0;">{{ $price ? $price->currency.' '.number_format((float) $price->amount, 2) : 'Price pending' }}</p>
+                    <p class="stat-number" style="font-size:1.9rem; margin:0;">{{ $price ? $price['currency'].' '.number_format((float) $price['amount'], 2) : 'Price pending' }}</p>
                     <ul class="check-list">
-                        @if ($package->is_self_service)
+                        @if ($package['is_self_service'])
                             <li>You manage your own listing content.</li>
                             <li>Best for owners who want direct control.</li>
                         @else
                             <li>Staff can capture content by visit, WhatsApp, phone, or form.</li>
                             <li>Best for assisted setup and managed onboarding.</li>
                         @endif
-                        <li>Listing runs for {{ $package->duration_days }} days.</li>
+                        <li>Listing runs for {{ $package['duration_days'] }} days.</li>
                     </ul>
                 </article>
             @endforeach
@@ -85,7 +85,7 @@
                         <label class="lp-label" for="package_slug">Directory package</label>
                         <select class="lp-select" id="package_slug" name="package_slug">
                             @foreach ($directoryPackages as $package)
-                                <option value="{{ $package->slug }}" @selected(old('package_slug') === $package->slug)>{{ $package->name }}</option>
+                                <option value="{{ $package['slug'] }}" @selected(old('package_slug') === $package['slug'])>{{ $package['name'] }}</option>
                             @endforeach
                         </select>
                     </div>

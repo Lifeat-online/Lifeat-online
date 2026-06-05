@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\AdCampaign;
+use App\Models\CampaignTrackingEvent;
 use App\Models\PushCampaign;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 class AdTrackingController extends Controller
@@ -16,10 +18,12 @@ class AdTrackingController extends Controller
      * Impression pixel — increment impression counter and return a 1×1 GIF.
      * Called by the <img> tag embedded in every rendered ad card.
      */
-    public function impression(AdCampaign $adCampaign): Response
+    public function impression(Request $request, AdCampaign $adCampaign): Response
     {
         if ($adCampaign->status === 'active') {
-            $adCampaign->increment('impressions');
+            if (CampaignTrackingEvent::record($adCampaign, CampaignTrackingEvent::TYPE_IMPRESSION, $request)) {
+                $adCampaign->increment('impressions');
+            }
         }
 
         return response(self::PIXEL_GIF, 200, [
@@ -34,10 +38,12 @@ class AdTrackingController extends Controller
      * Click redirect — increment click counter and forward to the destination URL.
      * All ad CTA links point here instead of directly to the destination.
      */
-    public function click(AdCampaign $adCampaign): RedirectResponse
+    public function click(Request $request, AdCampaign $adCampaign): RedirectResponse
     {
         if ($adCampaign->status === 'active') {
-            $adCampaign->increment('clicks');
+            if (CampaignTrackingEvent::record($adCampaign, CampaignTrackingEvent::TYPE_CLICK, $request)) {
+                $adCampaign->increment('clicks');
+            }
         }
 
         $destination = $adCampaign->destination_url
@@ -50,10 +56,12 @@ class AdTrackingController extends Controller
      * Push open pixel — increment open_count on the push campaign and return a 1×1 GIF.
      * Embedded as a tracking pixel in the push notification body or landing page.
      */
-    public function pushOpen(PushCampaign $pushCampaign): Response
+    public function pushOpen(Request $request, PushCampaign $pushCampaign): Response
     {
         if ($pushCampaign->sent_at) {
-            $pushCampaign->increment('open_count');
+            if (CampaignTrackingEvent::record($pushCampaign, CampaignTrackingEvent::TYPE_PUSH_OPEN, $request)) {
+                $pushCampaign->increment('open_count');
+            }
         }
 
         return response(self::PIXEL_GIF, 200, [

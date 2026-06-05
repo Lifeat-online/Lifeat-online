@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\AdCampaign;
-use App\Models\Category;
 use App\Models\Listing;
+use App\Support\Caching\PublicReadCache;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
@@ -20,15 +20,7 @@ class DirectoryController extends Controller
         $userLng = $request->float('user_lng');
         $radius = $request->integer('radius', 50); // Default 50km
 
-        $categories = Category::query()
-            ->where('type', 'listing')
-            ->with('contentTranslations')
-            ->withCount([
-                'listings as visible_listings_count' => fn ($query) => $query->published(),
-            ])
-            ->orderByDesc('visible_listings_count')
-            ->orderBy('name')
-            ->get();
+        $categories = PublicReadCache::listingCategories();
 
         $listings = Listing::with(['categories.contentTranslations', 'contentTranslations'])
             ->withCount(['reviews' => fn ($query) => $query->where('status', 'approved')])
@@ -104,22 +96,16 @@ class DirectoryController extends Controller
             ->values()
             ->all();
 
+        $publicStats = PublicReadCache::publicStats();
+
         return view('directory.index', [
             'listings' => $listings,
             'categories' => $categories,
             'featuredCategories' => $categories->take(6)->values(),
-            'popularLocations' => Listing::published()
-                ->selectRaw('city, count(*) as listings_count')
-                ->whereNotNull('city')
-                ->where('city', '!=', '')
-                ->groupBy('city')
-                ->orderByDesc('listings_count')
-                ->orderBy('city')
-                ->limit(6)
-                ->get(),
+            'popularLocations' => PublicReadCache::popularListingLocations(),
             'directoryStats' => [
-                'visible_listings' => Listing::published()->count(),
-                'featured_listings' => Listing::published()->where('is_featured', true)->count(),
+                'visible_listings' => $publicStats['visible_listings'],
+                'featured_listings' => $publicStats['featured_listings'],
                 'categories' => $categories->count(),
                 'results' => $listings->total(),
             ],

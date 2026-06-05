@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Events\PayoutPaid;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\PayoutRequest;
 use App\Services\StaffCommissionService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PayoutRequestController extends Controller
 {
@@ -18,9 +22,9 @@ class PayoutRequestController extends Controller
         Gate::authorize('viewAny', PayoutRequest::class);
 
         $status = $request->string('status')->toString();
+        $walletId = $request->integer('wallet');
 
-        $requests = PayoutRequest::with(['requestedBy', 'reviewedBy', 'wallet.user'])
-            ->when($status !== '', fn ($q) => $q->where('status', $status))
+        $requests = $this->filteredQuery($request)
             ->latest('id')
             ->paginate(20)
             ->withQueryString();
@@ -36,7 +40,66 @@ class PayoutRequestController extends Controller
                 PayoutRequest::STATUS_CANCELLED,
             ],
             'pendingCount' => PayoutRequest::whereIn('status', PayoutRequest::activeStatuses())->count(),
+            'selectedWalletId' => $walletId ?: null,
         ]);
+    }
+
+    public function export(Request $request): StreamedResponse
+    {
+        Gate::authorize('export', PayoutRequest::class);
+
+        $query = $this->filteredQuery($request)->orderBy('id');
+
+        return response()->streamDownload(function () use ($query) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, [
+                'Payout ID',
+                'Staff Member',
+                'Staff Email',
+                'Status',
+                'Currency',
+                'Amount',
+                'Bank',
+                'Account Holder',
+                'Account Number',
+                'Branch Code',
+                'Payment Reference',
+                'Requested At',
+                'Reviewed At',
+                'Paid At',
+                'Reviewed By',
+                'Ledger Debit Total',
+                'Wallet Available Balance',
+                'Wallet Paid Out Total',
+                'Notes',
+            ]);
+
+            $query->chunkById(200, function ($requests) use ($handle) {
+                foreach ($requests as $payout) {
+                    fputcsv($handle, [
+                        $payout->id,
+                        $payout->requestedBy?->name,
+                        $payout->requestedBy?->email,
+                        $payout->status,
+                        $payout->currency,
+                        $payout->amount,
+                        $payout->bank_name,
+                        $payout->account_holder,
+                        $payout->account_number,
+                        $payout->branch_code,
+                        $payout->payment_reference,
+                        optional($payout->requested_at)->toDateTimeString(),
+                        optional($payout->reviewed_at)->toDateTimeString(),
+                        optional($payout->paid_at)->toDateTimeString(),
+                        $payout->reviewedBy?->name,
+                        $payout->ledgerEntries->sum('net_amount'),
+                        $payout->wallet?->available_balance,
+                        $payout->wallet?->paid_out_total,
+                        $payout->notes,
+                    ]);
+                }
+            });
+        }, 'payout-requests-export.csv', ['Content-Type' => 'text/csv']);
     }
 
     public function show(PayoutRequest $payoutRequest): View
@@ -57,11 +120,20 @@ class PayoutRequestController extends Controller
         abort_unless($payoutRequest->status === PayoutRequest::STATUS_REQUESTED, 422, 'Only pending requests can be approved.');
 
         $before = ['status' => $payoutRequest->status];
-        $payoutRequest->update([
-            'status'             => PayoutRequest::STATUS_APPROVED,
-            'reviewed_by_user_id' => $request->user()->id,
-            'reviewed_at'        => now(),
-        ]);
+
+        DB::transaction(function () use ($payoutRequest, $request) {
+            $locked = PayoutRequest::whereKey($payoutRequest->id)->lockForUpdate()->first();
+
+            abort_unless($locked->status === PayoutRequest::STATUS_REQUESTED, 422, 'Only pending requests can be approved.');
+
+            $locked->update([
+                'status'             => PayoutRequest::STATUS_APPROVED,
+                'reviewed_by_user_id' => $request->user()->id,
+                'reviewed_at'        => now(),
+            ]);
+        });
+
+        $payoutRequest->refresh();
 
         $this->logAudit($request, 'payout_request.approved', $payoutRequest, $before, ['status' => PayoutRequest::STATUS_APPROVED]);
 
@@ -78,12 +150,20 @@ class PayoutRequestController extends Controller
         $validated = $request->validate(['notes' => ['nullable', 'string', 'max:500']]);
         $before = ['status' => $payoutRequest->status];
 
-        $payoutRequest->update([
-            'status'              => PayoutRequest::STATUS_REJECTED,
-            'reviewed_by_user_id' => $request->user()->id,
-            'reviewed_at'         => now(),
-            'notes'               => $validated['notes'] ?? $payoutRequest->notes,
-        ]);
+        DB::transaction(function () use ($payoutRequest, $request, $validated) {
+            $locked = PayoutRequest::whereKey($payoutRequest->id)->lockForUpdate()->first();
+
+            abort_unless($locked->status === PayoutRequest::STATUS_REQUESTED, 422, 'Only pending requests can be rejected.');
+
+            $locked->update([
+                'status'              => PayoutRequest::STATUS_REJECTED,
+                'reviewed_by_user_id' => $request->user()->id,
+                'reviewed_at'         => now(),
+                'notes'               => $validated['notes'] ?? $locked->notes,
+            ]);
+        });
+
+        $payoutRequest->refresh();
 
         $this->logAudit($request, 'payout_request.rejected', $payoutRequest, $before, ['status' => PayoutRequest::STATUS_REJECTED]);
 
@@ -100,13 +180,22 @@ class PayoutRequestController extends Controller
         $validated = $request->validate(['payment_reference' => ['nullable', 'string', 'max:100']]);
         $before = ['status' => $payoutRequest->status];
 
-        $payoutRequest->update([
-            'status'            => PayoutRequest::STATUS_PAID,
-            'payment_reference' => $validated['payment_reference'] ?? null,
-            'paid_at'           => now(),
-        ]);
+        DB::transaction(function () use ($payoutRequest, $request, $validated) {
+            $locked = PayoutRequest::whereKey($payoutRequest->id)->lockForUpdate()->first();
 
-        $commissionService->debitForPayout($payoutRequest);
+            abort_unless($locked->status === PayoutRequest::STATUS_APPROVED, 422, 'Only approved requests can be marked paid.');
+
+            $locked->update([
+                'status'            => PayoutRequest::STATUS_PAID,
+                'payment_reference' => $validated['payment_reference'] ?? null,
+                'paid_at'           => now(),
+            ]);
+        });
+
+        $payoutRequest->refresh();
+
+        $ledgerEntry = $commissionService->debitForPayout($payoutRequest);
+        PayoutPaid::dispatch($payoutRequest->fresh(['wallet', 'requestedBy']), $ledgerEntry);
 
         $this->logAudit($request, 'payout_request.marked_paid', $payoutRequest, $before, [
             'status'            => PayoutRequest::STATUS_PAID,
@@ -129,5 +218,16 @@ class PayoutRequestController extends Controller
             'ip_address'    => $request->ip(),
             'user_agent'    => $request->userAgent(),
         ]);
+    }
+
+    private function filteredQuery(Request $request): Builder
+    {
+        $status = $request->string('status')->toString();
+        $walletId = $request->integer('wallet');
+
+        return PayoutRequest::query()
+            ->with(['requestedBy', 'reviewedBy', 'wallet.user', 'ledgerEntries'])
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($walletId > 0, fn ($query) => $query->where('wallet_id', $walletId));
     }
 }

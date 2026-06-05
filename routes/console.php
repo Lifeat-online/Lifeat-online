@@ -12,13 +12,13 @@ use App\Services\JimmyWritingService;
 use App\Services\Research\ResearchCollectorService;
 use App\Services\SubscriptionLifecycleService;
 use App\Services\SubscriptionRenewalService;
+use App\Support\Monitoring\HealthReport;
 use App\Support\ProductionReadiness\EnvironmentCheck;
 use App\Support\Uploads\UploadReferenceIndex;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Artisan;
-use Laravel\Pulse\Pulse;
 use Laravel\Reverb\Contracts\ApplicationProvider;
 use Laravel\Reverb\Contracts\Logger;
 use Laravel\Reverb\Jobs\PingInactiveConnections;
@@ -28,8 +28,6 @@ use Laravel\Reverb\Protocols\Pusher\Contracts\ChannelManager;
 use Laravel\Reverb\ServerProviderManager;
 use Laravel\Reverb\Servers\Reverb\Contracts\PubSubProvider;
 use Laravel\Reverb\Servers\Reverb\Factory as ReverbServerFactory;
-use Laravel\Telescope\Contracts\EntriesRepository;
-use Laravel\Telescope\Telescope;
 use Minishlink\WebPush\VAPID;
 use React\EventLoop\Loop;
 use Symfony\Component\Console\Command\Command;
@@ -202,14 +200,6 @@ Artisan::command('reverb:start-railway
         $this->components->info("Stopping server on {$host}:{$port}");
     });
 
-    if (app()->bound(Pulse::class)) {
-        $loop->addPeriodicTimer($config['pulse_ingest_interval'], fn () => app(Pulse::class)->ingest());
-    }
-
-    if (app()->bound(EntriesRepository::class)) {
-        $loop->addPeriodicTimer($config['telescope_ingest_interval'] ?? 15, fn () => Telescope::store(app(EntriesRepository::class)));
-    }
-
     $this->components->info('Starting '.($server->isSecure() ? 'secure ' : '')."server on {$host}:{$port}{$path}".(($hostname && $hostname !== $host) ? " ({$hostname})" : ''));
 
     $server->start();
@@ -245,6 +235,32 @@ Artisan::command('production:check {--fail-on-warning : Return a failing exit co
 
     return Command::SUCCESS;
 })->purpose('Check production environment settings before deployment');
+
+Artisan::command('monitoring:health {--json : Output the report as JSON} {--fail-on-warning : Return a failing exit code when warnings are present}', function (HealthReport $health) {
+    $report = $health->run();
+
+    if ($this->option('json')) {
+        $this->line(json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    } else {
+        $this->line('Health status: '.$report['status']);
+
+        foreach ($report['checks'] as $key => $check) {
+            $line = "[{$key}] {$check['message']}";
+
+            match ($check['status']) {
+                'error' => $this->error($line),
+                'warning' => $this->warn($line),
+                default => $this->line($line),
+            };
+        }
+    }
+
+    if ($report['status'] === 'down' || ($this->option('fail-on-warning') && $report['status'] === 'degraded')) {
+        return Command::FAILURE;
+    }
+
+    return Command::SUCCESS;
+})->purpose('Report production health signals for uptime and deploy monitoring');
 
 Artisan::command('uploads:orphans {--disk=public : Storage disk to scan: public or local} {--delete : Delete orphaned files instead of only listing them}', function (UploadReferenceIndex $index) {
     $disk = (string) $this->option('disk');
@@ -415,3 +431,19 @@ Artisan::command('push-campaigns:dispatch-due', function (PushCampaignDispatchSe
 
     $this->info("Dispatched {$count} push campaigns.");
 })->purpose('Dispatch due push campaigns that hold valid entitlements');
+
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('backup:run --type=db')
+    ->cron(config('backup.db.schedule', '0 2 * * *'))
+    ->name('backup-db')
+    ->withoutOverlapping(60)
+    ->onOneServer()
+    ->environments(['production', 'staging']);
+
+Schedule::command('backup:run --type=storage')
+    ->cron(config('backup.storage.schedule', '0 3 * * 0'))
+    ->name('backup-storage')
+    ->withoutOverlapping(60)
+    ->onOneServer()
+    ->environments(['production', 'staging']);

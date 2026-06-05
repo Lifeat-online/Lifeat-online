@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Package;
-use App\Models\Setting;
 use App\Models\WriterApplication;
 use App\Services\AdvertisingBundleCheckoutService;
+use App\Support\Caching\PublicReadCache;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,29 +14,10 @@ class AdvertiseController extends Controller
 {
     public function index(): View
     {
-        $directoryPackages = Package::with(['type', 'prices'])
-            ->active()
-            ->whereHas('type', fn ($query) => $query->where('slug', 'business_directory'))
-            ->orderBy('is_self_service')
-            ->get();
-
-        $eventPackages = Package::with(['type', 'prices'])
-            ->active()
-            ->whereHas('type', fn ($query) => $query->where('slug', 'event_package'))
-            ->orderBy('name')
-            ->get();
-
-        $advertPackages = Package::with(['type', 'prices'])
-            ->active()
-            ->whereHas('type', fn ($query) => $query->where('slug', 'advert_package'))
-            ->orderBy('name')
-            ->get();
-
-        $pushPackages = Package::with(['type', 'prices'])
-            ->active()
-            ->whereHas('type', fn ($query) => $query->where('slug', 'push_campaign'))
-            ->orderBy('name')
-            ->get();
+        $directoryPackages = PublicReadCache::activePackagesForType('business_directory', 'self_service');
+        $eventPackages = PublicReadCache::activePackagesForType('event_package');
+        $advertPackages = PublicReadCache::activePackagesForType('advert_package');
+        $pushPackages = PublicReadCache::activePackagesForType('push_campaign');
 
         $approvedStaff = WriterApplication::query()
             ->where('status', WriterApplication::STATUS_APPROVED)
@@ -68,13 +48,6 @@ class AdvertiseController extends Controller
             'advertPackages' => $advertPackages,
             'pushPackages' => $pushPackages,
             'approvedStaff' => $approvedStaff,
-            'pricing' => [
-                'directory_standard_6m' => (float) Setting::getValue('pricing.business_directory_6m', 500),
-                'directory_self_service_6m' => (float) Setting::getValue('pricing.business_directory_self_service_6m', 750),
-                'event_one_off' => (float) Setting::getValue('pricing.event_one_off', 250),
-                'event_monthly' => (float) Setting::getValue('pricing.event_monthly', 99),
-                'push_notification' => (float) Setting::getValue('pricing.push_notification', 0),
-            ],
         ]);
     }
 

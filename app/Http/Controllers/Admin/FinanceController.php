@@ -15,11 +15,13 @@ use App\Models\SubscriptionReminder;
 use App\Services\NotificationDispatchService;
 use App\Services\StaffCommissionService;
 use App\Services\SubscriptionLifecycleService;
+use App\Support\Logging\OperationalLog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -70,7 +72,7 @@ class FinanceController extends Controller
         $before = ['referred_by_user_id' => $order->referred_by_user_id];
         $order->update(['referred_by_user_id' => $validated['referred_by_user_id'] ?: null]);
 
-        AuditLog::create([
+        $audit = AuditLog::create([
             'actor_user_id' => $request->user()?->id,
             'action'        => 'order.attribution_set',
             'subject_type'  => Order::class,
@@ -79,6 +81,16 @@ class FinanceController extends Controller
             'after_json'    => ['referred_by_user_id' => $order->referred_by_user_id],
             'ip_address'    => $request->ip(),
             'user_agent'    => $request->userAgent(),
+        ]);
+
+        OperationalLog::info('finance.action_recorded', [
+            'audit_log_id' => $audit->id,
+            'action' => 'order.attribution_set',
+            'actor_user_id' => $request->user()?->id,
+            'subject_type' => Order::class,
+            'subject_id' => $order->id,
+            'before_keys' => array_keys($before),
+            'after_keys' => ['referred_by_user_id'],
         ]);
 
         return redirect()->route('admin.finance.orders.show', $order)
@@ -275,17 +287,23 @@ class FinanceController extends Controller
 
         $before = $payment->only(['status', 'paid_at', 'provider_transaction_id', 'failure_reason']);
 
-        $payment->update([
-            'status' => 'paid',
-            'paid_at' => $payment->paid_at ?: now(),
-            'provider_transaction_id' => $payment->provider_transaction_id ?: 'MANUAL-'.strtoupper(str()->random(8)),
-            'failure_reason' => null,
-        ]);
+        DB::transaction(function () use ($payment) {
+            $locked = Payment::whereKey($payment->id)->lockForUpdate()->first();
 
-        $payment->order?->update([
-            'status' => 'paid',
-            'placed_at' => $payment->order?->placed_at ?: now(),
-        ]);
+            $locked->update([
+                'status' => 'paid',
+                'paid_at' => $locked->paid_at ?: now(),
+                'provider_transaction_id' => $locked->provider_transaction_id ?: 'MANUAL-'.strtoupper(str()->random(8)),
+                'failure_reason' => null,
+            ]);
+
+            $locked->order?->update([
+                'status' => 'paid',
+                'placed_at' => $locked->order?->placed_at ?: now(),
+            ]);
+        });
+
+        $payment->refresh();
 
         $this->logAudit($request, 'payment.marked_paid', $payment, $before, $payment->fresh()->only(['status', 'paid_at', 'provider_transaction_id', 'failure_reason']));
 
@@ -298,14 +316,20 @@ class FinanceController extends Controller
 
         $before = $payment->only(['status', 'failure_reason']);
 
-        $payment->update([
-            'status' => 'failed',
-            'failure_reason' => $request->input('failure_reason', 'Marked failed by finance.'),
-        ]);
+        DB::transaction(function () use ($payment, $request) {
+            $locked = Payment::whereKey($payment->id)->lockForUpdate()->first();
 
-        $payment->order?->update([
-            'status' => 'cancelled',
-        ]);
+            $locked->update([
+                'status' => 'failed',
+                'failure_reason' => $request->input('failure_reason', 'Marked failed by finance.'),
+            ]);
+
+            $locked->order?->update([
+                'status' => 'cancelled',
+            ]);
+        });
+
+        $payment->refresh();
 
         $this->logAudit($request, 'payment.marked_failed', $payment, $before, $payment->fresh()->only(['status', 'failure_reason']));
 
@@ -323,31 +347,43 @@ class FinanceController extends Controller
         ]);
 
         $amount = (float) ($validated['refund_amount'] ?? $payment->amount);
+        $suspendReasons = [];
+        $suspendedSubscriptions = [];
 
-        $payment->refunds()->create([
-            'processed_by_user_id' => $request->user()->id,
-            'amount' => $amount,
-            'status' => 'processed',
-            'reason' => $validated['refund_reason'] ?? 'Manual refund recorded by finance.',
-            'refunded_at' => now(),
-        ]);
+        DB::transaction(function () use ($payment, $request, $validated, $amount, &$suspendReasons, &$suspendedSubscriptions) {
+            $locked = Payment::whereKey($payment->id)->lockForUpdate()->first();
 
-        $payment->update([
-            'status' => $amount >= (float) $payment->amount ? 'refunded' : $payment->status,
-        ]);
+            $locked->refunds()->create([
+                'processed_by_user_id' => $request->user()->id,
+                'amount' => $amount,
+                'status' => 'processed',
+                'reason' => $validated['refund_reason'] ?? 'Manual refund recorded by finance.',
+                'refunded_at' => now(),
+            ]);
 
-        $payment->order?->update([
-            'status' => $amount >= (float) $payment->amount ? 'refunded' : $payment->order?->status,
-        ]);
+            $locked->update([
+                'status' => $amount >= (float) $locked->amount ? 'refunded' : $locked->status,
+            ]);
 
-        if ($amount >= (float) $payment->amount) {
-            $commissionService->reverseForRefund($payment);
+            $locked->order?->update([
+                'status' => $amount >= (float) $locked->amount ? 'refunded' : $locked->order?->status,
+            ]);
 
-            Subscription::where('payment_id', $payment->id)
-                ->get()
-                ->each(function (Subscription $subscription) use ($validated) {
-                    app(SubscriptionLifecycleService::class)->suspend($subscription, $validated['refund_reason'] ?? null);
-                });
+            if ($amount >= (float) $locked->amount) {
+                $suspendedSubscriptions = Subscription::where('payment_id', $locked->id)
+                    ->lockForUpdate()
+                    ->get();
+
+                $suspendReasons = $validated;
+            }
+        });
+
+        if (! empty($suspendedSubscriptions)) {
+            $commissionService->reverseForRefund($payment->fresh());
+
+            foreach ($suspendedSubscriptions as $subscription) {
+                app(SubscriptionLifecycleService::class)->suspend($subscription, $suspendReasons['refund_reason'] ?? null);
+            }
         }
 
         $this->logAudit($request, 'payment.refunded', $payment, $before, $payment->fresh()->only(['status', 'failure_reason']));
@@ -418,7 +454,7 @@ class FinanceController extends Controller
 
     private function logAudit(Request $request, string $action, Model $subject, array $before, array $after): void
     {
-        AuditLog::create([
+        $audit = AuditLog::create([
             'actor_user_id' => $request->user()?->id,
             'action' => $action,
             'subject_type' => $subject::class,
@@ -427,6 +463,16 @@ class FinanceController extends Controller
             'after_json' => $after,
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
+        ]);
+
+        OperationalLog::info('finance.action_recorded', [
+            'audit_log_id' => $audit->id,
+            'action' => $action,
+            'actor_user_id' => $request->user()?->id,
+            'subject_type' => $subject::class,
+            'subject_id' => $subject->getKey(),
+            'before_keys' => array_keys($before),
+            'after_keys' => array_keys($after),
         ]);
     }
 

@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\LocationNode;
 use App\Models\Tag;
 use App\Models\User;
+use App\Support\Caching\PublicReadCache;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
@@ -134,17 +135,9 @@ class ArticleController extends Controller
 
         return view('articles.index', [
             'articles' => $articles,
-            'categories' => Category::query()
-                ->where('type', 'article')
-                ->orderBy('name')
-                ->get(),
-            'tags' => Tag::query()
-                ->where('type', 'article')
-                ->orderBy('name')
-                ->get(),
-            'locations' => LocationNode::query()
-                ->orderBy('name')
-                ->get(),
+            'categories' => PublicReadCache::articleCategories(),
+            'tags' => PublicReadCache::articleTags(),
+            'locations' => PublicReadCache::articleLocations(),
             'filters' => [
                 'q' => $search,
                 'category' => $categorySlug,

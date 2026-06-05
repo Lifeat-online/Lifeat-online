@@ -17,7 +17,7 @@
                 </div>
             @endif
 
-            @if (auth()->user()?->email === 'jameskoen78@gmail.com')
+            @if (auth()->user()?->hasRole('dev', 'developer'))
                 <form method="POST" action="{{ route('admin.push-notifications.store') }}" class="rounded-lg bg-white p-6 shadow-sm">
                     @csrf
                     <input type="hidden" name="audience" value="all">

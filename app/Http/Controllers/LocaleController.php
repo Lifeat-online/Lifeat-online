@@ -10,7 +10,12 @@ class LocaleController extends Controller
 {
     public function __invoke(Request $request, string $locale, LocalePreferenceService $preferences): RedirectResponse
     {
-        abort_unless(array_key_exists($locale, (array) config('localization.supported')), 404);
+        $supported = array_keys((array) config('localization.supported', []));
+
+        abort_unless(
+            in_array($locale, $supported, true) && preg_match('/^[a-z]{2}(-[A-Za-z0-9]{2,8})?$/', $locale) === 1,
+            404,
+        );
 
         $locale = $preferences->remember($request, $locale, $request->user());
 

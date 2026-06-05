@@ -92,6 +92,49 @@
                         </div>
                     </div>
 
+                    @if ($package->exists)
+                        <div class="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                            <p class="font-semibold">Pricing authority note</p>
+                            <p class="mt-1">Changing amount, currency, or VAT creates a new effective price version. Existing orders keep their saved price snapshots.</p>
+                            <label class="mt-3 block text-sm font-medium" for="price_change_note">Required when changing price</label>
+                            <textarea
+                                id="price_change_note"
+                                class="mt-1 w-full rounded-md border-amber-200"
+                                name="price_change_note"
+                                rows="3"
+                                placeholder="Example: Approved 2026 Q3 package price update"
+                            >{{ old('price_change_note') }}</textarea>
+                        </div>
+
+                        <div class="rounded-md border border-gray-200 p-4">
+                            <h3 class="text-sm font-semibold text-gray-900">Price history</h3>
+                            <div class="mt-3 overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-3 py-2 text-left">Amount</th>
+                                            <th class="px-3 py-2 text-left">VAT</th>
+                                            <th class="px-3 py-2 text-left">Effective From</th>
+                                            <th class="px-3 py-2 text-left">Effective To</th>
+                                            <th class="px-3 py-2 text-left">Created By</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100">
+                                        @foreach ($package->prices->sortByDesc('effective_from')->values() as $historyPrice)
+                                            <tr>
+                                                <td class="px-3 py-2">{{ $historyPrice->currency }} {{ number_format((float) $historyPrice->amount, 2) }}</td>
+                                                <td class="px-3 py-2">{{ $historyPrice->vat_inclusive ? 'Inclusive' : 'Exclusive' }}</td>
+                                                <td class="px-3 py-2">{{ $historyPrice->effective_from?->format('Y-m-d H:i') ?: '-' }}</td>
+                                                <td class="px-3 py-2">{{ $historyPrice->effective_to?->format('Y-m-d H:i') ?: 'Current' }}</td>
+                                                <td class="px-3 py-2">{{ $historyPrice->creator?->email ?: '-' }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    @endif
+
                     <label class="inline-flex items-center gap-2">
                         <input type="checkbox" name="is_self_service" value="1" @checked(old('is_self_service', $package->is_self_service))>
                         <span>Self-service package</span>

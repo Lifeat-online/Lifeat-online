@@ -3,6 +3,11 @@
 namespace App\Providers;
 
 use App\Events\MallOrderPaid;
+use App\Events\PaymentPaid;
+use App\Events\PayoutPaid;
+use App\Events\PushCampaignDispatched;
+use App\Events\SubscriptionActivated;
+use App\Listeners\RecordRevenueLifecycleEvent;
 use App\Listeners\SendMallOrderPaidEmails;
 use App\Models\Article;
 use App\Models\Category;
@@ -57,6 +62,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Subscription::class, SubscriptionPolicy::class);
 
         Event::listen(MallOrderPaid::class, SendMallOrderPaidEmails::class);
+        Event::listen(PaymentPaid::class, RecordRevenueLifecycleEvent::class);
+        Event::listen(SubscriptionActivated::class, RecordRevenueLifecycleEvent::class);
+        Event::listen(PayoutPaid::class, RecordRevenueLifecycleEvent::class);
+        Event::listen(PushCampaignDispatched::class, RecordRevenueLifecycleEvent::class);
 
         Article::observe(QueueContentTranslations::class);
         Category::observe(QueueContentTranslations::class);

@@ -106,6 +106,6 @@ class AskLifeController extends Controller
 
     private function ensureDevOwner(Request $request): void
     {
-        abort_unless($request->user()?->isDevOwner(), 403, 'Jimmy is currently limited to the Dev owner.');
+        abort_unless($request->user()?->hasRole('dev', 'developer'), 403, 'AskLife is currently limited to platform developers.');
     }
 }

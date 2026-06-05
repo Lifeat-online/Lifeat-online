@@ -39,7 +39,7 @@ class MapIntegrationController extends Controller
 
     private function ensureDevOwner(Request $request): void
     {
-        if (strtolower((string) $request->user()?->email) !== 'jameskoen78@gmail.com') {
+        if (! $request->user()?->hasRole('dev', 'developer', 'super_admin')) {
             abort(403);
         }
     }

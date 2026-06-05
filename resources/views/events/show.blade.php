@@ -1,6 +1,42 @@
 @extends('layouts.public')
 
 @section('title', $event->localizedValue('title').' | Events')
+@section('meta_description', $event->localizedValue('excerpt') ?: ($event->localizedValue('description') ?: 'View event details for '.$event->localizedValue('title').' on Life@.'))
+@section('canonical_url', route('events.show', $event))
+@if ($event->featured_image)
+    @section('og_image', url('/media/'.ltrim($event->featured_image, '/')))
+@endif
+
+@push('head')
+    <script type="application/ld+json">{!! json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Event',
+        'name' => $event->localizedValue('title'),
+        'description' => $event->localizedValue('excerpt') ?: $event->localizedValue('description'),
+        'url' => route('events.show', $event),
+        'image' => $event->featured_image ? [url('/media/'.ltrim($event->featured_image, '/'))] : [asset('pwa/icon-512.png')],
+        'startDate' => $event->start_at?->toAtomString(),
+        'endDate' => $event->end_at?->toAtomString(),
+        'eventStatus' => 'https://schema.org/EventScheduled',
+        'eventAttendanceMode' => 'https://schema.org/OfflineEventAttendanceMode',
+        'location' => [
+            '@type' => 'Place',
+            'name' => $event->venue_name ?: $event->listing?->localizedValue('title'),
+            'address' => array_filter([
+                '@type' => 'PostalAddress',
+                'streetAddress' => $event->address_line,
+                'addressLocality' => $event->city,
+                'addressRegion' => $event->region,
+                'addressCountry' => $event->country,
+            ]),
+        ],
+        'organizer' => [
+            '@type' => 'Organization',
+            'name' => $event->listing?->localizedValue('title') ?: config('app.name', 'Life Platform'),
+            'url' => $event->listing ? route('directory.show', $event->listing) : url('/'),
+        ],
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
+@endpush
 
 @push('styles')
     <style>

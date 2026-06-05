@@ -4,7 +4,55 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', config('app.name', 'Life Platform'))</title>
+    @php
+        $seoTitle = trim($__env->yieldContent('title', config('app.name', 'Life Platform')));
+        $seoDescription = trim($__env->yieldContent(
+            'meta_description',
+            'Eastern Freestate local news, business discovery, events, vouchers, classifieds, civic fault reporting, and community opportunities.'
+        ));
+        $seoCanonical = trim($__env->yieldContent('canonical_url', url()->current()));
+        $seoImage = trim($__env->yieldContent('og_image', asset('pwa/icon-512.png')));
+        $seoType = trim($__env->yieldContent('og_type', 'website'));
+        $defaultSchema = [
+            '@context' => 'https://schema.org',
+            '@graph' => [
+                [
+                    '@type' => 'Organization',
+                    '@id' => url('/').'#organization',
+                    'name' => config('app.name', 'Life Platform'),
+                    'url' => url('/'),
+                    'logo' => asset('pwa/icon-512.png'),
+                ],
+                [
+                    '@type' => 'WebSite',
+                    '@id' => url('/').'#website',
+                    'url' => url('/'),
+                    'name' => config('app.name', 'Life Platform'),
+                    'description' => $seoDescription,
+                    'publisher' => ['@id' => url('/').'#organization'],
+                    'potentialAction' => [
+                        '@type' => 'SearchAction',
+                        'target' => route('search.index').'?q={search_term_string}',
+                        'query-input' => 'required name=search_term_string',
+                    ],
+                ],
+            ],
+        ];
+    @endphp
+    <title>{{ $seoTitle }}</title>
+    <meta name="description" content="{{ $seoDescription }}">
+    <link rel="canonical" href="{{ $seoCanonical }}">
+    <meta property="og:site_name" content="{{ config('app.name', 'Life Platform') }}">
+    <meta property="og:title" content="{{ $seoTitle }}">
+    <meta property="og:description" content="{{ $seoDescription }}">
+    <meta property="og:url" content="{{ $seoCanonical }}">
+    <meta property="og:type" content="{{ $seoType }}">
+    <meta property="og:image" content="{{ $seoImage }}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ $seoTitle }}">
+    <meta name="twitter:description" content="{{ $seoDescription }}">
+    <meta name="twitter:image" content="{{ $seoImage }}">
+    <script type="application/ld+json">{!! json_encode($defaultSchema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
     @include('partials.pwa-head')
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="preload" as="image" href="{{ asset('branding/life-logo-light.svg') }}">
@@ -361,7 +409,7 @@
             </div>
         @endif
     </footer>
-    @if (auth()->user()?->isDevOwner())
+    @if (auth()->user()?->hasRole('dev', 'developer'))
         @include('partials.ask-life-widget')
     @endif
     @stack('scripts')

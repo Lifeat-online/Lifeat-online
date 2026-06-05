@@ -26,7 +26,7 @@
                     <select id="category_id" name="category_id">
                         <option value="">All</option>
                         @foreach ($categories as $category)
-                            <option value="{{ $category->id }}" @selected((int) ($filters['category_id'] ?? 0) === (int) $category->id)>{{ $category->name }}</option>
+                            <option value="{{ $category['id'] }}" @selected((int) ($filters['category_id'] ?? 0) === (int) $category['id'])>{{ $category['name'] }}</option>
                         @endforeach
                     </select>
                 </div>

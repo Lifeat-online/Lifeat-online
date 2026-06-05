@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Account\RequestPayoutRequest;
 use App\Models\AuditLog;
 use App\Models\PayoutRequest;
 use App\Models\StaffWallet;
@@ -34,7 +35,7 @@ class AccountWalletController extends Controller
         ]);
     }
 
-    public function requestPayout(Request $request): RedirectResponse
+    public function requestPayout(Request $request, RequestPayoutRequest $payoutRequest): RedirectResponse
     {
         $user = $request->user();
 
@@ -44,14 +45,7 @@ class AccountWalletController extends Controller
 
         abort_if($wallet->pendingPayoutRequest(), 422, 'You already have an active payout request.');
 
-        $validated = $request->validate([
-            'amount'           => ['required', 'numeric', 'min:1', "max:{$wallet->available_balance}"],
-            'bank_name'        => ['required', 'string', 'max:100'],
-            'account_holder'   => ['required', 'string', 'max:150'],
-            'account_number'   => ['required', 'string', 'max:30'],
-            'branch_code'      => ['required', 'string', 'max:10'],
-            'notes'            => ['nullable', 'string', 'max:500'],
-        ]);
+        $validated = $payoutRequest->validated();
 
         $payout = PayoutRequest::create([
             'wallet_id'            => $wallet->id,

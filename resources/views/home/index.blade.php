@@ -1,6 +1,8 @@
 @extends('layouts.public')
 
 @section('title', 'Eastern Freestate | Home')
+@section('meta_description', 'Life@ connects Eastern Freestate residents with local news, trusted businesses, upcoming events, vouchers, classifieds, civic fault reporting, and community opportunities.')
+@section('canonical_url', route('home'))
 
 @push('styles')
     <style>
@@ -513,10 +515,10 @@
         </div>
         <div class="category-grid">
             @forelse ($featuredCategories as $category)
-                <a href="{{ route('search.index', ['category' => $category->slug]) }}" class="category-card">
+                <a href="{{ route('search.index', ['category' => $category['slug']]) }}" class="category-card">
                     <span class="eyebrow">Category</span>
-                    <h3 class="h3-cat">{{ $category->localizedValue('name') }}</h3>
-                    <p class="muted h3-tight">{{ $category->visible_listings_count }} visible businesses</p>
+                    <h3 class="h3-cat">{{ $category['name'] }}</h3>
+                    <p class="muted h3-tight">{{ $category['visible_listings_count'] }} visible businesses</p>
                 </a>
             @empty
                 <div class="empty-state">Directory categories will appear here as the listing catalogue grows.</div>

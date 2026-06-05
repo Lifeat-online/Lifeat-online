@@ -30,6 +30,9 @@
             @if ($selectedPushCampaign)
                 <p><strong>Selected push campaign:</strong> {{ $selectedPushCampaign->title }}</p>
             @endif
+            @if ($selectedRenewalSubscription)
+                <p><strong>Renewing subscription:</strong> {{ $selectedRenewalSubscription->package?->name }} ({{ ucfirst($selectedRenewalSubscription->status) }})</p>
+            @endif
             @guest
                 <p class="muted">Login is required before an order and invoice can be created.</p>
                 <p><a class="button" href="{{ route('login') }}">Login to continue</a></p>
@@ -37,21 +40,27 @@
         </article>
     </section>
 
+    @if ($listingOnboarding)
+        <section class="section">
+            @include('account.listings._onboarding-checklist', ['onboardingChecklist' => $listingOnboarding])
+        </section>
+    @endif
+
     <section class="section">
         <div class="grid grid-2">
             @forelse ($packages as $package)
-                @php($price = $package->currentPrice())
+                @php($price = $package['current_price'] ?? null)
                 <article class="card">
-                    <h3>{{ $package->name }}</h3>
-                    <p class="muted">{{ $package->description }}</p>
-                    <p><strong>{{ $price ? $price->currency.' '.number_format((float) $price->amount, 2) : 'Price pending' }}</strong></p>
-                    <p class="muted">{{ ucfirst(str_replace('_', ' ', $package->billing_model)) }} / {{ $package->duration_days }} days</p>
-                    <p class="muted">{{ $package->is_self_service ? 'Self-service' : 'Staff-assisted / managed' }}</p>
+                    <h3>{{ $package['name'] }}</h3>
+                    <p class="muted">{{ $package['description'] }}</p>
+                    <p><strong>{{ $price ? $price['currency'].' '.number_format((float) $price['amount'], 2) : 'Price pending' }}</strong></p>
+                    <p class="muted">{{ ucfirst(str_replace('_', ' ', $package['billing_model'])) }} / {{ $package['duration_days'] }} days</p>
+                    <p class="muted">{{ $package['is_self_service'] ? 'Self-service' : 'Staff-assisted / managed' }}</p>
                     @auth
                         @if ($selectedListing)
                             <form method="post" action="{{ route('checkout.start') }}">
                                 @csrf
-                                <input type="hidden" name="package_slug" value="{{ $package->slug }}">
+                                <input type="hidden" name="package_slug" value="{{ $package['slug'] }}">
                                 <input type="hidden" name="listing_slug" value="{{ $selectedListing->slug }}">
                                 @if ($selectedEvent)
                                     <input type="hidden" name="event_slug" value="{{ $selectedEvent->slug }}">
@@ -62,14 +71,17 @@
                                 @if ($selectedPushCampaign)
                                     <input type="hidden" name="push_campaign_slug" value="{{ $selectedPushCampaign->slug }}">
                                 @endif
-                                <button class="button" type="submit">Create Order</button>
+                                @if ($selectedRenewalSubscription)
+                                    <input type="hidden" name="renewal_subscription_id" value="{{ $selectedRenewalSubscription->id }}">
+                                @endif
+                                <button class="button" type="submit">{{ $selectedRenewalSubscription ? 'Create Renewal Order' : 'Create Order' }}</button>
                             </form>
                         @else
                             <p class="muted">Select a listing first to start checkout.</p>
                         @endif
                     @else
                         <p>
-                            <a class="button" href="{{ route('basket.index', array_filter(['package' => $package->slug, 'listing' => $selectedListing?->slug, 'event' => $selectedEvent?->slug, 'campaign' => $selectedCampaign?->slug, 'push_campaign' => $selectedPushCampaign?->slug])) }}">
+                            <a class="button" href="{{ route('basket.index', array_filter(['package' => $package['slug'], 'listing' => $selectedListing?->slug, 'event' => $selectedEvent?->slug, 'campaign' => $selectedCampaign?->slug, 'push_campaign' => $selectedPushCampaign?->slug])) }}">
                                 Choose Package
                             </a>
                         </p>

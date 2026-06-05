@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Event;
+use App\Http\Requests\Account\SavePushCampaignRequest;
 use App\Models\Listing;
 use App\Models\PushCampaign;
 use App\Models\AuditLog;
@@ -59,12 +59,12 @@ class AccountPushCampaignController extends Controller
         ]);
     }
 
-    public function store(Request $request, Listing $listing): RedirectResponse
+    public function store(SavePushCampaignRequest $request, Listing $listing): RedirectResponse
     {
         Gate::authorize('manage', $listing);
         $this->ensureEntitledListing($listing);
 
-        $data = $this->validated($request, $listing);
+        $data = $request->validated();
         $this->ensureEventBelongsToListing($data['event_id'] ?? null, $listing);
         if (($data['status'] ?? null) === 'active') {
             $data['status'] = 'ready';
@@ -117,12 +117,12 @@ class AccountPushCampaignController extends Controller
         ]);
     }
 
-    public function update(Request $request, Listing $listing, PushCampaign $pushCampaign): RedirectResponse
+    public function update(SavePushCampaignRequest $request, Listing $listing, PushCampaign $pushCampaign): RedirectResponse
     {
         Gate::authorize('manage', $listing);
         abort_unless($pushCampaign->listing_id === $listing->id, 404);
 
-        $data = $this->validated($request, $listing);
+        $data = $request->validated();
         $this->ensureEventBelongsToListing($data['event_id'] ?? null, $listing);
 
         if (($data['status'] ?? null) === 'active') {
@@ -176,22 +176,6 @@ class AccountPushCampaignController extends Controller
         return redirect()
             ->route('account.listings.push-campaigns.index', $listing)
             ->with('status', 'Push campaign removed.');
-    }
-
-    private function validated(Request $request, Listing $listing): array
-    {
-        return $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'headline' => ['nullable', 'string', 'max:255'],
-            'message' => ['required', 'string', 'max:2000'],
-            'event_id' => ['nullable', 'integer', 'exists:events,id'],
-            'schedule_at' => ['nullable', 'date'],
-            'audience_scope' => ['required', 'in:listing_city,listing_region,custom_radius'],
-            'target_city' => ['nullable', 'string', 'max:255'],
-            'target_region' => ['nullable', 'string', 'max:255'],
-            'radius_km' => ['nullable', 'integer', 'min:1', 'max:200'],
-            'status' => ['required', 'in:draft,ready,scheduled,active'],
-        ]);
     }
 
     private function ensureEntitledListing(Listing $listing): void

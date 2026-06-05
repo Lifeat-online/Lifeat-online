@@ -9,12 +9,13 @@ use App\Models\Councillor;
 use App\Models\Listing;
 use App\Models\MarketingIntegration;
 use App\Models\PushCampaign;
+use App\Support\Monitoring\OperationalKpiReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class MetricsController extends Controller
 {
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(Request $request, OperationalKpiReport $kpis): JsonResponse
     {
         $request->user();
 
@@ -58,6 +59,7 @@ class MetricsController extends Controller
                 'listings' => Listing::count(),
                 'vouchers' => class_exists(\App\Models\Voucher::class) ? \App\Models\Voucher::count() : 0,
             ],
+            'kpis' => $kpis->run(),
         ]);
     }
 }

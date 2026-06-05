@@ -3,6 +3,14 @@
 @section('title', $listing->title.' | My Listings')
 
 @section('content')
+    @php
+        $activeSubscription = $listing->activeSubscription;
+        $expiresAt = $listing->package_expires_at ?: $activeSubscription?->ends_at;
+        $daysUntilExpiry = $expiresAt ? (int) now()->startOfDay()->diffInDays($expiresAt->copy()->startOfDay(), false) : null;
+        $expiresSoon = $activeSubscription && $daysUntilExpiry !== null && $daysUntilExpiry >= 0 && $daysUntilExpiry <= 30;
+        $hasExpiredHistory = ! $activeSubscription && $listing->subscriptions->isNotEmpty();
+    @endphp
+
     <section class="section">
         <div class="section-head">
             <div>
@@ -26,6 +34,26 @@
         </div>
     </section>
 
+    @if ($expiresSoon || $hasExpiredHistory)
+        <section class="section">
+            <article class="card">
+                @if ($expiresSoon)
+                    <h3>Package expires soon</h3>
+                    <p class="muted">Your listing package ends on {{ $expiresAt->format('j M Y') }}. Renew now to keep public visibility, listing benefits, and campaign eligibility uninterrupted.</p>
+                    <a class="button" href="{{ route('checkout.subscriptions.renew', $activeSubscription) }}">Renew package</a>
+                @else
+                    <h3>Package needs renewal</h3>
+                    <p class="muted">This listing has package history but no active business entitlement. Choose a package to restore public listing visibility.</p>
+                    <a class="button" href="{{ route('checkout.index', ['listing' => $listing->slug]) }}">Choose package</a>
+                @endif
+            </article>
+        </section>
+    @endif
+
+    <section class="section">
+        @include('account.listings._onboarding-checklist', ['onboardingChecklist' => $onboardingChecklist])
+    </section>
+
     <section class="section">
         <div class="grid grid-2">
             <article class="card">
@@ -42,6 +70,15 @@
                 </p>
                 <p><strong>Category count:</strong> {{ $listing->categories->count() }}</p>
                 <p><strong>Package expiry:</strong> {{ optional($listing->package_expires_at)->format('j M Y H:i') ?: '-' }}</p>
+                <p><strong>Renewal status:</strong>
+                    @if ($activeSubscription)
+                        {{ $expiresSoon ? 'Renewal recommended' : 'Active' }}
+                    @elseif ($hasExpiredHistory)
+                        Renewal needed
+                    @else
+                        Checkout not started
+                    @endif
+                </p>
             </article>
 
             <article class="card">
@@ -205,6 +242,9 @@
                 @forelse ($listing->subscriptions->sortByDesc('id') as $subscription)
                     <p>
                         <strong>{{ $subscription->package?->name ?: 'Package' }}</strong><br>
+                        @if ($subscription->status === 'active')
+                            <a class="button-link" href="{{ route('checkout.subscriptions.renew', $subscription) }}">Renew this package</a><br>
+                        @endif
                         <span class="muted">{{ ucfirst($subscription->status) }} · Ends {{ optional($subscription->ends_at)->format('j M Y') ?: '-' }}</span>
                     </p>
                 @empty

@@ -109,7 +109,7 @@
                     </x-slot>
 
                     <x-slot name="content">
-                        @if (strtolower((string) Auth::user()->email) === 'jameskoen78@gmail.com')
+                        @if (Auth::user()->hasRole('dev', 'developer'))
                             <x-dropdown-link :href="route('admin.dashboard', ['tab' => 'dev'])">
                                 {{ __('Dev Dashboard') }}
                             </x-dropdown-link>
@@ -246,7 +246,7 @@
                     {{ __('Profile') }}
                 </x-responsive-nav-link>
 
-                @if (strtolower((string) Auth::user()->email) === 'jameskoen78@gmail.com')
+                @if (Auth::user()->hasRole('dev', 'developer'))
                     <x-responsive-nav-link :href="route('admin.dashboard', ['tab' => 'dev'])">
                         {{ __('Dev Dashboard') }}
                     </x-responsive-nav-link>

@@ -1,7 +1,6 @@
 import './bootstrap';
 
 import Alpine from 'alpinejs';
-import { createClient } from '@supabase/supabase-js';
 
 window.Alpine = Alpine;
 
@@ -451,17 +450,6 @@ const initPushNotifications = () => {
     });
 };
 
-const initSupabase = () => {
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!url || !key) return;
-    try {
-        window.supabase = createClient(url, key);
-    } catch (error) {
-        console.error('Supabase initialization failed:', error);
-    }
-};
-
 const initTransportRealtime = () => {
     const root = document.querySelector('[data-transport-realtime]');
     if (!root) return;
@@ -534,7 +522,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initSectionHighlighting();
     initServiceWorker();
     initPushNotifications();
-    initSupabase();
     initTransportRealtime();
     initLocaleSwitchLoading();
 });

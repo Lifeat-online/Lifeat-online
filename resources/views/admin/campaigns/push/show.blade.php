@@ -1,3 +1,5 @@
+@php use App\Models\CampaignTrackingEvent; @endphp
+
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between gap-4">
@@ -62,6 +64,56 @@
                                 </div>
                             </div>
                             <p class="mt-3 text-xs text-gray-400">Open rate is measured via tracking pixel. Embed <code class="bg-gray-100 px-1 rounded">{{ route('ad-tracking.push-open', $campaign) }}</code> in the push landing page to track opens.</p>
+
+                            <div class="mt-6">
+                                <h4 class="text-sm font-semibold uppercase text-gray-500">Daily Open Activity</h4>
+                                <div class="mt-3 overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-4 py-3 text-left">Date</th>
+                                                <th class="px-4 py-3 text-left">Tracked Opens</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100">
+                                            @foreach ($dailyRows as $row)
+                                                <tr>
+                                                    <td class="px-4 py-3">{{ $row['date']->format('j M Y') }}</td>
+                                                    <td class="px-4 py-3">{{ number_format($row[CampaignTrackingEvent::TYPE_PUSH_OPEN] ?? 0) }}</td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="mt-6">
+                                <h4 class="text-sm font-semibold uppercase text-gray-500">Recent Open Events</h4>
+                                @if ($recentTrackingEvents->isEmpty())
+                                    <p class="mt-2 text-sm text-gray-500">No open events have been logged yet.</p>
+                                @else
+                                    <div class="mt-3 overflow-x-auto">
+                                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                            <thead class="bg-gray-50">
+                                                <tr>
+                                                    <th class="px-4 py-3 text-left">Occurred</th>
+                                                    <th class="px-4 py-3 text-left">Token</th>
+                                                    <th class="px-4 py-3 text-left">Referrer</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-100">
+                                                @foreach ($recentTrackingEvents as $event)
+                                                    <tr>
+                                                        <td class="px-4 py-3">{{ optional($event->occurred_at)->format('j M Y H:i') }}</td>
+                                                        <td class="px-4 py-3">{{ $event->tracking_token ?: '-' }}</td>
+                                                        <td class="px-4 py-3 break-all text-gray-500">{{ $event->referrer ?: '-' }}</td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                @endif
+                            </div>
                         </div>
                     @endif
 

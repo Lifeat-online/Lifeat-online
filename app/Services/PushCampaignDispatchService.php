@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Events\PushCampaignDispatched;
 use App\Models\PushCampaign;
 use App\Models\NotificationLog;
+use App\Support\Logging\OperationalLog;
 use RuntimeException;
 
 class PushCampaignDispatchService
@@ -18,7 +20,15 @@ class PushCampaignDispatchService
     {
         $campaign->loadMissing(['listing', 'event', 'activeSubscription.package']);
 
-        $this->ensureDispatchable($campaign);
+        try {
+            $this->ensureDispatchable($campaign);
+        } catch (RuntimeException $exception) {
+            OperationalLog::warning('campaign.push_dispatch_rejected', $this->campaignContext($campaign, [
+                'rejection_reason' => $exception->getMessage(),
+            ]));
+
+            throw $exception;
+        }
 
         $dispatchedAt = now();
         $delivery = $this->webPushDeliveryService->sendCampaign($campaign);
@@ -52,6 +62,18 @@ class PushCampaignDispatchService
             'sent_at' => $dispatchedAt,
         ])->save();
 
+        OperationalLog::info('campaign.push_dispatched', $this->campaignContext($campaign, [
+            'notification_log_id' => $notification->id,
+            'sent_at' => $dispatchedAt,
+            'web_push_configured' => $delivery['configured'] ?? null,
+            'web_push_attempted' => $delivery['attempted'] ?? null,
+            'web_push_sent' => $delivery['sent'] ?? null,
+            'web_push_failed' => $delivery['failed'] ?? null,
+            'web_push_expired' => $delivery['expired'] ?? null,
+        ]));
+
+        PushCampaignDispatched::dispatch($campaign->fresh(['listing', 'event', 'activeSubscription']), $notification);
+
         return $notification;
     }
 
@@ -76,5 +98,21 @@ class PushCampaignDispatchService
         if ($campaign->status === 'scheduled' && $campaign->schedule_at && $campaign->schedule_at->isFuture()) {
             throw new RuntimeException('This push campaign is scheduled for a future time.');
         }
+    }
+
+    private function campaignContext(PushCampaign $campaign, array $extra = []): array
+    {
+        return array_merge([
+            'push_campaign_id' => $campaign->id,
+            'listing_id' => $campaign->listing_id,
+            'event_id' => $campaign->event_id,
+            'user_id' => $campaign->user_id,
+            'status' => $campaign->status,
+            'audience_scope' => $campaign->audience_scope,
+            'target_city' => $campaign->target_city,
+            'target_region' => $campaign->target_region,
+            'schedule_at' => $campaign->schedule_at,
+            'active_subscription_id' => $campaign->active_subscription_id,
+        ], $extra);
     }
 }

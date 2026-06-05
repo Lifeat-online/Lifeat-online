@@ -23,4 +23,9 @@ class StaffWalletPolicy
         return (int) $wallet->user_id === (int) $user->id
             && $user->hasRole('staff');
     }
+
+    public function adjust(User $user, StaffWallet $wallet): bool
+    {
+        return $user->hasRole('admin');
+    }
 }

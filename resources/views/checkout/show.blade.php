@@ -5,7 +5,12 @@
 @section('content')
     <section class="section">
         <div class="section-head">
-            <h2>Order Summary</h2>
+            <div>
+                <h2>Order Summary</h2>
+                @if ($order->renewedSubscription)
+                    <p class="muted">Renewal for {{ $order->renewedSubscription->package?->name ?: 'subscription package' }}.</p>
+                @endif
+            </div>
         </div>
 
         <article class="card">
@@ -18,6 +23,12 @@
             @endif
         </article>
     </section>
+
+    @if ($listingOnboarding)
+        <section class="section">
+            @include('account.listings._onboarding-checklist', ['onboardingChecklist' => $listingOnboarding])
+        </section>
+    @endif
 
     <section class="section">
         <div class="grid grid-2">
@@ -45,7 +56,7 @@
                 @if ($invoice)
                     <form method="post" action="{{ route('checkout.invoice.send', $order) }}" style="margin-top: 1rem;">
                         @csrf
-                        <button class="button" type="submit">Mark Invoice Sent</button>
+                        <button class="button" type="submit">Email invoice</button>
                     </form>
                 @endif
                 @if ($payment && $payment->status === 'failed')
@@ -60,47 +71,34 @@
 
     <section class="section">
         <article class="card">
-            <h3>PayFast Foundation</h3>
-            <p class="muted">This order is ready for a PayFast handoff. For now, the callback endpoint below can be used to simulate PayFast success or failure while the real gateway integration is being built.</p>
+            <h3>Payment Handoff</h3>
+            <p class="muted">Generate a PayFast handoff when you are ready to pay. This order keeps a payment-attempt history so you can see whether the latest attempt is pending, failed, or complete.</p>
 
-            <form method="post" action="{{ route('checkout.payfast.initiate', $order) }}" style="margin-bottom: 1rem;">
-                @csrf
-                <button class="button" type="submit">Generate PayFast Payload</button>
-            </form>
-
-            @if ($latestAttempt)
-                <div class="card" style="margin-bottom: 1rem; background: rgba(29, 78, 216, 0.04);">
-                    <p><strong>Latest Attempt:</strong> {{ ucfirst($latestAttempt->status) }}</p>
-                    <p><strong>Redirect URL:</strong> {{ $latestAttempt->redirect_url }}</p>
-                    @if (($latestAttempt->request_payload_json['signature'] ?? null))
-                        <p><strong>Signature:</strong> {{ $latestAttempt->request_payload_json['signature'] }}</p>
-                    @endif
-                    <pre style="overflow:auto; white-space:pre-wrap;">{{ json_encode($latestAttempt->request_payload_json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
-                </div>
+            @if (! $payment || $payment->status !== 'paid')
+                <form method="post" action="{{ route('checkout.payfast.initiate', $order) }}" style="margin-bottom: 1rem;">
+                    @csrf
+                    <button class="button" type="submit">Prepare PayFast payment</button>
+                </form>
             @endif
 
-            <form method="post" action="{{ route('checkout.payfast.callback') }}" class="form-grid">
-                @csrf
-                <input type="hidden" name="order_number" value="{{ $order->order_number }}">
-                <div>
-                    <label for="status">Callback Status</label>
-                    <select id="status" name="status">
-                        <option value="paid">Paid</option>
-                        <option value="failed">Failed</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="provider_transaction_id">Transaction Reference</label>
-                    <input id="provider_transaction_id" name="provider_transaction_id" value="{{ $payment?->provider_transaction_id }}">
-                </div>
-                <div>
-                    <label for="signature">Signature</label>
-                    <input id="signature" name="signature" value="{{ $latestAttempt->request_payload_json['signature'] ?? '' }}">
-                </div>
-                <div>
-                    <button class="button" type="submit">Simulate Callback</button>
-                </div>
-            </form>
+            @if ($latestAttempt?->redirect_url && $latestAttempt->status === 'initiated')
+                <p><a class="button-link" href="{{ $latestAttempt->redirect_url }}" rel="noopener">Open latest PayFast handoff</a></p>
+            @endif
+
+            <h4>Attempt History</h4>
+            @forelse ($paymentAttempts as $attempt)
+                <p>
+                    <strong>{{ ucfirst($attempt->status) }}</strong><br>
+                    <span class="muted">
+                        {{ ucfirst($attempt->provider) }}
+                        @if ($attempt->attempted_at)
+                            - {{ $attempt->attempted_at->format('j M Y H:i') }}
+                        @endif
+                    </span>
+                </p>
+            @empty
+                <div class="empty-state">No payment attempts have been generated yet.</div>
+            @endforelse
         </article>
     </section>
 @endsection

@@ -34,6 +34,7 @@ class EnvironmentCheck
             $this->uploadStorageChecks(),
             $this->backupChecks(),
             $this->payFastChecks(),
+            $this->errorTrackingChecks(),
         )));
     }
 
@@ -185,6 +186,45 @@ class EnvironmentCheck
             $this->expectNotIn('error', 'payfast.merchant_id', $merchantId, ['10000100'], 'PayFast merchant ID is still the sandbox default.'),
             $this->expectNotIn('error', 'payfast.merchant_key', $merchantKey, ['46f0cd694581a'], 'PayFast merchant key is still the sandbox default.'),
             $this->expectPresent('warning', 'payfast.passphrase', $passphrase, 'Set a PayFast passphrase if your PayFast account uses one.'),
+        ]));
+    }
+
+    /**
+     * @return array<int, array{level: string, key: string, message: string}>
+     */
+    private function errorTrackingChecks(): array
+    {
+        $enabled = (bool) config('error_tracking.enabled', false);
+        $driver = (string) config('error_tracking.driver', 'log');
+        $sampleRate = (float) config('error_tracking.sample_rate', 1.0);
+
+        return array_values(array_filter([
+            $this->expectTrue('error', 'ERROR_TRACKING_ENABLED', $enabled, 'ERROR_TRACKING_ENABLED must be true before public launch.'),
+            $this->expectNotIn('error', 'ERROR_TRACKING_DRIVER', $driver, ['', 'null', 'none'], 'ERROR_TRACKING_DRIVER must be log or webhook.'),
+            $enabled && $driver === 'webhook'
+                ? $this->expectPresent('error', 'ERROR_TRACKING_WEBHOOK_URL', (string) config('error_tracking.webhook_url', ''), 'ERROR_TRACKING_WEBHOOK_URL is required when ERROR_TRACKING_DRIVER=webhook.')
+                : null,
+            $enabled && $driver === 'log'
+                ? [
+                    'level' => 'warning',
+                    'key' => 'ERROR_TRACKING_DRIVER',
+                    'message' => 'ERROR_TRACKING_DRIVER=log records exceptions locally; production should use webhook with Sentry, Bugsnag, or an equivalent external incident sink.',
+                ]
+                : null,
+            $enabled && ! in_array($driver, ['log', 'webhook', 'null', 'none'], true)
+                ? [
+                    'level' => 'error',
+                    'key' => 'ERROR_TRACKING_DRIVER',
+                    'message' => 'ERROR_TRACKING_DRIVER must be log or webhook.',
+                ]
+                : null,
+            $enabled && ($sampleRate <= 0.0 || $sampleRate > 1.0)
+                ? [
+                    'level' => 'warning',
+                    'key' => 'ERROR_TRACKING_SAMPLE_RATE',
+                    'message' => 'ERROR_TRACKING_SAMPLE_RATE should be greater than 0 and no more than 1.',
+                ]
+                : null,
         ]));
     }
 

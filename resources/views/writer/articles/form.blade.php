@@ -4,7 +4,9 @@
     </x-slot>
 
     <div class="py-12">
-        <div class="max-w-5xl mx-auto sm:px-6 lg:px-8">
+        <div class="max-w-5xl mx-auto space-y-6 sm:px-6 lg:px-8">
+            @include('writer.articles._onboarding-checklist', ['writerOnboarding' => $writerOnboarding])
+
             <div class="rounded-lg bg-white p-6 shadow-sm">
                 @if ($errors->any())
                     <div class="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
@@ -85,6 +87,7 @@
                     <div class="rounded-md bg-gray-50 p-4 text-sm text-gray-700">
                         <p>Current status: <strong>{{ str_replace('_', ' ', ucfirst($article->status ?: 'draft')) }}</strong></p>
                         <p>Estimated word count: <strong>{{ old('body') || old('excerpt') ? str_word_count(strip_tags((string) (old('body') ?: old('excerpt')))) : $article->wordCount() }}</strong></p>
+                        <p class="mt-2 text-gray-600">Payment is only calculated after an editor publishes the article and the word ledger is created. Drafts and review submissions are not payable yet.</p>
                     </div>
 
                     @if ($article->exists && $article->revisionNotes->isNotEmpty())
@@ -104,7 +107,7 @@
 
                     <label class="inline-flex items-center gap-2">
                         <input type="checkbox" name="submit_for_review" value="1" @checked(old('submit_for_review', $article->status === 'pending_review'))>
-                        <span>Submit for review</span>
+                        <span>Submit for review when the title, excerpt, body, category, and local angle are ready for an editor.</span>
                     </label>
 
                     <div class="flex gap-3">

@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\Listing;
 use App\Models\Subscription;
 use App\Models\SubscriptionReminder;
+use App\Support\Logging\OperationalLog;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -13,7 +14,7 @@ class SubscriptionLifecycleService
 {
     public function extend(Subscription $subscription, int $days): Subscription
     {
-        return DB::transaction(function () use ($subscription, $days) {
+        $updated = DB::transaction(function () use ($subscription, $days) {
             $subscription->loadMissing(['entitlements', 'subscribable']);
 
             $base = $subscription->ends_at && $subscription->ends_at->isFuture()
@@ -41,11 +42,17 @@ class SubscriptionLifecycleService
 
             return $subscription->fresh(['entitlements', 'subscribable']);
         });
+
+        OperationalLog::info('subscription.extended', $this->subscriptionContext($updated, [
+            'extension_days' => $days,
+        ]));
+
+        return $updated;
     }
 
     public function suspend(Subscription $subscription, ?string $reason = null): Subscription
     {
-        return DB::transaction(function () use ($subscription) {
+        $updated = DB::transaction(function () use ($subscription) {
             $subscription->loadMissing(['entitlements', 'subscribable']);
 
             $subscription->update([
@@ -65,11 +72,17 @@ class SubscriptionLifecycleService
 
             return $subscription->fresh(['entitlements', 'subscribable']);
         });
+
+        OperationalLog::warning('subscription.suspended', $this->subscriptionContext($updated, [
+            'has_reason' => filled($reason),
+        ]));
+
+        return $updated;
     }
 
     public function expire(Subscription $subscription): Subscription
     {
-        return DB::transaction(function () use ($subscription) {
+        $updated = DB::transaction(function () use ($subscription) {
             $subscription->loadMissing(['entitlements', 'subscribable']);
 
             $subscription->update([
@@ -89,6 +102,10 @@ class SubscriptionLifecycleService
 
             return $subscription->fresh(['entitlements', 'subscribable']);
         });
+
+        OperationalLog::warning('subscription.expired', $this->subscriptionContext($updated));
+
+        return $updated;
     }
 
     public function logReminder(
@@ -98,12 +115,21 @@ class SubscriptionLifecycleService
         string $status = 'logged'
     ): SubscriptionReminder
     {
-        return $subscription->reminders()->create([
+        $reminder = $subscription->reminders()->create([
             'reminder_type' => $type,
             'channel' => $channel,
             'status' => $status,
             'sent_at' => now(),
         ]);
+
+        OperationalLog::info('subscription.reminder_logged', $this->subscriptionContext($subscription, [
+            'subscription_reminder_id' => $reminder->id,
+            'reminder_type' => $type,
+            'channel' => $channel,
+            'reminder_status' => $status,
+        ]));
+
+        return $reminder;
     }
 
     private function syncSubscribableState(Subscription $subscription, Carbon $until, bool $active): void
@@ -129,5 +155,21 @@ class SubscriptionLifecycleService
                 'published_at' => $active ? ($entity->published_at ?: now()) : $entity->published_at,
             ]);
         }
+    }
+
+    private function subscriptionContext(Subscription $subscription, array $extra = []): array
+    {
+        return array_merge([
+            'subscription_id' => $subscription->id,
+            'user_id' => $subscription->user_id,
+            'package_id' => $subscription->package_id,
+            'subscribable_type' => $subscription->subscribable_type,
+            'subscribable_id' => $subscription->subscribable_id,
+            'status' => $subscription->status,
+            'starts_at' => $subscription->starts_at,
+            'ends_at' => $subscription->ends_at,
+            'renews_at' => $subscription->renews_at,
+            'payment_id' => $subscription->payment_id,
+        ], $extra);
     }
 }

@@ -15,8 +15,6 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
         $this->call([
             ArticleCategorySeeder::class,
             ArticleTagSeeder::class,
@@ -24,13 +22,30 @@ class DatabaseSeeder extends Seeder
             MallStoreCategorySeeder::class,
         ]);
 
-        if ((bool) env('MALL_SEED_DEMO', false)) {
+        if ($this->shouldSeedDemoData('mall_demo')) {
             $this->call(MallDemoSeeder::class);
         }
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        if ($this->shouldSeedDemoData('demo_users') && ! User::where('email', 'test@example.com')->exists()) {
+            User::factory()->create([
+                'name' => 'Test User',
+                'email' => 'test@example.com',
+            ]);
+        }
+    }
+
+    private function shouldSeedDemoData(string $key): bool
+    {
+        if (! (bool) config('seeders.'.$key, false)) {
+            return false;
+        }
+
+        if (! app()->environment(['local', 'testing'])) {
+            $this->command?->warn("Skipping {$key} seed data outside local/testing.");
+
+            return false;
+        }
+
+        return true;
     }
 }

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use LogicException;
 
 class WalletLedgerEntry extends Model
 {
@@ -35,6 +36,12 @@ class WalletLedgerEntry extends Model
             'net_amount'   => 'decimal:2',
             'recorded_at'  => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::updating(fn () => throw new LogicException('Wallet ledger entries are append-only.'));
+        static::deleting(fn () => throw new LogicException('Wallet ledger entries are append-only.'));
     }
 
     public function wallet(): BelongsTo

@@ -55,7 +55,7 @@ class DevUpdateController extends Controller
 
     private function ensureDevOwner(Request $request): void
     {
-        if (strtolower((string) $request->user()?->email) !== 'jameskoen78@gmail.com') {
+        if (! $request->user()?->hasRole('dev', 'developer', 'super_admin')) {
             abort(403);
         }
     }
@@ -67,7 +67,7 @@ class DevUpdateController extends Controller
         }
 
         return $this->devToolsAvailable()
-            && filter_var((string) env('DEV_TEST_RUNNER_ENABLED', 'false'), FILTER_VALIDATE_BOOL);
+            && (bool) config('devtools.test_runner_enabled', false);
     }
 
     private function ensureDevToolsAvailable(): void
@@ -83,6 +83,6 @@ class DevUpdateController extends Controller
             return true;
         }
 
-        return filter_var((string) env('DEV_TOOLS_ENABLED', 'false'), FILTER_VALIDATE_BOOL);
+        return (bool) config('devtools.enabled', false);
     }
 }

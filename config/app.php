@@ -54,8 +54,6 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
-    'admin_bootstrap_token' => env('ADMIN_BOOTSTRAP_TOKEN'),
-
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

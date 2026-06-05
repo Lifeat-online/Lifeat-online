@@ -39,7 +39,7 @@ class VendorProductController extends Controller
             'images' => $images,
         ]));
 
-        $product->categories()->sync($validated['category_ids'] ?? []);
+        $product->categories()->sync($this->storeCategoryIds($store, $validated['category_ids'] ?? []));
 
         return redirect()->route('mall.vendor.products.index')->with('status', 'Product created.');
     }
@@ -73,7 +73,7 @@ class VendorProductController extends Controller
         }
 
         $product->update($payload);
-        $product->categories()->sync($validated['category_ids'] ?? []);
+        $product->categories()->sync($this->storeCategoryIds($store, $validated['category_ids'] ?? []));
 
         return redirect()->route('mall.vendor.products.index')->with('status', 'Product updated.');
     }
@@ -118,6 +118,14 @@ class VendorProductController extends Controller
         }
 
         return $images;
+    }
+
+    private function storeCategoryIds($store, array $categoryIds): array
+    {
+        return $store->productCategories()
+            ->whereIn('id', $categoryIds)
+            ->pluck('id')
+            ->all();
     }
 
     private function uniqueProductSlug(int $storeId, string $name, ?int $ignoreId = null): string

@@ -21,6 +21,7 @@
                                 <th class="px-4 py-3 text-left">Type</th>
                                 <th class="px-4 py-3 text-left">Billing</th>
                                 <th class="px-4 py-3 text-left">Price</th>
+                                <th class="px-4 py-3 text-left">Price Versions</th>
                                 <th class="px-4 py-3 text-left">Status</th>
                                 <th class="px-4 py-3 text-left">Actions</th>
                             </tr>
@@ -32,7 +33,13 @@
                                     <td class="px-4 py-3">{{ $package->name }}</td>
                                     <td class="px-4 py-3">{{ $package->type?->name }}</td>
                                     <td class="px-4 py-3">{{ ucfirst(str_replace('_', ' ', $package->billing_model)) }}</td>
-                                    <td class="px-4 py-3">{{ $price ? $price->currency.' '.number_format((float) $price->amount, 2) : '-' }}</td>
+                                    <td class="px-4 py-3">
+                                        {{ $price ? $price->currency.' '.number_format((float) $price->amount, 2) : '-' }}
+                                        @if ($price?->effective_from)
+                                            <div class="text-xs text-gray-500">Since {{ $price->effective_from->format('Y-m-d H:i') }}</div>
+                                        @endif
+                                    </td>
+                                    <td class="px-4 py-3">{{ $package->prices->count() }}</td>
                                     <td class="px-4 py-3">{{ ucfirst($package->status) }}</td>
                                     <td class="px-4 py-3">
                                         <a href="{{ route('admin.packages.edit', $package) }}" class="text-indigo-600">Edit</a>
@@ -40,7 +47,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="px-4 py-6 text-center text-gray-500">No packages created yet.</td>
+                                    <td colspan="7" class="px-4 py-6 text-center text-gray-500">No packages created yet.</td>
                                 </tr>
                             @endforelse
                         </tbody>

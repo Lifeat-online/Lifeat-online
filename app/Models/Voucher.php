@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasContentTranslations;
+use App\Support\Caching\PublicReadCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -57,6 +58,12 @@ class Voucher extends Model
             'published_at' => 'datetime',
             'meta_json' => 'array',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saved(fn () => PublicReadCache::flushPublic());
+        static::deleted(fn () => PublicReadCache::flushPublic());
     }
 
     public function getRouteKeyName(): string

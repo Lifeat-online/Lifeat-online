@@ -38,4 +38,9 @@ class PayoutRequestPolicy
     {
         return $user->hasRole('admin');
     }
+
+    public function export(User $user): bool
+    {
+        return $user->hasRole('admin', 'editor');
+    }
 }

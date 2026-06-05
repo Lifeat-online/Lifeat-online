@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Middleware\EnforceProductionSafeConfig;
 use App\Http\Middleware\EnsureTransportDriverOnDuty;
 use App\Http\Middleware\EnsureMallAdmin;
 use App\Http\Middleware\EnsureMallVendorIsActive;
 use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Middleware\ForceHttps;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TranslateInterface;
 use Illuminate\Console\Scheduling\Schedule;
@@ -40,6 +42,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
         $middleware->web(append: [
+            ForceHttps::class,
+            EnforceProductionSafeConfig::class,
             SetLocale::class,
             TranslateInterface::class,
         ]);
@@ -54,5 +58,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->report(function (\Throwable $exception): void {
+            app(\App\Support\Monitoring\ErrorTracker::class)->report(
+                $exception,
+                app()->bound('request') ? request() : null
+            );
+        });
     })->create();

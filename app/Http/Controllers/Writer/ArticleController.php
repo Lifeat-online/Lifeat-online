@@ -7,6 +7,7 @@ use App\Models\Article;
 use App\Models\Category;
 use App\Models\LocationNode;
 use App\Models\Tag;
+use App\Support\Onboarding\WriterOnboardingChecklist;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,17 +15,18 @@ use Illuminate\Validation\Rule;
 
 class ArticleController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, WriterOnboardingChecklist $onboarding): View
     {
         return view('writer.articles.index', [
             'articles' => Article::with(['categories', 'wordLedger', 'revisionNotes.author'])
                 ->where('user_id', $request->user()->id)
                 ->latest()
                 ->paginate(15),
+            'writerOnboarding' => $onboarding->forUser($request->user()),
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request, WriterOnboardingChecklist $onboarding): View
     {
         return view('writer.articles.form', [
             'article' => new Article(),
@@ -37,6 +39,7 @@ class ArticleController extends Controller
             'pageTitle' => 'Submit Article',
             'formAction' => route('writer.articles.store'),
             'formMethod' => 'POST',
+            'writerOnboarding' => $onboarding->forUser($request->user()),
         ]);
     }
 
@@ -57,7 +60,7 @@ class ArticleController extends Controller
         return redirect()->route('writer.articles.edit', $article)->with('status', 'Article saved.');
     }
 
-    public function edit(Request $request, Article $article): View
+    public function edit(Request $request, Article $article, WriterOnboardingChecklist $onboarding): View
     {
         abort_unless($article->user_id === $request->user()->id, 403);
 
@@ -72,6 +75,7 @@ class ArticleController extends Controller
             'pageTitle' => 'Edit Submission',
             'formAction' => route('writer.articles.update', $article),
             'formMethod' => 'PUT',
+            'writerOnboarding' => $onboarding->forUser($request->user()),
         ]);
     }
 

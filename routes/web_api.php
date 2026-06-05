@@ -51,23 +51,23 @@ Route::middleware('auth')->prefix('api')->name('api.')->group(function () {
         Route::get('/metrics', AdminMetricsController::class)->name('metrics');
         Route::get('/audit-logs', [AdminAuditLogController::class, 'index'])->middleware('role:admin,editor,support')->name('audit-logs.index');
 
-        Route::get('/listings', [AdminListingController::class, 'index'])->name('listings.index');
-        Route::post('/listings', [AdminListingController::class, 'store'])->name('listings.store');
-        Route::get('/listings/{listing:slug}', [AdminListingController::class, 'show'])->name('listings.show');
-        Route::put('/listings/{listing:slug}', [AdminListingController::class, 'update'])->name('listings.update');
-        Route::delete('/listings/{listing:slug}', [AdminListingController::class, 'destroy'])->name('listings.destroy');
-        Route::post('/listings/bulk', [AdminListingController::class, 'bulk'])->name('listings.bulk');
+        Route::get('/listings', [AdminListingController::class, 'index'])->middleware('role:admin,editor,staff')->name('listings.index');
+        Route::post('/listings', [AdminListingController::class, 'store'])->middleware('role:admin,editor,staff')->name('listings.store');
+        Route::get('/listings/{listing:slug}', [AdminListingController::class, 'show'])->middleware('role:admin,editor,staff')->name('listings.show');
+        Route::put('/listings/{listing:slug}', [AdminListingController::class, 'update'])->middleware('role:admin,editor,staff')->name('listings.update');
+        Route::delete('/listings/{listing:slug}', [AdminListingController::class, 'destroy'])->middleware('role:admin,editor,staff')->name('listings.destroy');
+        Route::post('/listings/bulk', [AdminListingController::class, 'bulk'])->middleware('role:admin,editor,staff')->name('listings.bulk');
 
-        Route::get('/events', [AdminEventController::class, 'index'])->name('events.index');
-        Route::post('/events', [AdminEventController::class, 'store'])->name('events.store');
-        Route::get('/events/{event:slug}', [AdminEventController::class, 'show'])->name('events.show');
-        Route::put('/events/{event:slug}', [AdminEventController::class, 'update'])->name('events.update');
-        Route::delete('/events/{event:slug}', [AdminEventController::class, 'destroy'])->name('events.destroy');
-        Route::post('/events/bulk', [AdminEventController::class, 'bulk'])->name('events.bulk');
+        Route::get('/events', [AdminEventController::class, 'index'])->middleware('role:admin,editor,staff')->name('events.index');
+        Route::post('/events', [AdminEventController::class, 'store'])->middleware('role:admin,editor,staff')->name('events.store');
+        Route::get('/events/{event:slug}', [AdminEventController::class, 'show'])->middleware('role:admin,editor,staff')->name('events.show');
+        Route::put('/events/{event:slug}', [AdminEventController::class, 'update'])->middleware('role:admin,editor,staff')->name('events.update');
+        Route::delete('/events/{event:slug}', [AdminEventController::class, 'destroy'])->middleware('role:admin,editor,staff')->name('events.destroy');
+        Route::post('/events/bulk', [AdminEventController::class, 'bulk'])->middleware('role:admin,editor,staff')->name('events.bulk');
 
-        Route::get('/articles', [AdminArticleController::class, 'index'])->name('articles.index');
+        Route::get('/articles', [AdminArticleController::class, 'index'])->middleware('role:admin,editor')->name('articles.index');
         Route::post('/articles', [AdminArticleController::class, 'store'])->middleware('role:admin,editor')->name('articles.store');
-        Route::get('/articles/{article:slug}', [AdminArticleController::class, 'show'])->name('articles.show');
+        Route::get('/articles/{article:slug}', [AdminArticleController::class, 'show'])->middleware('role:admin,editor')->name('articles.show');
         Route::put('/articles/{article:slug}', [AdminArticleController::class, 'update'])->middleware('role:admin,editor')->name('articles.update');
         Route::delete('/articles/{article:slug}', [AdminArticleController::class, 'destroy'])->middleware('role:admin,editor')->name('articles.destroy');
         Route::post('/articles/bulk', [AdminArticleController::class, 'bulk'])->middleware('role:admin,editor')->name('articles.bulk');

@@ -37,6 +37,7 @@
                         {{ $category->name }}
                     </label>
                 @endforeach
+                <a class="mall-chip" href="{{ route('mall.vendor.product-categories.index') }}">Manage Categories</a>
             </div>
             @if ($errors->any()) <div class="mall-alert">{{ $errors->first() }}</div> @endif
             <button class="mall-button" type="submit">Save Product</button>

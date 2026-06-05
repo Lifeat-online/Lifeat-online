@@ -39,6 +39,11 @@
             border: 1px solid var(--border);
             background: var(--surface);
         }
+        .status-roadmap {
+            display: grid;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
         @media (max-width: 900px) {
             .submitted-shell {
                 grid-template-columns: 1fr;
@@ -80,6 +85,14 @@
                 <div class="step-card">
                     <strong>Onboarding contact</strong>
                     <p class="helper">Approved applicants are contacted for the next setup step before they start working inside the platform.</p>
+                </div>
+                <div class="step-card">
+                    <strong>Access email</strong>
+                    <p class="helper">If approved, you receive an access email to set your password, open the writer workspace, submit articles, and track earnings.</p>
+                </div>
+                <div class="step-card">
+                    <strong>Payment expectations</strong>
+                    <p class="helper">Payout details are only needed after approved work creates a payable article ledger or staff commission record.</p>
                 </div>
             </div>
         </div>

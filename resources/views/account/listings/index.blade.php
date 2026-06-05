@@ -36,6 +36,13 @@
 
     <section class="section">
         @forelse ($listings as $listing)
+            @php
+                $activeSubscription = $listing->activeSubscription;
+                $expiresAt = $listing->package_expires_at ?: $activeSubscription?->ends_at;
+                $daysUntilExpiry = $expiresAt ? (int) now()->startOfDay()->diffInDays($expiresAt->copy()->startOfDay(), false) : null;
+                $expiresSoon = $activeSubscription && $daysUntilExpiry !== null && $daysUntilExpiry >= 0 && $daysUntilExpiry <= 30;
+                $hasExpiredHistory = ! $activeSubscription && $listing->subscriptions->isNotEmpty();
+            @endphp
             <article class="card" style="margin-bottom:1rem;">
                 <div class="section-head" style="margin-bottom:0.75rem;">
                     <div>
@@ -53,7 +60,11 @@
                     </div>
                 </div>
                 <p class="muted">
-                    @if ($listing->hasActiveBusinessEntitlement())
+                    @if ($expiresSoon)
+                        Package expires soon: {{ $expiresAt->format('j M Y') }}. Renew early to avoid losing public visibility.
+                    @elseif ($hasExpiredHistory)
+                        Package expired or inactive. Renew to restore public listing visibility.
+                    @elseif ($listing->hasActiveBusinessEntitlement())
                         Publicly visible with an active business entitlement.
                     @elseif ($listing->status === 'published')
                         Published status is set, but the listing still needs an active entitlement to stay public.
@@ -64,6 +75,11 @@
                 <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
                     <a class="button-link" href="{{ route('account.listings.show', $listing) }}">Open listing workspace</a>
                     <a class="button-link" href="{{ route('account.listings.edit', $listing) }}">Edit profile</a>
+                    @if ($activeSubscription)
+                        <a class="button-link" href="{{ route('checkout.subscriptions.renew', $activeSubscription) }}">Renew package</a>
+                    @elseif ($hasExpiredHistory)
+                        <a class="button-link" href="{{ route('checkout.index', ['listing' => $listing->slug]) }}">Choose package</a>
+                    @endif
                 </div>
             </article>
         @empty

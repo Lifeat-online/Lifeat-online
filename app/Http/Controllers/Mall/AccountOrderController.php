@@ -22,7 +22,7 @@ class AccountOrderController extends Controller
 
     public function show(Request $request, MallOrder $order): View
     {
-        abort_unless($order->user_id === $request->user()->id, 404);
+        $this->authorize('view', $order);
 
         $order->load('store', 'items.product', 'payments', 'fulfillment');
 

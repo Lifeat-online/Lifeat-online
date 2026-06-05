@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Listing;
+use App\Models\User;
 use App\Services\AiContentAssistantService;
 use App\Services\AuditLogService;
 use App\Support\Validation\UploadRules;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -77,7 +79,7 @@ class ListingController extends Controller
         return redirect()->route('admin.listings.edit', $listing);
     }
 
-    public function create(AiContentAssistantService $assistant): View
+    public function create(Request $request, AiContentAssistantService $assistant): View
     {
         $listing = new Listing();
 
@@ -85,6 +87,8 @@ class ListingController extends Controller
             'listing' => $listing,
             'categories' => Category::where('type', 'listing')->orderBy('name')->get(),
             'selectedCategoryIds' => [],
+            'ownerOptions' => $this->ownerOptions(),
+            'canManageOwner' => $this->canManageListingOwner($request),
             'qualityScore' => $assistant->listingQualityScore($listing),
             'pageTitle' => 'Create Listing',
             'formAction' => route('admin.listings.store'),
@@ -95,7 +99,7 @@ class ListingController extends Controller
     public function store(Request $request, AuditLogService $audit)
     {
         $data = $this->validated($request);
-        $data['user_id'] = $request->user()->id;
+        $data['user_id'] = $this->ownerUserIdFor($request) ?? $request->user()->id;
         $data['registered_by_user_id'] = $request->user()->hasRole('staff') ? $request->user()->id : null;
         $data['published_at'] = $this->publishedAt($data['status'], $data['published_at'] ?? null);
         $data['is_featured'] = $request->boolean('is_featured');
@@ -112,7 +116,7 @@ class ListingController extends Controller
         return redirect()->route('admin.listings.edit', $listing)->with('status', 'Listing saved.');
     }
 
-    public function edit(Listing $listing, AiContentAssistantService $assistant): View
+    public function edit(Request $request, Listing $listing, AiContentAssistantService $assistant): View
     {
         $listing->load(['categories', 'activeSubscription']);
 
@@ -120,6 +124,8 @@ class ListingController extends Controller
             'listing' => $listing,
             'categories' => Category::where('type', 'listing')->orderBy('name')->get(),
             'selectedCategoryIds' => $listing->categories->modelKeys(),
+            'ownerOptions' => $this->ownerOptions($listing->user_id),
+            'canManageOwner' => $this->canManageListingOwner($request),
             'qualityScore' => $assistant->listingQualityScore($listing),
             'pageTitle' => 'Edit Listing',
             'formAction' => route('admin.listings.update', $listing),
@@ -130,15 +136,30 @@ class ListingController extends Controller
     public function update(Request $request, Listing $listing, AuditLogService $audit)
     {
         $before = $listing->toArray();
+        $previousOwner = $this->ownerSnapshot((int) $listing->user_id);
 
         $data = $this->validated($request, $listing);
+        $data['user_id'] = $this->ownerUserIdFor($request, $listing) ?? $listing->user_id;
         $data['published_at'] = $this->publishedAt($data['status'], $data['published_at'] ?? $listing->published_at);
         $data['is_featured'] = $request->boolean('is_featured');
         $data = $this->handleUploads($request, $data, $listing);
+        $ownerChanged = (int) $data['user_id'] !== (int) $listing->user_id;
 
-        $listing->update($data);
-        $listing->categories()->sync($request->input('category_ids', []));
-        $audit->log($request, 'listing.updated', $listing, $before, $listing->fresh()->toArray());
+        DB::transaction(function () use ($request, $listing, $data, $audit, $before, $ownerChanged, $previousOwner) {
+            $listing->update($data);
+            $listing->categories()->sync($request->input('category_ids', []));
+
+            if ($ownerChanged) {
+                $this->syncListingScopedOwners($listing, (int) $data['user_id']);
+            }
+
+            $fresh = $listing->fresh();
+            $audit->log($request, 'listing.updated', $listing, $before, $fresh->toArray());
+
+            if ($ownerChanged) {
+                $audit->log($request, 'listing.ownership_transferred', $listing, $previousOwner, $this->ownerSnapshot((int) $fresh->user_id));
+            }
+        });
 
         if ($request->expectsJson()) {
             return response()->json(['ok' => true, 'listing' => $listing->fresh()->load('categories')]);
@@ -221,6 +242,61 @@ class ListingController extends Controller
             'category_ids' => ['nullable', 'array'],
             'category_ids.*' => ['integer', 'exists:categories,id'],
         ]);
+    }
+
+    private function ownerUserIdFor(Request $request, ?Listing $listing = null): ?int
+    {
+        if (! $this->canManageListingOwner($request)) {
+            return $listing?->user_id ?? $request->user()?->id;
+        }
+
+        $validated = $request->validate([
+            'owner_user_id' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        return filled($validated['owner_user_id'] ?? null)
+            ? (int) $validated['owner_user_id']
+            : ($listing?->user_id ?? $request->user()?->id);
+    }
+
+    private function canManageListingOwner(Request $request): bool
+    {
+        return $request->user()?->hasRole('admin', 'editor') ?? false;
+    }
+
+    private function ownerOptions(?int $currentOwnerId = null)
+    {
+        return User::query()
+            ->where(function ($query) use ($currentOwnerId) {
+                $query->whereIn('role', ['business_owner', 'staff', 'admin', 'super_admin']);
+
+                if ($currentOwnerId) {
+                    $query->orWhere('id', $currentOwnerId);
+                }
+            })
+            ->orderBy('name')
+            ->orderBy('email')
+            ->limit(200)
+            ->get(['id', 'name', 'email', 'role']);
+    }
+
+    private function ownerSnapshot(int $ownerId): array
+    {
+        $owner = User::query()->find($ownerId);
+
+        return [
+            'user_id' => $ownerId,
+            'owner_name' => $owner?->name,
+            'owner_email' => $owner?->email,
+            'owner_role' => $owner?->role,
+        ];
+    }
+
+    private function syncListingScopedOwners(Listing $listing, int $ownerUserId): void
+    {
+        $listing->events()->update(['user_id' => $ownerUserId]);
+        $listing->adCampaigns()->update(['user_id' => $ownerUserId]);
+        $listing->pushCampaigns()->update(['user_id' => $ownerUserId]);
     }
 
     private function publishedAt(string $status, mixed $publishedAt): mixed

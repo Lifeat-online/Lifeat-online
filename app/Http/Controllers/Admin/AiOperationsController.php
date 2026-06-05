@@ -126,6 +126,8 @@ class AiOperationsController extends Controller
                 "ai_prompt.{$featureKey}.version",
                 "ai_prompt.{$featureKey}.output_language",
             ])
+            ->get()
+            ->each
             ->delete();
 
         return back()->with('status', 'AI prompt override reset for '.str_replace('_', ' ', $featureKey).'.');
@@ -349,7 +351,7 @@ class AiOperationsController extends Controller
 
     private function canManageAiOperations(Request $request): bool
     {
-        return strtolower((string) $request->user()?->email) === 'jameskoen78@gmail.com';
+        return (bool) $request->user()?->hasRole('dev', 'developer', 'super_admin');
     }
 
     private function ensureDevOwner(Request $request): void

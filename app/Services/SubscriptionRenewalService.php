@@ -8,6 +8,7 @@ use App\Models\Payment;
 use App\Models\Invoice;
 use App\Models\Setting;
 use App\Models\Subscription;
+use App\Support\Logging\OperationalLog;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -29,6 +30,8 @@ class SubscriptionRenewalService
             ->first();
 
         if ($existingOrder) {
+            OperationalLog::info('subscription.renewal_order_reused', $this->renewalContext($subscription, $existingOrder));
+
             return $existingOrder;
         }
 
@@ -44,7 +47,7 @@ class SubscriptionRenewalService
         $subtotal = $price->vat_inclusive ? round($amount - $vatAmount, 2) : $amount;
         $total = $price->vat_inclusive ? $amount : round($amount + $vatAmount, 2);
 
-        return DB::transaction(function () use ($subscription, $price, $subtotal, $vatAmount, $total, $initiatePayment) {
+        $order = DB::transaction(function () use ($subscription, $price, $subtotal, $vatAmount, $total, $initiatePayment) {
             $order = Order::create([
                 'user_id' => $subscription->user_id,
                 'renewed_subscription_id' => $subscription->id,
@@ -111,5 +114,27 @@ class SubscriptionRenewalService
 
             return $order;
         });
+
+        OperationalLog::info('subscription.renewal_order_created', $this->renewalContext($subscription, $order, [
+            'payment_initiated' => $initiatePayment,
+        ]));
+
+        return $order;
+    }
+
+    private function renewalContext(Subscription $subscription, Order $order, array $extra = []): array
+    {
+        return array_merge([
+            'subscription_id' => $subscription->id,
+            'user_id' => $subscription->user_id,
+            'package_id' => $subscription->package_id,
+            'subscribable_type' => $subscription->subscribable_type,
+            'subscribable_id' => $subscription->subscribable_id,
+            'order_id' => $order->id,
+            'order_number' => $order->order_number,
+            'order_status' => $order->status,
+            'amount' => (float) $order->total,
+            'currency' => $order->currency,
+        ], $extra);
     }
 }

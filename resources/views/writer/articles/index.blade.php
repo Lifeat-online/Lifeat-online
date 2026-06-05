@@ -10,7 +10,9 @@
     </x-slot>
 
     <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto space-y-6 sm:px-6 lg:px-8">
+            @include('writer.articles._onboarding-checklist', ['writerOnboarding' => $writerOnboarding])
+
             <div class="rounded-lg bg-white p-6 shadow-sm">
                 @if (session('status'))
                     <div class="mb-4 rounded-md bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>

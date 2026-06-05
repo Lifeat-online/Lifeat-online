@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Category;
 use App\Models\Event;
+use App\Support\Caching\PublicReadCache;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
@@ -19,15 +19,7 @@ class EventController extends Controller
         $userLng = $request->float('user_lng');
         $radius = $request->integer('radius', 50);
 
-        $categories = Category::query()
-            ->where('type', 'event')
-            ->with('contentTranslations')
-            ->withCount([
-                'events as visible_events_count' => fn ($query) => $query->published(),
-            ])
-            ->orderByDesc('visible_events_count')
-            ->orderBy('name')
-            ->get();
+        $categories = PublicReadCache::eventCategories();
 
         $events = Event::with(['listing.contentTranslations', 'categories.contentTranslations', 'contentTranslations'])
             ->published()
@@ -114,18 +106,10 @@ class EventController extends Controller
             'events' => $events,
             'categories' => $categories,
             'featuredCategories' => $categories->take(6)->values(),
-            'popularLocations' => Event::published()
-                ->selectRaw('city, count(*) as events_count')
-                ->whereNotNull('city')
-                ->where('city', '!=', '')
-                ->groupBy('city')
-                ->orderByDesc('events_count')
-                ->orderBy('city')
-                ->limit(6)
-                ->get(),
+            'popularLocations' => PublicReadCache::popularEventLocations(),
             'eventStats' => [
-                'visible_events' => Event::published()->count(),
-                'upcoming_events' => Event::published()->where('start_at', '>=', now()->startOfDay())->count(),
+                'visible_events' => PublicReadCache::publicStats()['visible_events'],
+                'upcoming_events' => PublicReadCache::publicStats()['upcoming_events'],
                 'categories' => $categories->count(),
                 'results' => $events->total(),
             ],

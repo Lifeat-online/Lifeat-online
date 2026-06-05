@@ -3,18 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\Article;
-use App\Models\Category;
 use App\Models\Event;
 use App\Models\Listing;
 use App\Models\Voucher;
+use App\Support\Caching\PublicReadCache;
 use Illuminate\Contracts\View\View;
 
 class HomeController extends Controller
 {
     public function __invoke(): View
     {
-        $adminBootstrapVisible = true;
-
+        $publicStats = PublicReadCache::publicStats();
         $latestArticles = Article::with(['author', 'contentTranslations', 'categories.contentTranslations'])
             ->published()
             ->latest('published_at')
@@ -51,23 +50,13 @@ class HomeController extends Controller
         return view('home.index', [
             'leadArticle' => $latestArticles->first(),
             'secondaryArticles' => $latestArticles->slice(1)->values(),
-            'listingCount' => Listing::published()->count(),
-            'eventCount' => Event::published()->count(),
-            'articleCount' => Article::published()->count(),
+            'listingCount' => $publicStats['visible_listings'],
+            'eventCount' => $publicStats['visible_events'],
+            'articleCount' => $publicStats['published_articles'],
             'featuredListings' => $featuredListings,
             'upcomingEvents' => $upcomingEvents,
             'featuredVouchers' => $featuredVouchers,
-            'adminBootstrapVisible' => $adminBootstrapVisible,
-            'featuredCategories' => Category::query()
-                ->where('type', 'listing')
-                ->with('contentTranslations')
-                ->withCount([
-                    'listings as visible_listings_count' => fn ($query) => $query->published(),
-                ])
-                ->orderByDesc('visible_listings_count')
-                ->orderBy('name')
-                ->limit(6)
-                ->get(),
+            'featuredCategories' => PublicReadCache::listingCategories()->take(6)->values(),
             'latestArticles' => $latestArticles,
             'homeAdCampaigns' => \App\Models\AdCampaign::where('status', 'active')
                 ->whereNotNull('creative_image')

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Mall\Vendor;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Mall\Vendor\RegisterVendorRequest;
 use App\Models\MallStore;
 use App\Models\MallStoreCategory;
 use App\Models\MallVendorProfile;
@@ -30,25 +31,9 @@ class VendorRegistrationController extends Controller
         return view('mall.vendor.register', compact('categories'));
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(RegisterVendorRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
-            'tagline' => ['nullable', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:2000'],
-            'primary_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
-            'payfast_merchant_id' => ['nullable', 'string', 'max:20'],
-            'payfast_merchant_key' => ['nullable', 'string', 'max:20'],
-            'category_ids' => ['array'],
-            'category_ids.*' => ['integer', 'exists:mall_store_categories,id'],
-            'contact_name' => ['required', 'string', 'max:100'],
-            'contact_email' => ['required', 'email', 'max:150'],
-            'contact_phone' => ['nullable', 'string', 'max:20'],
-            'business_reg' => ['nullable', 'string', 'max:50'],
-            'bank_name' => ['nullable', 'string', 'max:50'],
-            'bank_account' => ['nullable', 'string', 'max:30'],
-            'bank_branch_code' => ['nullable', 'string', 'max:10'],
-        ]);
+        $validated = $request->validated();
 
         $store = MallStore::create([
             'owner_user_id' => $request->user()->id,

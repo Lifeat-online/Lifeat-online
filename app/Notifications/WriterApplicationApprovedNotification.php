@@ -34,6 +34,8 @@ class WriterApplicationApprovedNotification extends Notification
                 'token' => $this->token,
                 'email' => $notifiable->email,
             ]))
+            ->line('After signing in, open My Article Submissions to draft your first story, submit it for review, and watch for editor feedback.')
+            ->line('Writer earnings only appear after an article is approved, published, and added to the word ledger. Banking or payout details are handled later through the payout workflow.')
             ->line('If you already have a password, you can still use this link to reset it safely.');
     }
 }

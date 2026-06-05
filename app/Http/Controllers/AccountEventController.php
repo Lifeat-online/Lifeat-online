@@ -2,18 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Account\SaveEventRequest;
 use App\Models\Category;
 use App\Models\Event;
 use App\Models\Listing;
-use App\Support\Validation\UploadRules;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class AccountEventController extends Controller
@@ -61,11 +61,11 @@ class AccountEventController extends Controller
         ]);
     }
 
-    public function store(Request $request, Listing $listing): RedirectResponse
+    public function store(SaveEventRequest $request, Listing $listing): RedirectResponse
     {
         Gate::authorize('manage', $listing);
 
-        $data = $this->validated($request);
+        $data = $request->validated();
         $this->ensurePublishableListing($data['status'], $listing);
         $data['listing_id'] = $listing->id;
         $data['user_id'] = $listing->user_id ?: $request->user()->id;
@@ -74,8 +74,8 @@ class AccountEventController extends Controller
         $data['is_all_day'] = $request->boolean('is_all_day');
         $data = $this->handleUploads($request, $data);
 
-        $event = Event::create($data);
-        $event->categories()->sync($request->input('category_ids', []));
+        $event = Event::create($this->eventAttributes($data));
+        $event->categories()->sync($data['category_ids'] ?? []);
 
         return redirect()
             ->route('account.listings.events.edit', [$listing, $event])
@@ -114,19 +114,19 @@ class AccountEventController extends Controller
         ]);
     }
 
-    public function update(Request $request, Listing $listing, Event $event): RedirectResponse
+    public function update(SaveEventRequest $request, Listing $listing, Event $event): RedirectResponse
     {
         Gate::authorize('manage', $listing);
         abort_unless($event->listing_id === $listing->id, 404);
 
-        $data = $this->validated($request, $event);
+        $data = $request->validated();
         $this->ensurePublishableListing($data['status'], $listing);
         $data['published_at'] = $this->publishedAt($data['status'], $data['published_at'] ?? $event->published_at);
         $data['is_all_day'] = $request->boolean('is_all_day');
         $data = $this->handleUploads($request, $data, $event);
 
-        $event->update($data);
-        $event->categories()->sync($request->input('category_ids', []));
+        $event->update($this->eventAttributes($data));
+        $event->categories()->sync($data['category_ids'] ?? []);
 
         return redirect()
             ->route('account.listings.events.edit', [$listing, $event])
@@ -149,29 +149,12 @@ class AccountEventController extends Controller
             ->with('status', 'Event removed.');
     }
 
-    private function validated(Request $request, ?Event $event = null): array
+    private function eventAttributes(array $data): array
     {
-        return $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'excerpt' => ['nullable', 'string'],
-            'description' => ['nullable', 'string'],
-            'venue_name' => ['nullable', 'string', 'max:255'],
-            'address_line' => ['nullable', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:255'],
-            'region' => ['nullable', 'string', 'max:255'],
-            'country' => ['nullable', 'string', 'max:255'],
-            'postal_code' => ['nullable', 'string', 'max:255'],
-            'start_at' => ['required', 'date'],
-            'end_at' => ['nullable', 'date', 'after_or_equal:start_at'],
-            'website_url' => ['nullable', 'url'],
-            'featured_image_upload' => UploadRules::optionalPublicImage(),
-            'remove_featured_image' => ['nullable', 'boolean'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'status' => ['required', Rule::in(['draft', 'published'])],
-            'published_at' => ['nullable', 'date'],
-            'category_ids' => ['nullable', 'array'],
-            'category_ids.*' => ['integer', Rule::exists('categories', 'id')->where('type', 'event')],
+        return Arr::except($data, [
+            'category_ids',
+            'featured_image_upload',
+            'remove_featured_image',
         ]);
     }
 

@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Account\AdCampaignRequest;
 use App\Models\AdCampaign;
-use App\Models\Event;
 use App\Models\Listing;
-use App\Support\Validation\UploadRules;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -56,18 +56,18 @@ class AccountAdCampaignController extends Controller
         ]);
     }
 
-    public function store(Request $request, Listing $listing): RedirectResponse
+    public function store(AdCampaignRequest $request, Listing $listing): RedirectResponse
     {
         Gate::authorize('manage', $listing);
         $this->ensureEntitledListing($listing);
 
-        $data = $this->validated($request, $listing);
+        $data = $request->validated();
         $data['listing_id'] = $listing->id;
         $data['user_id'] = $listing->user_id ?: $request->user()->id;
         $data['slug'] = $this->uniqueSlug($data['title']);
         $data = $this->handleUploads($request, $data);
 
-        $campaign = AdCampaign::create($data);
+        $campaign = AdCampaign::create($this->campaignAttributes($data));
 
         return redirect()
             ->route('account.listings.ad-campaigns.edit', [$listing, $campaign])
@@ -105,15 +105,15 @@ class AccountAdCampaignController extends Controller
         ]);
     }
 
-    public function update(Request $request, Listing $listing, AdCampaign $adCampaign): RedirectResponse
+    public function update(AdCampaignRequest $request, Listing $listing, AdCampaign $adCampaign): RedirectResponse
     {
         Gate::authorize('manage', $listing);
         abort_unless($adCampaign->listing_id === $listing->id, 404);
 
-        $data = $this->validated($request, $listing);
+        $data = $request->validated();
         $data = $this->handleUploads($request, $data, $adCampaign);
 
-        $adCampaign->update($data);
+        $adCampaign->update($this->campaignAttributes($data));
 
         return redirect()
             ->route('account.listings.ad-campaigns.edit', [$listing, $adCampaign])
@@ -133,23 +133,6 @@ class AccountAdCampaignController extends Controller
             ->with('status', 'Advert campaign removed.');
     }
 
-    private function validated(Request $request, Listing $listing): array
-    {
-        return $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'headline' => ['nullable', 'string', 'max:255'],
-            'body' => ['nullable', 'string'],
-            'destination_url' => ['nullable', 'url'],
-            'event_id' => ['nullable', 'integer', 'exists:events,id'],
-            'placement' => ['required', 'in:banner,sitewide_banner,in_article_intro,in_article_mid,in_article_end,popup'],
-            'start_at' => ['nullable', 'date'],
-            'end_at' => ['nullable', 'date', 'after_or_equal:start_at'],
-            'creative_image_upload' => UploadRules::optionalPublicImage(),
-            'remove_creative_image' => ['nullable', 'boolean'],
-            'status' => ['required', 'in:draft,ready,active'],
-        ] + ($listing->exists ? [] : []));
-    }
-
     private function handleUploads(Request $request, array $data, ?AdCampaign $campaign = null): array
     {
         if ($request->boolean('remove_creative_image') && $campaign?->creative_image) {
@@ -165,6 +148,14 @@ class AccountAdCampaignController extends Controller
         }
 
         return $data;
+    }
+
+    private function campaignAttributes(array $data): array
+    {
+        return Arr::except($data, [
+            'creative_image_upload',
+            'remove_creative_image',
+        ]);
     }
 
     private function storeImage(UploadedFile $file, string $directory): string

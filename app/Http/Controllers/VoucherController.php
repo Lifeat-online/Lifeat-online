@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Category;
 use App\Models\Listing;
 use App\Models\Voucher;
+use App\Support\Caching\PublicReadCache;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
@@ -17,11 +17,7 @@ class VoucherController extends Controller
         $sort = trim((string) $request->string('sort', 'newest'));
         $listingSlug = trim((string) $request->string('listing'));
 
-        $categories = Category::query()
-            ->where('type', 'listing')
-            ->with('contentTranslations')
-            ->orderBy('name')
-            ->get();
+        $categories = PublicReadCache::listingCategories()->sortBy('name')->values();
 
         $vouchers = Voucher::query()
             ->with([

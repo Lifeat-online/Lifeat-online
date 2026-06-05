@@ -78,6 +78,18 @@
                             <label class="mb-1 block text-sm font-medium">Publish At</label>
                             <input class="w-full rounded-md border-gray-300" type="datetime-local" name="published_at" value="{{ old('published_at', optional($listing->published_at)->format('Y-m-d\TH:i')) }}">
                         </div>
+                        @if ($canManageOwner)
+                            <div class="md:col-span-2">
+                                <label class="mb-1 block text-sm font-medium">Listing Owner</label>
+                                <select class="w-full rounded-md border-gray-300" name="owner_user_id">
+                                    @foreach ($ownerOptions as $owner)
+                                        <option value="{{ $owner->id }}" @selected((int) old('owner_user_id', $listing->user_id ?: auth()->id()) === (int) $owner->id)>
+                                            {{ $owner->name }} &lt;{{ $owner->email }}&gt; - {{ str_replace('_', ' ', $owner->role ?: 'user') }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
                     </div>
 
                     <div class="grid gap-6 md:grid-cols-2">

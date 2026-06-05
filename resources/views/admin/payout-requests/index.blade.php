@@ -7,13 +7,21 @@
                     <span class="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-sm font-semibold text-amber-800">{{ $pendingCount }} pending</span>
                 @endif
             </h2>
-            <a href="{{ route('admin.wallet.index') }}" class="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700">Staff Wallets</a>
+            <div class="flex flex-wrap items-center gap-3">
+                @can('export', App\Models\PayoutRequest::class)
+                    <a href="{{ route('admin.payout-requests.export', request()->only(['status', 'wallet'])) }}" class="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white">Export CSV</a>
+                @endcan
+                <a href="{{ route('admin.wallet.index') }}" class="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700">Staff Wallets</a>
+            </div>
         </div>
     </x-slot>
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto space-y-6 sm:px-6 lg:px-8">
             <form method="get" class="flex flex-wrap gap-4 rounded-lg bg-white p-4 shadow-sm">
+                @if ($selectedWalletId)
+                    <input type="hidden" name="wallet" value="{{ $selectedWalletId }}">
+                @endif
                 <select name="status" class="rounded-md border-gray-300 text-sm">
                     <option value="">All statuses</option>
                     @foreach ($statusOptions as $opt)
@@ -21,8 +29,11 @@
                     @endforeach
                 </select>
                 <button type="submit" class="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white">Filter</button>
-                @if ($selectedStatus)
+                @if ($selectedStatus || $selectedWalletId)
                     <a href="{{ route('admin.payout-requests.index') }}" class="text-sm text-gray-600 self-center">Clear</a>
+                @endif
+                @if ($selectedWalletId)
+                    <span class="self-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Wallet #{{ $selectedWalletId }}</span>
                 @endif
             </form>
 

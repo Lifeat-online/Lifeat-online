@@ -4,18 +4,18 @@
 
 @php
     $pack = fn ($packages) => $packages->map(function ($package) {
-        $price = $package->currentPrice();
+        $price = $package['current_price'] ?? null;
 
         return [
-            'slug' => $package->slug,
-            'name' => $package->name,
-            'description' => $package->description,
-            'amount' => $price ? (float) $price->amount : 0,
-            'currency' => $price?->currency ?: 'ZAR',
-            'duration_days' => $package->duration_days,
-            'billing_model' => $package->billing_model,
-            'is_self_service' => (bool) $package->is_self_service,
-            'settings' => $package->settings_json ?: [],
+            'slug' => $package['slug'],
+            'name' => $package['name'],
+            'description' => $package['description'],
+            'amount' => $price ? (float) $price['amount'] : 0,
+            'currency' => $price['currency'] ?? 'ZAR',
+            'duration_days' => $package['duration_days'],
+            'billing_model' => $package['billing_model'],
+            'is_self_service' => (bool) $package['is_self_service'],
+            'settings' => $package['settings'] ?: [],
         ];
     })->values();
 
