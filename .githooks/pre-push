@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# Lifeat pre-push hook
+# ---------------------------------------------------------------------------
+# Runs Pint and a smoke subset of phpunit before allowing the push.
+# Install with:  git config core.hooksPath .githooks
+# Skip with:     SKIP_PRE_PUSH=1 git push ...
+# ---------------------------------------------------------------------------
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+if [[ "${SKIP_PRE_PUSH:-0}" == "1" ]]; then
+    echo "[pre-push] SKIP_PRE_PUSH=1, skipping checks."
+    exit 0
+fi
+
+# 1. Pint (code style) ---------------------------------------------------
+if [[ -x vendor/bin/pint ]]; then
+    echo "[pre-push] Running Pint (--test)…"
+    if ! vendor/bin/pint --test; then
+        echo "[pre-push] Pint failed. Run 'vendor/bin/pint' to fix, then retry."
+        exit 1
+    fi
+fi
+
+# 2. Smoke test subset ----------------------------------------------------
+# Only run the most relevant feature tests for what we just changed.
+# Default to BackupCommand + OperatorPushNotifier — these cover the
+# operator alerting surface that touched deploy + scheduler + env.
+SMOKE_FILTER="${PRE_PUSH_SMOKE_FILTER:-BackupCommandTest|OperatorPushNotifierTest|ErrorTrackingTest}"
+echo "[pre-push] Running smoke tests (--filter=$SMOKE_FILTER)…"
+if ! php artisan test --filter="$SMOKE_FILTER"; then
+    echo "[pre-push] Smoke tests failed. Run 'php artisan test' for full output."
+    exit 1
+fi
+
+echo "[pre-push] All checks passed. Pushing…"
+exit 0

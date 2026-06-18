@@ -68,6 +68,7 @@ For local PHPUnit runs, ensure the PHP CLI has these extensions enabled: `mbstri
 - For uploads, mount durable Hetzner/Coolify storage at `/app/storage/app` and set `UPLOAD_STORAGE_BACKEND=mounted_volume` plus `UPLOAD_STORAGE_MOUNT_PATH=/app/storage/app`; S3-compatible object storage can be wired later.
 - Enable managed database backups and record a successful restore drill with `BACKUPS_ENABLED=true`, `BACKUP_PROVIDER`, `BACKUP_RESTORE_DRILL_COMPLETED=true`, and `BACKUP_LAST_RESTORE_DRILL_DATE`.
 - Provision the first admin from the deployment shell with `php artisan admin:create`; the command writes an audit log for account creation or promotion.
+- A pre-push hook lives in `.githooks/pre-push` (run `./setup-hooks.sh` once per clone) and runs `vendor/bin/pint --test` plus a smoke subset of `php artisan test` (filter `BackupCommand|OperatorPushNotifier|ErrorTracking`) before allowing a push. Skip with `SKIP_PRE_PUSH=1 git push …`.
 - Use the production readiness tracker in `Planning/production-readiness-todo.md` for launch blockers, verification, and operational hardening.
 
 ## License
