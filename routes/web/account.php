@@ -47,6 +47,9 @@ Route::post('/account/wallet/payout-requests', [AccountWalletController::class, 
 Route::delete('/account/wallet/payout-requests/{payoutRequest}', [AccountWalletController::class, 'cancelPayout'])
     ->middleware(['auth', 'role:staff'])
     ->name('account.wallet.payout-requests.cancel');
+Route::get('/account/wallet/statement.pdf', [AccountWalletController::class, 'statementPdf'])
+    ->middleware(['auth', 'role:staff'])
+    ->name('account.wallet.statement.pdf');
 
 Route::get('/account/submissions', [AccountSubmissionController::class, 'index'])
     ->middleware('auth')

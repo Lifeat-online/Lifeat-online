@@ -6,9 +6,11 @@ use App\Http\Requests\Account\RequestPayoutRequest;
 use App\Models\AuditLog;
 use App\Models\PayoutRequest;
 use App\Models\StaffWallet;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 
 class AccountWalletController extends Controller
@@ -48,28 +50,28 @@ class AccountWalletController extends Controller
         $validated = $payoutRequest->validated();
 
         $payout = PayoutRequest::create([
-            'wallet_id'            => $wallet->id,
+            'wallet_id' => $wallet->id,
             'requested_by_user_id' => $user->id,
-            'amount'               => $validated['amount'],
-            'currency'             => $wallet->currency,
-            'status'               => PayoutRequest::STATUS_REQUESTED,
-            'bank_name'            => $validated['bank_name'],
-            'account_holder'       => $validated['account_holder'],
-            'account_number'       => $validated['account_number'],
-            'branch_code'          => $validated['branch_code'],
-            'notes'                => $validated['notes'] ?? null,
-            'requested_at'         => now(),
+            'amount' => $validated['amount'],
+            'currency' => $wallet->currency,
+            'status' => PayoutRequest::STATUS_REQUESTED,
+            'bank_name' => $validated['bank_name'],
+            'account_holder' => $validated['account_holder'],
+            'account_number' => $validated['account_number'],
+            'branch_code' => $validated['branch_code'],
+            'notes' => $validated['notes'] ?? null,
+            'requested_at' => now(),
         ]);
 
         AuditLog::create([
             'actor_user_id' => $user->id,
-            'action'        => 'payout_request.submitted',
-            'subject_type'  => PayoutRequest::class,
-            'subject_id'    => $payout->id,
-            'before_json'   => [],
-            'after_json'    => ['amount' => $payout->amount, 'status' => $payout->status],
-            'ip_address'    => $request->ip(),
-            'user_agent'    => $request->userAgent(),
+            'action' => 'payout_request.submitted',
+            'subject_type' => PayoutRequest::class,
+            'subject_id' => $payout->id,
+            'before_json' => [],
+            'after_json' => ['amount' => $payout->amount, 'status' => $payout->status],
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
         ]);
 
         return redirect()->route('account.wallet.index')
@@ -86,16 +88,54 @@ class AccountWalletController extends Controller
 
         AuditLog::create([
             'actor_user_id' => $request->user()->id,
-            'action'        => 'payout_request.cancelled_by_staff',
-            'subject_type'  => PayoutRequest::class,
-            'subject_id'    => $payoutRequest->id,
-            'before_json'   => ['status' => PayoutRequest::STATUS_REQUESTED],
-            'after_json'    => ['status' => PayoutRequest::STATUS_CANCELLED],
-            'ip_address'    => $request->ip(),
-            'user_agent'    => $request->userAgent(),
+            'action' => 'payout_request.cancelled_by_staff',
+            'subject_type' => PayoutRequest::class,
+            'subject_id' => $payoutRequest->id,
+            'before_json' => ['status' => PayoutRequest::STATUS_REQUESTED],
+            'after_json' => ['status' => PayoutRequest::STATUS_CANCELLED],
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
         ]);
 
         return redirect()->route('account.wallet.index')
             ->with('status', 'Payout request cancelled.');
+    }
+
+    public function statementPdf(Request $request): Response
+    {
+        $user = $request->user();
+
+        $wallet = StaffWallet::with([
+            'ledgerEntries' => fn ($q) => $q->latest('recorded_at')->limit(200),
+            'payoutRequests' => fn ($q) => $q->latest('id')->limit(100),
+        ])->firstOrCreate(
+            ['user_id' => $user->id],
+            ['currency' => 'ZAR']
+        );
+
+        Gate::authorize('view', $wallet);
+
+        $pdf = Pdf::loadView('account.wallet.statement-pdf', [
+            'wallet' => $wallet,
+            'payoutRequests' => $wallet->payoutRequests->sortByDesc('id')->values(),
+            'ledgerEntries' => $wallet->ledgerEntries->sortByDesc('recorded_at')->values(),
+            'holder' => $user,
+            'generatedAt' => now(),
+        ])->setPaper('a4', 'portrait');
+
+        AuditLog::create([
+            'actor_user_id' => $user->id,
+            'action' => 'wallet.statement_pdf_generated',
+            'subject_type' => StaffWallet::class,
+            'subject_id' => $wallet->id,
+            'before_json' => [],
+            'after_json' => ['generated_at' => now()->toDateTimeString()],
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        $filename = sprintf('lifeat-payout-statement-%d-%s.pdf', $wallet->id, now()->format('Ymd-His'));
+
+        return $pdf->stream($filename);
     }
 }

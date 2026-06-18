@@ -1,6 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">My Commission Wallet</h2>
+        <div class="mt-2">
+            <a href="{{ route('account.wallet.statement.pdf') }}" target="_blank" rel="noopener" class="inline-flex items-center text-sm text-indigo-600 hover:text-indigo-800">
+                Download PDF statement
+            </a>
+        </div>
     </x-slot>
 
     <div class="py-12">
