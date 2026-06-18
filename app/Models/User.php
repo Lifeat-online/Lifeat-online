@@ -171,6 +171,15 @@ class User extends Authenticatable
             return true;
         }
 
+        $devImpersonatesAdmin = in_array((string) $this->role, ['dev', 'developer'], true)
+            && $requested->intersect([
+                'admin', 'super_admin', 'editor', 'content_manager', 'staff', 'sales_staff', 'dev', 'developer',
+            ])->isNotEmpty();
+
+        if ($devImpersonatesAdmin) {
+            return true;
+        }
+
         if (! static::roleTablesExist()) {
             return false;
         }
