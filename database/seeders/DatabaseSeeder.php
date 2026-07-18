@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             ArticleTagSeeder::class,
             LocationNodeSeeder::class,
             MallStoreCategorySeeder::class,
+            DevUserSeeder::class,
         ]);
 
         if ($this->shouldSeedDemoData('mall_demo')) {
