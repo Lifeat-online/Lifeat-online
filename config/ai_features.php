@@ -75,6 +75,12 @@ return [
             'profile' => 'premium',
             'notes' => 'Lower-volume, higher-value writing. Route to the best writing provider you can afford.',
         ],
+        'dev_operator_agent' => [
+            'label' => 'Developer Operator Assistant',
+            'profile' => 'premium',
+            'required_capabilities' => ['structured_json'],
+            'notes' => 'Low-volume tool planning for audited developer tasks. The server remains responsible for authorization and execution.',
+        ],
         'settings_test' => [
             'label' => 'Provider health check',
             'profile' => 'cheap_structured',

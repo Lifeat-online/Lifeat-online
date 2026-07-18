@@ -31,4 +31,9 @@ class OperatorConversation extends Model
     {
         return $this->hasMany(OperatorMessage::class);
     }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(OperatorTask::class);
+    }
 }

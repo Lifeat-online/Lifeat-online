@@ -27,7 +27,11 @@ return [
     ],
     'operator' => [
         'enabled' => env('AI_OPERATOR_ASSISTANT', false),
+        'agent_enabled' => env('AI_OPERATOR_AGENT_ENABLED', false),
         'mutations_enabled' => env('AI_OPERATOR_MUTATIONS', false),
         'limited_auto_enabled' => env('AI_OPERATOR_LIMITED_AUTO', false),
+        'step_limit' => (int) env('AI_OPERATOR_STEP_LIMIT', 12),
+        'task_timeout_seconds' => (int) env('AI_OPERATOR_TASK_TIMEOUT', 300),
+        'max_cost' => (float) env('AI_OPERATOR_MAX_TASK_COST', 1.00),
     ],
 ];

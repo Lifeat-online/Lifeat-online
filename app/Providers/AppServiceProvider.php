@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Ai\Contracts\EmbeddingProvider;
 use App\Ai\Editorial\Contracts\HostResolver;
 use App\Ai\Editorial\DnsHostResolver;
+use App\Ai\Operator\AiOperatorTaskPlanner;
+use App\Ai\Operator\Contracts\OperatorTaskPlanner;
 use App\Ai\Providers\FakeEmbeddingProvider;
 use App\Ai\Providers\OpenAiEmbeddingProvider;
 use App\Events\MallOrderPaid;
@@ -16,32 +18,33 @@ use App\Listeners\RecordRevenueLifecycleEvent;
 use App\Listeners\SendMallOrderPaidEmails;
 use App\Models\Article;
 use App\Models\Category;
+use App\Models\CivicFaultReport;
 use App\Models\Classified;
 use App\Models\Event as LifeEvent;
 use App\Models\Listing;
 use App\Models\LocationNode;
 use App\Models\NotificationLog;
 use App\Models\Order;
-use App\Models\PayoutRequest;
 use App\Models\Payment;
+use App\Models\PayoutRequest;
 use App\Models\StaffWallet;
 use App\Models\Subscription;
 use App\Models\Tag;
 use App\Models\Voucher;
-use App\Observers\QueueContentTranslations;
 use App\Observers\QueueArticleKnowledge;
+use App\Observers\QueueContentTranslations;
 use App\Observers\QueuePublicKnowledge;
 use App\Policies\ListingPolicy;
 use App\Policies\NotificationLogPolicy;
 use App\Policies\OrderPolicy;
-use App\Policies\PayoutRequestPolicy;
 use App\Policies\PaymentPolicy;
+use App\Policies\PayoutRequestPolicy;
 use App\Policies\StaffWalletPolicy;
 use App\Policies\SubscriptionPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -52,6 +55,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(OperatorTaskPlanner::class, AiOperatorTaskPlanner::class);
         $this->app->bind(HostResolver::class, DnsHostResolver::class);
         $this->app->bind(EmbeddingProvider::class, function (): EmbeddingProvider {
             $dimensions = (int) config('ai_platform.embeddings.dimensions', 1536);
@@ -101,7 +105,7 @@ class AppServiceProvider extends ServiceProvider
         Tag::observe(QueueContentTranslations::class);
         Voucher::observe(QueueContentTranslations::class);
         Voucher::observe(QueuePublicKnowledge::class);
-        \App\Models\CivicFaultReport::observe(QueuePublicKnowledge::class);
+        CivicFaultReport::observe(QueuePublicKnowledge::class);
 
         $this->configureRateLimiters();
 

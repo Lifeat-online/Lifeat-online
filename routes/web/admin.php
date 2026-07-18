@@ -49,6 +49,24 @@ Route::middleware(['auth', 'role:admin,editor,staff,support,dev,developer'])->pr
         ->middleware('role:admin,editor,dev,developer')
         ->where('tool', '[A-Za-z0-9._-]+')
         ->name('ai-operator.tools.approve');
+    Route::post('/ai-operator/tasks', [AdminAiOperatorController::class, 'storeTask'])
+        ->middleware('role:dev,developer')
+        ->name('ai-operator.tasks.store');
+    Route::get('/ai-operator/tasks/{operatorTask}', [AdminAiOperatorController::class, 'showTask'])
+        ->middleware('role:dev,developer')
+        ->name('ai-operator.tasks.show');
+    Route::post('/ai-operator/tasks/{operatorTask}/cancel', [AdminAiOperatorController::class, 'cancelTask'])
+        ->middleware('role:dev,developer')
+        ->name('ai-operator.tasks.cancel');
+    Route::post('/ai-operator/tasks/{operatorTask}/approve', [AdminAiOperatorController::class, 'approveTask'])
+        ->middleware('role:dev,developer')
+        ->name('ai-operator.tasks.approve');
+    Route::post('/ai-operator/tasks/{operatorTask}/reject', [AdminAiOperatorController::class, 'rejectTask'])
+        ->middleware('role:dev,developer')
+        ->name('ai-operator.tasks.reject');
+    Route::post('/ai-operator/tasks/{operatorTask}/resume', [AdminAiOperatorController::class, 'resumeTask'])
+        ->middleware('role:dev,developer')
+        ->name('ai-operator.tasks.resume');
 
     Route::get('/editorial-dossiers', [AdminEditorialDossierController::class, 'index'])
         ->middleware('role:admin,editor,dev,developer')

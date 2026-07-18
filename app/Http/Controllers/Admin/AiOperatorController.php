@@ -6,16 +6,182 @@ use App\Ai\Operator\OperatorApprovalService;
 use App\Ai\Operator\OperatorToolRegistry;
 use App\Ai\Operator\OperatorToolRuntime;
 use App\Http\Controllers\Controller;
+use App\Jobs\RunOperatorTask;
 use App\Models\OperatorConversation;
+use App\Models\OperatorTask;
+use App\Models\OperatorToolRun;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AiOperatorController extends Controller
 {
+    public function storeTask(Request $request): JsonResponse
+    {
+        abort_unless(config('ai_platform.operator.enabled') && config('ai_platform.operator.agent_enabled'), 403, 'The enhanced Operator Assistant is disabled.');
+        abort_unless($request->user()->hasRole('dev', 'developer'), 403);
+        $validated = $request->validate([
+            'conversation_id' => ['nullable', 'uuid', 'exists:operator_conversations,id'],
+            'message' => ['required', 'string', 'max:5000'],
+        ]);
+
+        $task = DB::transaction(function () use ($request, $validated): OperatorTask {
+            $conversation = isset($validated['conversation_id'])
+                ? OperatorConversation::query()->where('user_id', $request->user()->id)->findOrFail($validated['conversation_id'])
+                : OperatorConversation::create([
+                    'user_id' => $request->user()->id,
+                    'title' => Str::limit($validated['message'], 80, ''),
+                    'last_activity_at' => now(),
+                ]);
+            $conversation->messages()->create(['role' => 'user', 'content' => $validated['message']]);
+            $conversation->update(['last_activity_at' => now()]);
+
+            return $conversation->tasks()->create([
+                'user_id' => $request->user()->id,
+                'goal' => $validated['message'],
+                'status' => OperatorTask::STATUS_PLANNED,
+                'step_limit' => max(1, (int) config('ai_platform.operator.step_limit', 12)),
+                'usage' => ['steps' => 0, 'cost' => 0],
+            ]);
+        });
+
+        RunOperatorTask::dispatch($task->id);
+
+        return response()->json([
+            'task_id' => $task->id,
+            'conversation_id' => $task->operator_conversation_id,
+            'status' => $task->status,
+            'status_url' => route('admin.ai-operator.tasks.show', $task),
+        ], 202);
+    }
+
+    public function showTask(Request $request, OperatorTask $operatorTask): JsonResponse
+    {
+        abort_unless($operatorTask->user_id === $request->user()->id, 404);
+        $operatorTask->load('steps');
+
+        return response()->json([
+            'id' => $operatorTask->id,
+            'conversation_id' => $operatorTask->operator_conversation_id,
+            'goal' => $operatorTask->goal,
+            'status' => $operatorTask->status,
+            'plan' => $operatorTask->plan,
+            'sources' => $operatorTask->sources,
+            'usage' => $operatorTask->usage,
+            'result' => $operatorTask->result,
+            'error' => $operatorTask->error,
+            'steps' => $operatorTask->steps,
+        ]);
+    }
+
+    public function cancelTask(Request $request, OperatorTask $operatorTask): JsonResponse
+    {
+        abort_unless($operatorTask->user_id === $request->user()->id, 404);
+        if (! in_array($operatorTask->status, [OperatorTask::STATUS_COMPLETED, OperatorTask::STATUS_FAILED, OperatorTask::STATUS_CANCELLED], true)) {
+            $operatorTask->update(['status' => OperatorTask::STATUS_CANCELLED, 'cancelled_at' => now()]);
+        }
+
+        return response()->json(['id' => $operatorTask->id, 'status' => $operatorTask->fresh()->status]);
+    }
+
+    public function approveTask(
+        Request $request,
+        OperatorTask $operatorTask,
+        OperatorApprovalService $approvals,
+        OperatorToolRuntime $runtime,
+    ): JsonResponse {
+        abort_unless($operatorTask->user_id === $request->user()->id, 404);
+        abort_unless($operatorTask->status === OperatorTask::STATUS_WAITING_FOR_APPROVAL, 409, 'This task is not waiting for approval.');
+        $validated = $request->validate(['step_id' => ['required', 'integer']]);
+        $step = $operatorTask->steps()
+            ->whereKey($validated['step_id'])
+            ->where('status', OperatorTask::STATUS_WAITING_FOR_APPROVAL)
+            ->firstOrFail();
+        abort_unless($step->tool && in_array($step->risk, ['R2', 'R3'], true), 409, 'This task step cannot be approved.');
+
+        $approval = $approvals->issue($request->user(), $step->tool, $step->arguments ?? []);
+        $result = $runtime->execute(
+            $request->user(),
+            $step->tool,
+            $step->arguments ?? [],
+            $operatorTask->id.':'.$step->position.':approved',
+            $approval['approval_token'],
+        );
+        $run = OperatorToolRun::findOrFail($result['run_id']);
+        $step->update([
+            'status' => 'succeeded',
+            'result' => $result['result'],
+            'operator_tool_run_id' => $run->id,
+            'operator_tool_approval_id' => $run->operator_tool_approval_id,
+            'completed_at' => now(),
+        ]);
+        $this->incrementTaskStepUsage($operatorTask);
+        $operatorTask->update(['status' => OperatorTask::STATUS_PLANNED]);
+        $operatorTask->conversation->messages()->create([
+            'role' => 'assistant',
+            'tool' => $step->tool,
+            'content' => 'Approved step completed: '.$step->tool,
+            'payload' => ['task_step_id' => $step->id, 'result' => $result['result']],
+        ]);
+        RunOperatorTask::dispatch($operatorTask->id);
+
+        return response()->json(['id' => $operatorTask->id, 'status' => $operatorTask->fresh()->status]);
+    }
+
+    public function rejectTask(Request $request, OperatorTask $operatorTask): JsonResponse
+    {
+        abort_unless($operatorTask->user_id === $request->user()->id, 404);
+        abort_unless($operatorTask->status === OperatorTask::STATUS_WAITING_FOR_APPROVAL, 409, 'This task is not waiting for approval.');
+        $validated = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
+        $operatorTask->steps()->where('status', OperatorTask::STATUS_WAITING_FOR_APPROVAL)->update([
+            'status' => 'rejected',
+            'error' => $validated['reason'],
+            'completed_at' => now(),
+        ]);
+        $operatorTask->update([
+            'status' => OperatorTask::STATUS_CANCELLED,
+            'result' => ['summary' => 'Critical action rejected by the developer.', 'reason' => $validated['reason']],
+            'cancelled_at' => now(),
+        ]);
+        $operatorTask->conversation->messages()->create([
+            'role' => 'assistant',
+            'content' => 'Task cancelled: '.$validated['reason'],
+            'payload' => ['status' => OperatorTask::STATUS_CANCELLED],
+        ]);
+
+        return response()->json(['id' => $operatorTask->id, 'status' => $operatorTask->status]);
+    }
+
+    public function resumeTask(Request $request, OperatorTask $operatorTask): JsonResponse
+    {
+        abort_unless($operatorTask->user_id === $request->user()->id, 404);
+        abort_unless($operatorTask->status === OperatorTask::STATUS_WAITING_FOR_INPUT, 409, 'This task is not waiting for input.');
+        $validated = $request->validate(['message' => ['required', 'string', 'max:5000']]);
+        $step = $operatorTask->steps()->where('status', OperatorTask::STATUS_WAITING_FOR_INPUT)->latest('position')->firstOrFail();
+        $step->update([
+            'status' => 'succeeded',
+            'result' => [...($step->result ?? []), 'response' => $validated['message']],
+            'completed_at' => now(),
+        ]);
+        $operatorTask->conversation->messages()->create(['role' => 'user', 'content' => $validated['message']]);
+        $operatorTask->conversation->update(['last_activity_at' => now()]);
+        $operatorTask->update(['status' => OperatorTask::STATUS_PLANNED]);
+        RunOperatorTask::dispatch($operatorTask->id);
+
+        return response()->json(['id' => $operatorTask->id, 'status' => $operatorTask->fresh()->status]);
+    }
+
+    private function incrementTaskStepUsage(OperatorTask $task): void
+    {
+        $usage = $task->usage ?? [];
+        $usage['steps'] = (int) ($usage['steps'] ?? 0) + 1;
+        $task->update(['usage' => $usage]);
+    }
+
     public function index(Request $request, OperatorToolRegistry $registry): View
     {
         $conversations = OperatorConversation::query()
