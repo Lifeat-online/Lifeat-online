@@ -8,6 +8,7 @@ use App\Ai\Knowledge\KnowledgeVisibility;
 use App\Models\KnowledgeDocument;
 use App\Services\AskLifeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class KnowledgeRetrievalTest extends TestCase
@@ -34,7 +35,7 @@ class KnowledgeRetrievalTest extends TestCase
         });
 
         $public = $this->document('Clarens community market', KnowledgeVisibility::PUBLIC, now());
-        $public->chunks()->create([
+        $publicChunk = $public->chunks()->create([
             'position' => 0,
             'content' => 'The Clarens community market opens every Saturday morning.',
             'content_hash' => hash('sha256', 'market'),
@@ -43,9 +44,10 @@ class KnowledgeRetrievalTest extends TestCase
             'embedding_model' => 'retrieval-test',
             'embedding_dimensions' => 1536,
         ]);
+        $this->storePgvector($publicChunk->id, [1.0, ...array_fill(0, 1535, 0.0)]);
 
         $private = $this->document('Secret market draft', KnowledgeVisibility::PRIVATE, null);
-        $private->chunks()->create([
+        $privateChunk = $private->chunks()->create([
             'position' => 0,
             'content' => 'Secret market plans must never be returned.',
             'content_hash' => hash('sha256', 'secret'),
@@ -54,6 +56,7 @@ class KnowledgeRetrievalTest extends TestCase
             'embedding_model' => 'retrieval-test',
             'embedding_dimensions' => 1536,
         ]);
+        $this->storePgvector($privateChunk->id, [1.0, ...array_fill(0, 1535, 0.0)]);
 
         $results = app(KnowledgeRetriever::class)->search('When is the Clarens market?', 'en', 5);
 
@@ -75,7 +78,7 @@ class KnowledgeRetrievalTest extends TestCase
         });
 
         $document = $this->document('Fouriesburg farmers market', KnowledgeVisibility::PUBLIC, now());
-        $document->chunks()->create([
+        $chunk = $document->chunks()->create([
             'position' => 0,
             'content' => 'The Fouriesburg farmers market trades on Friday mornings.',
             'content_hash' => hash('sha256', 'fouriesburg-market'),
@@ -84,6 +87,7 @@ class KnowledgeRetrievalTest extends TestCase
             'embedding_model' => 'hybrid-test',
             'embedding_dimensions' => 1536,
         ]);
+        $this->storePgvector($chunk->id, [1.0, ...array_fill(0, 1535, 0.0)]);
 
         $sources = app(AskLifeService::class)->sourcesForQuestion('Fouriesburg farmers market');
 
@@ -103,6 +107,18 @@ class KnowledgeRetrievalTest extends TestCase
             'content_hash' => hash('sha256', $title),
             'visibility' => $visibility,
             'published_at' => $publishedAt,
+        ]);
+    }
+
+    private function storePgvector(int $chunkId, array $vector): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
+        DB::update('UPDATE knowledge_chunks SET embedding_vector = ?::vector WHERE id = ?', [
+            '['.implode(',', $vector).']',
+            $chunkId,
         ]);
     }
 }
