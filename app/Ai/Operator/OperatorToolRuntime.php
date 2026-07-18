@@ -64,9 +64,9 @@ class OperatorToolRuntime
             'actor_user_id' => $user->id,
             'action' => 'ai_operator.tool.'.$tool,
             'subject_type' => OperatorToolRun::class,
-            'subject_id' => $run->id,
+            'subject_id' => null,
             'before_json' => ['arguments' => $arguments, 'risk' => $risk],
-            'after_json' => ['result' => $run->result, 'status' => $status, 'error' => $run->error],
+            'after_json' => ['run_id' => $run->id, 'result' => $run->result, 'status' => $status, 'error' => $run->error],
         ]);
     }
 

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Article;
+use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -23,6 +24,7 @@ class OperatorAssistantTest extends TestCase
 
         $this->assertDatabaseHas('operator_tool_runs', ['tool' => 'platform.health', 'status' => 'succeeded']);
         $this->assertDatabaseHas('audit_logs', ['actor_user_id' => $dev->id, 'action' => 'ai_operator.tool.platform.health']);
+        $this->assertNotEmpty(AuditLog::query()->latest('id')->first()->after_json['run_id']);
     }
 
     public function test_content_change_tool_creates_proposal_without_mutating_article(): void
