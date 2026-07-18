@@ -20,12 +20,15 @@ class KnowledgeRetrievalTest extends TestCase
         {
             public function embed(array $texts): array
             {
-                return array_map(fn (string $text) => str_contains(strtolower($text), 'market')
-                    ? [1.0, 0.0, 0.0]
-                    : [0.0, 1.0, 0.0], $texts);
+                return array_map(function (string $text): array {
+                    $vector = array_fill(0, 1536, 0.0);
+                    $vector[str_contains(strtolower($text), 'market') ? 0 : 1] = 1.0;
+
+                    return $vector;
+                }, $texts);
             }
 
-            public function dimensions(): int { return 3; }
+            public function dimensions(): int { return 1536; }
 
             public function model(): string { return 'retrieval-test'; }
         });
@@ -36,9 +39,9 @@ class KnowledgeRetrievalTest extends TestCase
             'content' => 'The Clarens community market opens every Saturday morning.',
             'content_hash' => hash('sha256', 'market'),
             'token_count' => 9,
-            'embedding' => [1.0, 0.0, 0.0],
+            'embedding' => [1.0, ...array_fill(0, 1535, 0.0)],
             'embedding_model' => 'retrieval-test',
-            'embedding_dimensions' => 3,
+            'embedding_dimensions' => 1536,
         ]);
 
         $private = $this->document('Secret market draft', KnowledgeVisibility::PRIVATE, null);
@@ -47,9 +50,9 @@ class KnowledgeRetrievalTest extends TestCase
             'content' => 'Secret market plans must never be returned.',
             'content_hash' => hash('sha256', 'secret'),
             'token_count' => 7,
-            'embedding' => [1.0, 0.0, 0.0],
+            'embedding' => [1.0, ...array_fill(0, 1535, 0.0)],
             'embedding_model' => 'retrieval-test',
-            'embedding_dimensions' => 3,
+            'embedding_dimensions' => 1536,
         ]);
 
         $results = app(KnowledgeRetriever::class)->search('When is the Clarens market?', 'en', 5);
@@ -66,8 +69,8 @@ class KnowledgeRetrievalTest extends TestCase
         config()->set('ai_platform.public_chat.hybrid_retrieval_enabled', true);
         $this->app->instance(EmbeddingProvider::class, new class implements EmbeddingProvider
         {
-            public function embed(array $texts): array { return array_map(fn () => [1.0, 0.0], $texts); }
-            public function dimensions(): int { return 2; }
+            public function embed(array $texts): array { return array_map(fn () => [1.0, ...array_fill(0, 1535, 0.0)], $texts); }
+            public function dimensions(): int { return 1536; }
             public function model(): string { return 'hybrid-test'; }
         });
 
@@ -77,9 +80,9 @@ class KnowledgeRetrievalTest extends TestCase
             'content' => 'The Fouriesburg farmers market trades on Friday mornings.',
             'content_hash' => hash('sha256', 'fouriesburg-market'),
             'token_count' => 9,
-            'embedding' => [1.0, 0.0],
+            'embedding' => [1.0, ...array_fill(0, 1535, 0.0)],
             'embedding_model' => 'hybrid-test',
-            'embedding_dimensions' => 2,
+            'embedding_dimensions' => 1536,
         ]);
 
         $sources = app(AskLifeService::class)->sourcesForQuestion('Fouriesburg farmers market');

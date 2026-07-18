@@ -25,12 +25,12 @@ class KnowledgeIndexingTest extends TestCase
             {
                 $this->calls++;
 
-                return array_map(fn () => [0.1, 0.2, 0.3], $texts);
+                return array_map(fn () => array_fill(0, 1536, 0.1), $texts);
             }
 
             public function dimensions(): int
             {
-                return 3;
+                return 1536;
             }
 
             public function model(): string
