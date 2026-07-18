@@ -1,5 +1,7 @@
 # Life@ Autonomous AI Manager Roadmap
 
+> **Superseded:** This document is retained for historical autonomous-manager context. Active priorities, architecture decisions, status, and delivery gates now live in [`ai-platform-implementation-plan.md`](ai-platform-implementation-plan.md).
+
 Status: Phase 0 control-room foundation in progress.
 
 This document defines the Life@ autonomous AI manager as an operating layer for the platform, not a free-running chatbot. The goal is to test how far an AI manager can run Life@ while preserving owner control, public trust, legal accountability, and clean financial records.

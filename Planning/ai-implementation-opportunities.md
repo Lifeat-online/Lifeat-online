@@ -1,5 +1,7 @@
 # Life@ AI Implementation Opportunities And Roadmap
 
+> **Superseded:** This document is retained for historical opportunity context. Active priorities, architecture decisions, status, and delivery gates now live in [`ai-platform-implementation-plan.md`](ai-platform-implementation-plan.md).
+
 Status: Phase 1 foundation implemented; provider-neutral text feature routing, Jimmy chat, commercial copy, AI article translation, AI event description, research collector, Editorial Agent brief queue, Jimmy draft-writing stage, and Image Agent implemented
 Last updated: 2026-06-04
 
