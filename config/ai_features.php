@@ -81,6 +81,13 @@ return [
             'required_capabilities' => ['structured_json'],
             'notes' => 'Low-volume tool planning for audited developer tasks. The server remains responsible for authorization and execution.',
         ],
+        'web_search' => [
+            'label' => 'Operator public web search',
+            'profile' => 'balanced',
+            'provider' => 'perplexity',
+            'required_capabilities' => ['structured_json', 'web_grounded'],
+            'notes' => 'Current public-web discovery. Selected results are fetched and retained separately before use as evidence.',
+        ],
         'settings_test' => [
             'label' => 'Provider health check',
             'profile' => 'cheap_structured',

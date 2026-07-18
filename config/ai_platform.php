@@ -28,6 +28,7 @@ return [
     'operator' => [
         'enabled' => env('AI_OPERATOR_ASSISTANT', false),
         'agent_enabled' => env('AI_OPERATOR_AGENT_ENABLED', false),
+        'r1_auto_enabled' => env('AI_OPERATOR_R1_AUTO', true),
         'mutations_enabled' => env('AI_OPERATOR_MUTATIONS', false),
         'limited_auto_enabled' => env('AI_OPERATOR_LIMITED_AUTO', false),
         'step_limit' => (int) env('AI_OPERATOR_STEP_LIMIT', 12),

@@ -9,7 +9,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ResearchSource extends Model
 {
     public const TYPE_GOOGLE_NEWS_RSS = 'google_news_rss';
+
     public const TYPE_RSS = 'rss';
+
+    public const TYPE_WEB_SEARCH = 'web_search';
 
     protected $fillable = [
         'name',

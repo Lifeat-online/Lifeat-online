@@ -39,6 +39,7 @@ class OperatorTaskOrchestrator
                 $tools = collect($this->registry->all())
                     ->filter(fn ($tool): bool => $tool->authorize($task->user))
                     ->reject(fn ($tool): bool => $tool->risk() === 'R4')
+                    ->reject(fn ($tool): bool => $tool->risk() === 'R1' && ! config('ai_platform.operator.r1_auto_enabled', true))
                     ->map(fn ($tool): array => [
                         'name' => $tool->name(),
                         'risk' => $tool->risk(),
@@ -63,7 +64,7 @@ class OperatorTaskOrchestrator
                 }
 
                 $this->executeToolAction($task, $action);
-                if ($task->fresh()->status === OperatorTask::STATUS_WAITING_FOR_APPROVAL) {
+                if (in_array($task->fresh()->status, [OperatorTask::STATUS_WAITING_FOR_APPROVAL, OperatorTask::STATUS_WAITING_FOR_INPUT], true)) {
                     return;
                 }
             }
@@ -121,6 +122,7 @@ class OperatorTaskOrchestrator
                 'operator_tool_run_id' => $result['run_id'],
                 'completed_at' => now(),
             ]);
+            $this->recordSources($task, (array) ($result['result'] ?? []));
             $this->incrementSteps($task);
             $this->message($task, (string) ($action['summary'] ?? $tool->name().' completed.'), [
                 'task_step_id' => $step->id,
@@ -128,6 +130,9 @@ class OperatorTaskOrchestrator
                 'risk' => $tool->risk(),
                 'result' => $result['result'],
             ]);
+            if ((bool) data_get($result, 'result.requires_input', false)) {
+                $this->waitForInput($task, (string) data_get($result, 'result.question', 'Developer input is required before publication.'));
+            }
         } catch (\Throwable $exception) {
             $step->update(['status' => 'failed', 'error' => Str::limit($exception->getMessage(), 1000, ''), 'completed_at' => now()]);
             throw $exception;
@@ -178,6 +183,21 @@ class OperatorTaskOrchestrator
         $usage = $task->fresh()->usage ?? [];
         $usage['steps'] = (int) ($usage['steps'] ?? 0) + 1;
         $task->update(['usage' => $usage]);
+    }
+
+    private function recordSources(OperatorTask $task, array $result): void
+    {
+        $ids = collect($task->sources ?? [])
+            ->merge(isset($result['snapshot_id']) ? [(int) $result['snapshot_id']] : [])
+            ->merge(array_map('intval', (array) ($result['source_snapshot_ids'] ?? [])))
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+        if ($ids !== ($task->sources ?? [])) {
+            $task->update(['sources' => $ids]);
+        }
     }
 
     private function enforceLimits(OperatorTask $task): void

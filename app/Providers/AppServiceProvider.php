@@ -7,6 +7,8 @@ use App\Ai\Editorial\Contracts\HostResolver;
 use App\Ai\Editorial\DnsHostResolver;
 use App\Ai\Operator\AiOperatorTaskPlanner;
 use App\Ai\Operator\Contracts\OperatorTaskPlanner;
+use App\Ai\Operator\Contracts\WebSearchProvider;
+use App\Ai\Operator\PerplexityWebSearchProvider;
 use App\Ai\Providers\FakeEmbeddingProvider;
 use App\Ai\Providers\OpenAiEmbeddingProvider;
 use App\Events\MallOrderPaid;
@@ -56,6 +58,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(OperatorTaskPlanner::class, AiOperatorTaskPlanner::class);
+        $this->app->bind(WebSearchProvider::class, PerplexityWebSearchProvider::class);
         $this->app->bind(HostResolver::class, DnsHostResolver::class);
         $this->app->bind(EmbeddingProvider::class, function (): EmbeddingProvider {
             $dimensions = (int) config('ai_platform.embeddings.dimensions', 1536);
