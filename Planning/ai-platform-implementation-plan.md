@@ -4,7 +4,7 @@
 
 **Owner:** Life@ platform team
 
-**Last verified:** 2026-07-18 on `feature/ai-platform` at implementation commit `b3dba88`
+**Last verified:** 2026-07-18 on `feature/ai-platform` at implementation commit `798ff45`
 
 **Target stack:** Laravel 13, PHP 8.4, Blade, Tailwind CSS, Alpine.js, Vite, queues, scheduler, Reverb, PostgreSQL 17, and pgvector 0.8.2
 
@@ -194,7 +194,7 @@ Keep the current request and response contract stable while splitting responsibi
 
 ## 8. Milestone 2 — Public knowledge index and hybrid retrieval
 
-**Status:** Implemented in code; PostgreSQL recall measurement remains a release gate
+**Status:** Implemented and measured in PostgreSQL/pgvector CI; staged product rollout remains gated
 
 **Effort:** L
 
@@ -421,16 +421,16 @@ Verified locally on 2026-07-18:
 - GitHub PostgreSQL AI readiness workflow completed against PostgreSQL 17 plus pgvector 0.8.2 with clean migrations and a restricted application role;
 - GitHub frontend build, dependency vulnerability scan, and PHP/Laravel smoke checks completed;
 - Composer and npm security audits reported no known vulnerabilities.
+- PostgreSQL measured evaluation: 117 accepted retrieval cases, recall@5 100%, citation validity 100%, English/Afrikaans coverage, and zero prohibited disclosure matches; see `Planning/ai-evaluation-results.json` and GitHub Actions run `29646808075`.
 
-The JSONL counts prove fixture coverage and schema only. An isolated measured-evaluation runner now seeds accepted public fixtures, exercises hybrid retrieval, checks recall@5, citation validity, locale coverage, and prohibited disclosure terms, and removes its temporary documents. PostgreSQL results must still be recorded from CI before rollout gates are enabled; editorial historical outcomes and live operator authorization remain external acceptance exercises.
+The JSONL counts prove fixture coverage and schema only. The isolated measured-evaluation runner seeds accepted public fixtures, exercises hybrid retrieval, checks recall@5, citation validity, locale coverage, and prohibited disclosure terms, and removes its temporary documents. Its PostgreSQL result is recorded in `Planning/ai-evaluation-results.json`. Editorial historical outcomes and live operator authorization remain external acceptance exercises rather than claims inferred from synthetic fixtures.
 
 The implementation deliberately does not include SQLite import, migration rehearsal, dual writes, or legacy-data rollback tooling because the database is disposable and the target is a clean PostgreSQL deployment.
 
 Remaining code scope after this implementation package:
 
 1. complete the focused-service extraction from the legacy `AskLifeService` compatibility engine;
-2. run the accepted measured evaluation against seeded PostgreSQL/pgvector data and record the CI results;
-3. record accepted editorial historical-outcome results when representative editorial history exists.
+2. record accepted editorial historical-outcome results when representative editorial history exists.
 
 Remaining external release gates:
 

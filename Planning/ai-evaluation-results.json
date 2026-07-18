@@ -1,0 +1,32 @@
+{
+    "version": 1,
+    "measured_at": "2026-07-18T13:48:29Z",
+    "branch": "feature/ai-platform",
+    "commit": "798ff45dc3313b2888994bf47021ed9d82c780cf",
+    "github_actions_run": "https://github.com/Lifeat-online/Lifeat-online/actions/runs/29646808075",
+    "environment": {
+        "database": "PostgreSQL 17",
+        "pgvector": "0.8.2",
+        "application_role": "restricted",
+        "embedding_model": "fake-deterministic",
+        "embedding_dimensions": 1536
+    },
+    "retrieval": {
+        "accepted_cases": 117,
+        "recall_at_5": 1.0,
+        "citation_validity": 1.0,
+        "unsafe_disclosures": 0,
+        "locale_coverage": [
+            "af",
+            "en"
+        ],
+        "passed": true
+    },
+    "fixture_shape": {
+        "ask_life": 150,
+        "editorial": 50,
+        "operator": 100,
+        "unauthorized_operator_executions": 0
+    },
+    "method": "The evaluator seeded isolated public knowledge documents for accepted retrieval cases, exercised PostgreSQL lexical and pgvector candidates through reciprocal-rank fusion, checked expected sources in the top five, validated citation identifiers and URLs, scanned selected content for prohibited disclosure terms, and removed the temporary documents."
+}
