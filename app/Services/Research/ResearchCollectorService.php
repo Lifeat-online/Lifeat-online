@@ -4,6 +4,7 @@ namespace App\Services\Research;
 
 use App\Models\ResearchItem;
 use App\Models\ResearchSource;
+use App\Models\SourceSnapshot;
 use App\Support\Editorial\BriefFreshness;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Carbon;
@@ -127,7 +128,7 @@ class ResearchCollectorService
                 }
 
                 if (! $dryRun) {
-                    ResearchItem::create([
+                    $researchItem = ResearchItem::create([
                         'research_source_id' => $source->id,
                         'source_name' => $item['source_name'] ?? $source->name,
                         'source_type' => $source->type,
@@ -143,6 +144,18 @@ class ResearchCollectorService
                         'detected_entities' => [],
                         'fingerprint' => $fingerprint,
                         'status' => ResearchItem::STATUS_NEW,
+                    ]);
+
+                    $feedEvidence = trim($researchItem->title."\n\n".($researchItem->summary ?? ''));
+                    SourceSnapshot::create([
+                        'research_item_id' => $researchItem->id,
+                        'url' => $researchItem->source_url ?: $url,
+                        'http_status' => $response->status(),
+                        'content_type' => (string) ($response->header('Content-Type') ?: 'application/rss+xml'),
+                        'content' => $feedEvidence,
+                        'content_hash' => hash('sha256', $feedEvidence),
+                        'response_headers' => [],
+                        'fetched_at' => now(),
                     ]);
                 }
 

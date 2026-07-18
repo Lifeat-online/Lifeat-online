@@ -16,6 +16,7 @@ class ArticleBrief extends Model
 
     protected $fillable = [
         'research_item_id',
+        'editorial_dossier_id',
         'ai_generation_id',
         'suggested_category_id',
         'title',
@@ -52,6 +53,8 @@ class ArticleBrief extends Model
     {
         return $this->belongsTo(ResearchItem::class);
     }
+
+    public function dossier(): BelongsTo { return $this->belongsTo(EditorialDossier::class, 'editorial_dossier_id'); }
 
     public function aiGeneration(): BelongsTo
     {

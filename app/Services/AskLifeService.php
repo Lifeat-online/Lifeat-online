@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Ai\Knowledge\KnowledgeRetriever;
 use App\Models\Article;
 use App\Models\CivicFaultReport;
 use App\Models\Classified;
@@ -21,6 +22,7 @@ class AskLifeService
     public function __construct(
         private readonly AiGatewayService $gateway,
         private readonly AiPromptCatalog $prompts,
+        private readonly KnowledgeRetriever $knowledge,
     ) {
     }
 
@@ -63,6 +65,10 @@ class AskLifeService
             ];
         }
 
+        if (config('ai_platform.public_chat.emergency_stop')) {
+            return $this->fallbackAnswer($question, $sources, 'Ask Life generation is temporarily disabled.', $intent, $context, $search, $targetLocale);
+        }
+
         if (! $this->gateway->configured()) {
             return $this->fallbackAnswer($question, $sources, 'AI provider is not configured yet.', $intent, $context, $search, $targetLocale);
         }
@@ -96,12 +102,24 @@ class AskLifeService
                 $usedIds = collect(data_get($result, 'payload.source_ids', []))
                     ->filter(fn ($id) => is_string($id) && $id !== '')
                     ->values();
+                $availableIds = $sources->pluck('id');
+                $unsupportedIds = $usedIds->diff($availableIds);
 
-                $rankedSources = $usedIds->isEmpty()
-                    ? $sources
-                    : $sources
-                        ->sortBy(fn (array $source) => $usedIds->search($source['id']) === false ? 999 : $usedIds->search($source['id']))
-                        ->values();
+                if ($usedIds->isEmpty() || $unsupportedIds->isNotEmpty()) {
+                    return $this->fallbackAnswer(
+                        $question,
+                        $sources,
+                        'The generated answer did not provide valid supporting Life@ sources.',
+                        $intent,
+                        $context,
+                        $search,
+                        $targetLocale,
+                    );
+                }
+
+                $rankedSources = $sources
+                    ->sortBy(fn (array $source) => $usedIds->search($source['id']) === false ? 999 : $usedIds->search($source['id']))
+                    ->values();
 
                 return [
                     'ok' => true,
@@ -139,12 +157,38 @@ class AskLifeService
             ? collect()
             : $this->dynamicSourcesFor($intent['source_types'], $terms, $user, $search, $locale);
 
+        $hybridSources = config('ai_platform.public_chat.hybrid_retrieval_enabled')
+            ? $this->knowledgeSources($question, $locale)
+            : collect();
+
         return $this->rankSources($dynamicSources, $search, $intent)
+            ->merge($hybridSources)
             ->merge($this->pageContextSources($context, $intent, $locale))
             ->merge($this->platformGuideSources($question, $terms, $intent, $context, $locale))
             ->unique('id')
             ->take(18)
             ->values();
+    }
+
+    private function knowledgeSources(string $question, string $locale): Collection
+    {
+        return collect($this->knowledge->search($question, $locale, 8))->map(function (array $result): array {
+            $type = $result['source_type'] === 'listing' ? 'business' : $result['source_type'];
+
+            return [
+                'id' => $result['source_type'].':'.$result['source_id'],
+                'type' => $type,
+                'title' => $result['title'],
+                'summary' => Str::limit($result['content'], 260),
+                'location' => null,
+                'url' => $result['url'],
+                'meta' => [
+                    'retrieval' => 'hybrid',
+                    'score' => $result['score'],
+                ],
+                'relevance_score' => (int) round($result['score'] * 1000),
+            ];
+        });
     }
 
     private function dynamicSourcesFor(array $sourceTypes, array $terms, ?User $user, array $search, string $locale): Collection
@@ -512,27 +556,7 @@ class AskLifeService
 
     private function listingSources(array $terms, ?User $user = null, array $search = [], string $locale = 'en'): Collection
     {
-        $query = Listing::with(['contentTranslations', 'categories.contentTranslations']);
-
-        // Public users: only published listings
-        if (! $user) {
-            $query->published();
-        }
-        // Signed-in listing owners can see their own work as well as public listings.
-        elseif (! $user->hasRole('admin', 'editor', 'staff')) {
-            $query->where(function (Builder $q) use ($user) {
-                $q->published()
-                    ->orWhere('user_id', $user->id);
-            });
-        }
-        // Staff users: published + their own drafts/pending
-        elseif ($user->hasRole('staff') && ! $user->hasRole('admin', 'editor')) {
-            $query->where(function (Builder $q) use ($user) {
-                $q->published()
-                    ->orWhere('user_id', $user->id);
-            });
-        }
-        // Admin/Editor: see everything (no scope applied)
+        $query = Listing::with(['contentTranslations', 'categories.contentTranslations'])->published();
 
         return $query
             ->where(function (Builder $query) use ($terms) {
@@ -564,27 +588,7 @@ class AskLifeService
 
     private function eventSources(array $terms, ?User $user = null, array $search = [], string $locale = 'en'): Collection
     {
-        $query = Event::with(['contentTranslations', 'categories.contentTranslations', 'listing.contentTranslations']);
-
-        // Public users: only published events
-        if (! $user) {
-            $query->published();
-        }
-        elseif (! $user->hasRole('admin', 'editor', 'staff')) {
-            $query->where(function (Builder $q) use ($user) {
-                $q->published()
-                    ->orWhere('user_id', $user->id)
-                    ->orWhereHas('listing', fn (Builder $listing) => $listing->where('user_id', $user->id));
-            });
-        }
-        // Staff users: published + their own listings' events
-        elseif ($user->hasRole('staff') && ! $user->hasRole('admin', 'editor')) {
-            $query->where(function (Builder $q) use ($user) {
-                $q->published()
-                    ->orWhereHas('listing', fn (Builder $listing) => $listing->where('user_id', $user->id));
-            });
-        }
-        // Admin/Editor: see everything
+        $query = Event::with(['contentTranslations', 'categories.contentTranslations', 'listing.contentTranslations'])->published();
 
         return $query
             ->where(function (Builder $query) use ($terms) {
@@ -618,20 +622,7 @@ class AskLifeService
 
     private function articleSources(array $terms, ?User $user = null, array $search = [], string $locale = 'en'): Collection
     {
-        $query = Article::with(['author', 'contentTranslations', 'categories.contentTranslations']);
-
-        // Public users: only published articles
-        if (! $user || ! $user->hasRole('admin', 'editor', 'staff', 'writer')) {
-            $query->published();
-        }
-        // Writers: published + their own drafts
-        elseif ($user->hasRole('writer') && ! $user->hasRole('admin', 'editor', 'staff')) {
-            $query->where(function (Builder $q) use ($user) {
-                $q->published()
-                    ->orWhere('author_id', $user->id);
-            });
-        }
-        // Admin/Editor/Staff: see everything
+        $query = Article::with(['author', 'contentTranslations', 'categories.contentTranslations'])->published();
 
         return $query
             ->where(function (Builder $query) use ($terms) {
@@ -659,33 +650,9 @@ class AskLifeService
 
     private function voucherSources(array $terms, ?User $user = null, array $search = [], string $locale = 'en'): Collection
     {
-        $query = Voucher::with(['contentTranslations', 'listing.contentTranslations']);
-
-        // Public users: only active vouchers with published listings
-        if (! $user) {
-            $query->active()
-                ->whereHas('listing', fn (Builder $listing) => $listing->published());
-        }
-        elseif (! $user->hasRole('admin', 'editor', 'staff')) {
-            $query->where(function (Builder $q) use ($user) {
-                $q->where(function (Builder $public) {
-                    $public->active()
-                        ->whereHas('listing', fn (Builder $listing) => $listing->published());
-                })
-                ->orWhereHas('listing', fn (Builder $listing) => $listing->where('user_id', $user->id));
-            });
-        }
-        // Staff users: active vouchers for published listings + all vouchers for their own listings
-        elseif ($user->hasRole('staff') && ! $user->hasRole('admin', 'editor')) {
-            $query->where(function (Builder $q) use ($user) {
-                $q->where(function (Builder $public) {
-                    $public->active()
-                        ->whereHas('listing', fn (Builder $listing) => $listing->published());
-                })
-                ->orWhereHas('listing', fn (Builder $listing) => $listing->where('user_id', $user->id));
-            });
-        }
-        // Admin/Editor: see everything (no scope)
+        $query = Voucher::with(['contentTranslations', 'listing.contentTranslations'])
+            ->active()
+            ->whereHas('listing', fn (Builder $listing) => $listing->published());
 
         return $query
             ->where(function (Builder $query) use ($terms) {
@@ -716,26 +683,7 @@ class AskLifeService
 
     private function classifiedSources(array $terms, ?User $user = null, array $search = [], string $locale = 'en'): Collection
     {
-        $query = Classified::with('contentTranslations');
-
-        // Public users: only published classifieds
-        if (! $user) {
-            $query->where('status', Classified::STATUS_PUBLISHED);
-        }
-        elseif (! $user->hasRole('admin', 'editor', 'staff')) {
-            $query->where(function (Builder $q) use ($user) {
-                $q->where('status', Classified::STATUS_PUBLISHED)
-                    ->orWhere('user_id', $user->id);
-            });
-        }
-        // Staff users: published + their own
-        elseif ($user->hasRole('staff') && ! $user->hasRole('admin', 'editor')) {
-            $query->where(function (Builder $q) use ($user) {
-                $q->where('status', Classified::STATUS_PUBLISHED)
-                    ->orWhere('user_id', $user->id);
-            });
-        }
-        // Admin/Editor: see everything
+        $query = Classified::with('contentTranslations')->where('status', Classified::STATUS_PUBLISHED);
 
         return $query
             ->where(function (Builder $query) use ($terms) {
@@ -761,13 +709,7 @@ class AskLifeService
 
     private function faultSources(array $terms, ?User $user = null, array $search = []): Collection
     {
-        $query = CivicFaultReport::query();
-
-        // Public users: only approved faults
-        if (! $user || ! $user->hasRole('admin', 'editor', 'councillor')) {
-            $query->where('is_approved', true);
-        }
-        // Admin/Editor/Councillor: see all faults (including unapproved)
+        $query = CivicFaultReport::query()->where('is_approved', true);
 
         return $query
             ->where(function (Builder $query) use ($terms) {
@@ -839,8 +781,8 @@ class AskLifeService
             [
                 'id' => 'guide:search',
                 'type' => 'guide',
-                'title' => 'Jimmy can help you navigate Life@',
-                'summary' => 'Jimmy can help users find local businesses, articles, events, vouchers, classifieds, civic faults, transport help, and business onboarding steps. He should be honest when Life@ does not have a verified record yet.',
+                'title' => 'Ask Life can help you navigate Life@',
+                'summary' => 'Ask Life can help users find local businesses, articles, events, vouchers, classifieds, civic faults, transport help, and business onboarding steps. It should be honest when Life@ does not have a verified record yet.',
                 'location' => 'Life@',
                 'url' => route('search.index'),
                 'meta' => [
@@ -912,7 +854,7 @@ class AskLifeService
                 'id' => 'guide:articles',
                 'type' => 'guide',
                 'title' => 'Articles and local updates',
-                'summary' => 'Life@ articles cover local stories and community updates. Jimmy should summarize only published article records supplied to him.',
+                'summary' => 'Life@ articles cover local stories and community updates. Ask Life should summarize only published article records supplied to it.',
                 'location' => 'Life@ Articles',
                 'url' => route('articles.index'),
                 'meta' => [
@@ -972,7 +914,7 @@ class AskLifeService
                 'id' => 'guide:contact',
                 'type' => 'guide',
                 'title' => 'Contact Life@',
-                'summary' => 'When a user needs human help, Life@ contact is the safest next step. Jimmy should not pretend to make official decisions or access private admin records.',
+                'summary' => 'When a user needs human help, Life@ contact is the safest next step. Ask Life should not pretend to make official decisions or access private admin records.',
                 'location' => 'Life@ Support',
                 'url' => route('contact.index'),
                 'meta' => [
@@ -988,8 +930,8 @@ class AskLifeService
 
         $afrikaans = [
             'guide:search' => [
-                'title' => 'Jakobus kan jou help om Life@ te gebruik',
-                'summary' => 'Jakobus kan mense help om plaaslike besighede, artikels, geleenthede, koopbewyse, geklassifiseerde advertensies, burgerlike foutverslae, vervoerhulp en besigheid-aanboordstappe te vind. Hy moet eerlik wees wanneer Life@ nog nie n geverifieerde rekord het nie.',
+                'title' => 'Ask Life kan jou help om Life@ te gebruik',
+                'summary' => 'Ask Life kan mense help om plaaslike besighede, artikels, geleenthede, koopbewyse, geklassifiseerde advertensies, burgerlike foutverslae, vervoerhulp en besigheid-aanboordstappe te vind. Dit moet eerlik wees wanneer Life@ nog nie n geverifieerde rekord het nie.',
                 'location' => 'Life@',
                 'best_for' => 'Algemene hulp, opvolgvrae, en om die regte Life@ afdeling te vind.',
             ],
@@ -1025,7 +967,7 @@ class AskLifeService
             ],
             'guide:articles' => [
                 'title' => 'Artikels en plaaslike opdaterings',
-                'summary' => 'Life@ artikels dek plaaslike stories en gemeenskapsopdaterings. Jakobus moet net gepubliseerde artikelrekords opsom wat aan hom verskaf is.',
+                'summary' => 'Life@ artikels dek plaaslike stories en gemeenskapsopdaterings. Ask Life moet net gepubliseerde artikelrekords opsom wat verskaf is.',
                 'location' => 'Life@ Artikels',
                 'best_for' => 'Plaaslike nuus, opdaterings en verduidelikings.',
             ],
@@ -1055,7 +997,7 @@ class AskLifeService
             ],
             'guide:contact' => [
                 'title' => 'Kontak Life@',
-                'summary' => 'Wanneer iemand menslike hulp nodig het, is Life@ kontak die veiligste volgende stap. Jakobus moet nie voorgee dat hy amptelike besluite neem of private adminrekords kan sien nie.',
+                'summary' => 'Wanneer iemand menslike hulp nodig het, is Life@ kontak die veiligste volgende stap. Ask Life moet nie voorgee dat dit amptelike besluite neem of private adminrekords kan sien nie.',
                 'location' => 'Life@ Ondersteuning',
                 'best_for' => 'Menslike ondersteuning, onsekerheid, regstellings of private rekeninghulp.',
             ],
@@ -1180,7 +1122,7 @@ class AskLifeService
     private function languageInstruction(string $locale): string
     {
         return $locale === 'af'
-            ? 'Answer in natural Afrikaans. Refer to the assistant as Jakobus, not Jimmy. Keep Life@, business names, routes, URLs, and official place names unchanged where appropriate.'
+            ? 'Answer in natural Afrikaans. Use the product name Ask Life. Keep Life@, business names, routes, URLs, and official place names unchanged where appropriate.'
             : 'Answer in natural South African English. Keep Life@, business names, routes, URLs, and official place names unchanged where appropriate.';
     }
 
@@ -1441,7 +1383,7 @@ class AskLifeService
                     ],
                 ],
                 'fallback' => [
-                    'guides_answer' => 'Ek is Jakobus. Ek kan jou help uitwerk waarheen om op Life@ te gaan: besighede, geleenthede, plaaslike artikels, koopbewyse, geklassifiseerdes, burgerlike foutverslae, vervoerhulp en besigheid-aanboord. Ek sal eerlik wees wanneer Life@ nog nie n geverifieerde rekord het nie, en ek sal jou na die veiligste volgende stap wys.',
+                    'guides_answer' => 'Ek is Ask Life. Ek kan jou help uitwerk waarheen om op Life@ te gaan: besighede, geleenthede, plaaslike artikels, koopbewyse, geklassifiseerdes, burgerlike foutverslae, vervoerhulp en besigheid-aanboord. Ek sal eerlik wees wanneer Life@ nog nie n geverifieerde rekord het nie, en ek sal jou na die veiligste volgende stap wys.',
                     'found_sources' => 'Ek het :types op Life@ gevind wat dalk kan help. Begin by :title.',
                     'no_direct_match_short' => 'Ek kon nog nie n direkte Life@ passing vind nie.',
                 ],

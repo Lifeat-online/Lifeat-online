@@ -68,6 +68,12 @@ class EditorialBriefService
             return ['ok' => false, 'skipped' => true, 'message' => 'Research item already has an article brief.'];
         }
 
+        $dossier = $item->storyClusters()->with('dossiers.claims.evidence')->get()
+            ->flatMap->dossiers->sortByDesc('id')->first();
+        if (config('ai_platform.editorial.dossiers_enabled') && ! $dossier?->readyForWriting()) {
+            return ['ok' => false, 'skipped' => true, 'message' => 'An approved evidence dossier is required before brief generation.'];
+        }
+
         $freshness = BriefFreshness::assess($item->published_at);
 
         if (! $freshness['approvable']) {
@@ -109,6 +115,16 @@ class EditorialBriefService
                     ],
                 ],
                 'research_item' => $this->researchItemContext($item),
+                'evidence_dossier' => $dossier ? [
+                    'id' => $dossier->id,
+                    'title' => $dossier->title,
+                    'summary' => $dossier->summary,
+                    'claims' => $dossier->claims->map(fn ($claim): array => [
+                        'claim' => $claim->claim,
+                        'importance' => $claim->importance,
+                        'evidence' => $claim->evidence->map->only(['stance', 'excerpt', 'authority_score'])->values()->all(),
+                    ])->values()->all(),
+                ] : null,
                 'freshness_policy' => BriefFreshness::policyContext($item->published_at),
                 'recent_life_articles' => $this->recentArticleContext(),
             ],
@@ -131,6 +147,7 @@ class EditorialBriefService
 
         $brief = ArticleBrief::create([
             'research_item_id' => $item->id,
+            'editorial_dossier_id' => $dossier?->id,
             'ai_generation_id' => ($result['generation'] ?? null)?->id,
             'suggested_category_id' => $this->categoryIdFromPayload($payload, $categories),
             'title' => Str::limit($this->stringFrom($payload, 'title', $item->title), 255, ''),

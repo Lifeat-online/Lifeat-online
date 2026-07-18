@@ -15,7 +15,7 @@ A Laravel platform for local job creation and community monetisation. The app co
 
 - **Backend**: Laravel 13.x on PHP 8.4+
 - **Frontend**: Blade, Tailwind CSS, Alpine.js, Vite
-- **Database**: SQLite for local development, MySQL/PostgreSQL compatible for production
+- **Database**: PostgreSQL 17 with pgvector 0.8.2 for application environments; in-memory SQLite for automated tests
 - **Deployment**: Hetzner/Coolify Nixpacks deployment pipeline
 - **Payments**: PayFast integration foundations
 
@@ -66,7 +66,7 @@ For local PHPUnit runs, ensure the PHP CLI has these extensions enabled: `mbstri
 - Auto-translation jobs default to the normal queue. For higher publishing volume, set `AUTO_TRANSLATION_QUEUE=translations` and run/document a worker that listens to it, for example `php artisan queue:work --queue=translations --sleep=3 --tries=2 --timeout=180`.
 - Transport realtime uses Laravel Reverb. Run it online as a separate service/process with `php artisan reverb:start --host=0.0.0.0 --port=$PORT`, set `BROADCAST_CONNECTION=reverb`, and point `REVERB_HOST` / `VITE_REVERB_HOST` at that service's public HTTPS domain.
 - For uploads, mount durable Hetzner/Coolify storage at `/app/storage/app` and set `UPLOAD_STORAGE_BACKEND=mounted_volume` plus `UPLOAD_STORAGE_MOUNT_PATH=/app/storage/app`; S3-compatible object storage can be wired later.
-- Enable managed database backups and record a successful restore drill with `BACKUPS_ENABLED=true`, `BACKUP_PROVIDER`, `BACKUP_RESTORE_DRILL_COMPLETED=true`, and `BACKUP_LAST_RESTORE_DRILL_DATE`.
+- Enable PostgreSQL backups with `BACKUPS_ENABLED=true` and document `BACKUP_PROVIDER`; this non-production clean reset does not require a restore rehearsal.
 - Provision the first admin from the deployment shell with `php artisan admin:create`; the command writes an audit log for account creation or promotion.
 - A pre-push hook lives in `.githooks/pre-push` (run `./setup-hooks.sh` once per clone) and runs `vendor/bin/pint --test` plus a smoke subset of `php artisan test` (filter `BackupCommand|OperatorPushNotifier|ErrorTracking`) before allowing a push. Skip with `SKIP_PRE_PUSH=1 git push …`.
 - Use the production readiness tracker in `Planning/production-readiness-todo.md` for launch blockers, verification, and operational hardening.

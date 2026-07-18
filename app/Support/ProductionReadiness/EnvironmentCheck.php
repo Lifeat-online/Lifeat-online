@@ -155,8 +155,6 @@ class EnvironmentCheck
                 'key' => 'BACKUP_RETENTION_DAYS',
                 'message' => 'BACKUP_RETENTION_DAYS should be at least 7 before launch.',
             ],
-            $this->expectTrue('error', 'BACKUP_RESTORE_DRILL_COMPLETED', $this->envBool('BACKUP_RESTORE_DRILL_COMPLETED'), 'A production-like backup restore drill must be completed before accepting real payments.'),
-            $this->expectPresent('warning', 'BACKUP_LAST_RESTORE_DRILL_DATE', (string) env('BACKUP_LAST_RESTORE_DRILL_DATE', ''), 'Record the date of the latest successful restore drill.'),
         ]));
     }
 

@@ -15,8 +15,9 @@ return [
 
     'routes' => [
         'ask_life' => [
-            'label' => 'Jimmy public assistant',
+            'label' => 'Ask Life public assistant',
             'profile' => 'fast_balanced',
+            'required_capabilities' => ['structured_json'],
             'notes' => 'High-volume chat. Prefer a cheap, fast, source-grounded model before premium fallback.',
         ],
         'listing_description' => [

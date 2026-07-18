@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.2-pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lifeat}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-lifeat_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set POSTGRES_ADMIN_PASSWORD}
+      LIFEAT_DB_APP_USER: ${LIFEAT_DB_APP_USER:-lifeat_app}
+      LIFEAT_DB_APP_PASSWORD: ${LIFEAT_DB_APP_PASSWORD:?Set LIFEAT_DB_APP_PASSWORD}
+    volumes:
+      - lifeat-postgres:/var/lib/postgresql/data
+      - ./init-lifeat.sh:/docker-entrypoint-initdb.d/10-lifeat.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  lifeat-postgres:

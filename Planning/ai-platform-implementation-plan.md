@@ -4,7 +4,7 @@
 
 **Owner:** Life@ platform team
 
-**Last verified:** 2026-07-18 against `master` commit `e6f20edf213749a301b03c3e0b79e2588c562ea9`
+**Last verified:** 2026-07-18 on `feature/ai-platform`; implementation commit recorded after publication
 
 **Target stack:** Laravel 13, PHP 8.4, Blade, Tailwind CSS, Alpine.js, Vite, queues, scheduler, Reverb, PostgreSQL 17, and pgvector 0.8.2
 
@@ -35,6 +35,7 @@ Ask Life is the first delivery priority. PostgreSQL migration is its infrastruct
 | Status | Meaning |
 |---|---|
 | Existing | Verified in the repository at the commit above. |
+| Implemented | Code and deterministic local verification satisfy the scoped behavior; external release gates may still apply. |
 | Partial | Useful implementation exists but does not satisfy the target behavior. |
 | Planned | Approved work not yet implemented. |
 | Blocked | Cannot proceed until the named dependency or gate is complete. |
@@ -62,19 +63,19 @@ Effort bands express relative scope, not delivery promises.
 
 | Area | Status | Verified state |
 |---|---|---|
-| AI gateway | Partial | `AiGatewayService` provides provider routing, structured generation, fallbacks, generation records, estimated cost, and budget enforcement, but remains a large service without capability-specific provider contracts. |
+| AI gateway | Implemented | Provider capability validation now rejects incompatible routes, and generation telemetry records trace ID, latency, finish reason, actual token use, cache result, and normalized failures. |
 | Feature routing | Existing | `config/ai_features.php` routes AI features by provider/model profile. |
 | Prompt management | Existing | `AiPromptCatalog` provides versioned defaults and database overrides. |
 | Ask Life | Partial | `AskLifeService` is 2,216 lines and combines language, intent, retrieval, ranking, fallbacks, formatting, prompting, and model execution. |
-| Public availability | Blocked | `AskLifeController` limits store, feedback, and speech endpoints to `dev`/`developer`. |
+| Public availability | Implemented | Developer, authenticated, and anonymous stages are independently gated by environment and database settings; authenticated and anonymous gates remain disabled by default. |
 | Ask Life tests | Existing | Feature tests cover developer access, deterministic fallback, configured AI, source cards, bilingual behavior, voice, and non-developer blocking. |
-| Research collection | Partial | RSS and Google News collection creates deduplicated `ResearchItem` records but does not snapshot full evidence, cluster reports, or track claims. |
-| Editorial briefs | Partial | A brief is generated from one `ResearchItem`; editors can review, edit, approve, or reject it. |
-| Jimmy writer | Partial | An approved brief can create an unpublished article draft, but the writer fetches supplied URLs at writing time and lacks a durable evidence graph. |
-| AI Manager | Partial | The dashboard calculates signals, creates recommendations, and changes action statuses. It has no general typed tool runtime or verified execution layer. |
+| Research collection | Implemented | Collection creates durable snapshots, story clusters, dossiers, claims, and evidence links through an allowlisted SSRF-hardened fetcher. |
+| Editorial briefs | Implemented | Briefs can be linked to evidence dossiers and unsupported high-importance claims block the evidence-writing gate. |
+| Jimmy writer | Implemented | Jimmy consumes stored dossier/snapshot evidence and cannot fetch arbitrary URLs while writing. |
+| AI Manager | Partial | A typed, authorized, risk-classified operator runtime supports health reads, article-status proposals, and approved article-status mutations; the broader operator conversation and domain tool catalog remain. |
 | Authorization | Existing | Role-aware routes and policies exist; `dev`/`developer` is treated as an operator equivalent for admin/editor access checks. |
 | Audit/operations | Existing | Audit logs, AI operations, queues, scheduler, health checks, backups, and operator notifications provide foundations to extend. |
-| Production database | Existing | The Hetzner/Coolify runbook currently documents SQLite. PostgreSQL migration is required before vector retrieval. |
+| Deployment database | Partial | PostgreSQL is now the application default and the knowledge migration requires administrator-provisioned pgvector 0.8.2; live Coolify service verification remains. |
 
 ## 4. Product and security boundaries
 
@@ -125,7 +126,7 @@ Continue using existing generation records, budgets, feature routing, fallbacks,
 
 ## 6. Milestone 0 — PostgreSQL and pgvector foundation
 
-**Status:** Planned
+**Status:** Implemented in code; PostgreSQL CI and Coolify runtime verification pending
 
 **Effort:** L
 
@@ -137,68 +138,31 @@ Continue using existing generation records, budgets, feature routing, fallbacks,
 - A privileged Coolify database-administrator provisioning step creates the PostgreSQL `vector` extension before application deployment.
 - The Laravel application role must not receive `CREATE EXTENSION`, database-owner, superuser, or equivalent infrastructure privileges.
 - Laravel migrations verify that `vector` exists with `extversion = '0.8.2'` and then create application-owned vector columns and indexes; they fail with an actionable error when provisioning is missing or the version differs.
-- Laravel production connection changed from SQLite to PostgreSQL only after rehearsal and reconciliation pass.
+- Laravel deployment configuration changes from SQLite to PostgreSQL.
 - Existing application migrations must run successfully from an empty PostgreSQL database.
 
-### Selective data import
+### Clean database reset
 
-Start with a clean PostgreSQL schema and import business-critical records from a consistent SQLite snapshot.
+The site is not in production and existing SQLite data is disposable. Do not build data-import, reconciliation, rehearsal, dual-write, or rollback tooling.
 
-Preserve:
-
-- identity/access: users, roles, role assignments, authentication ownership, required consent/state, active browser-push subscriptions, and other user-owned records that are not explicitly transient;
-- settings/reference: application settings, locations, categories, tags, packages, pricing, feature policy, and lookup/reference tables needed to interpret preserved records;
-- editorial/public content: articles, authors, translations, briefs, events, listings, listing media, vouchers, classifieds, civic records, reviews, moderation state, and their pivots/history;
-- commercial growth: advertising campaigns, advertisements, push campaigns, targeting, delivery/tracking history, applications, entitlements, and subscription records;
-- mall commerce: every live `mall_*` ownership, catalogue, cart/order, payment, fulfilment, vendor, and related history table;
-- transport: every live `transport_*` user, driver, vehicle, duty, request, quote, tracking, incident, and related history table;
-- finance: all order families, payments, payouts, refunds, wallets, ledger entries, invoices, commissions, writer applications, writer payment batches/ledgers, and required external transaction references;
-- operations/compliance: approvals, audit logs, operator alert/action state, AI Manager policy/actions, and records required to explain financial, public, moderation, or operational state;
-- media/storage references used by preserved records.
-
-Do not import:
-
-- cache, queue, failed-job, session, password-reset, or temporary token rows;
-- seeded test/demo records explicitly identified as disposable;
-- disposable AI generations, transient chat history, or rebuildable derived indexes;
-- orphaned records that fail the documented ownership or foreign-key rules.
-
-Before any rehearsal, add a version-controlled migration manifest that lists every source table discovered from the final SQLite schema and classifies it as `PRESERVE`, `REBUILD`, or `DROP`, with its import order, transformation, reconciliation rule, and reason. The import command must fail when a source table is absent from the manifest. Family rules above define the default classification; an individual exception requires an entry in the decision log and product-owner approval.
-
-### Import process
-
-1. Inventory source tables, row counts, foreign keys, polymorphic references, encrypted fields, and SQLite-specific values.
-2. Define an explicit include/exclude manifest and per-table transformation map.
-3. Create a production backup and immutable SQLite archive.
-4. Run the import against a non-production PostgreSQL database.
-5. Compare source and target counts for every included table.
-6. Reconcile financial totals by currency and status, plus wallet/ledger balances.
-7. Verify ownership, pivot tables, slugs, timestamps, enum-like statuses, JSON, booleans, encrypted values, and media references.
-8. Run application tests and representative authenticated/public smoke flows against PostgreSQL.
-9. Before the production cutover, provision the clean PostgreSQL service and administrator-owned pgvector extension without pointing application traffic at it.
-10. Enter maintenance mode and block all mutating traffic at the application/ingress boundary. Drain queued work to zero, then stop queue workers, scheduler/cron, Reverb consumers, and every other background writer. Verify no process can write before taking the final SQLite snapshot.
-11. Hash and archive the final SQLite snapshot, run application migrations against the empty PostgreSQL schema, and execute the validated selective import in manifest order.
-12. Reset every PostgreSQL identity/serial sequence after preserved IDs are imported, using each target table's maximum imported ID as the sequence baseline.
-13. Reconcile counts, relationships, financial totals, balances, media, extension version, and representative records while traffic and background writers remain stopped.
-14. Update production connection settings, clear/rebuild Laravel caches, and start web processes against PostgreSQL while public traffic remains closed. Run authenticated, public, payment-read, health, queue, scheduler, and backup smoke checks.
-15. Apply the go/no-go gate. Before traffic reopens, any failed check restores the frozen SQLite configuration and restarts the previous processes; no accepted writes may exist on either database during this rollback.
-16. Reopen traffic only after every exit criterion is signed off, then restart queue/scheduler/Reverb writers against PostgreSQL. This is the no-return gate: after PostgreSQL accepts new writes, SQLite is an audit archive and any rollback requires a separate reverse-migration/reconciliation plan that preserves those new writes.
+1. Provision the clean PostgreSQL service and administrator-owned pgvector extension.
+2. Point local/test deployment configuration at PostgreSQL.
+3. Run all application migrations against the empty database.
+4. Run the required reference and development seeders.
+5. Verify login, roles, public pages, admin pages, queues, scheduler, backups, `/up`, and `/health`.
+6. Configure the Coolify application, worker, and scheduler processes to use the same PostgreSQL service.
+7. Remove obsolete SQLite deployment/runbook assumptions after the PostgreSQL deployment is verified.
 
 ### PostgreSQL exit criteria
 
 - All migrations succeed from empty PostgreSQL.
 - Coolify administrator provisioning enables `vector`, Laravel verifies `extversion = '0.8.2'`, and the restricted application role can create/query vector columns without extension-management privileges.
-- Every source table is explicitly classified in the version-controlled import manifest; there are no unclassified tables.
-- Every included table has a signed reconciliation result.
-- Financial sums and wallet balances match the approved source snapshot.
-- No excluded session, cache, queue, test, or disposable AI rows are imported.
-- Imported PostgreSQL identity/serial sequences advance beyond the maximum preserved IDs.
 - Login, roles, admin access, public pages, checkout/payment reads, queue, scheduler, backups, `/up`, and `/health` pass against PostgreSQL.
-- The PostgreSQL backup and restore drill succeeds before AI indexing begins.
+- PostgreSQL backup and restore scripts support the clean deployment database; no migration rehearsal is required.
 
 ## 7. Milestone 1 — Ask Life compatibility refactor
 
-**Status:** Planned
+**Status:** Partial; compatibility facade is active, but the remaining focused-service extraction is still required
 
 **Effort:** L
 
@@ -230,7 +194,7 @@ Keep the current request and response contract stable while splitting responsibi
 
 ## 8. Milestone 2 — Public knowledge index and hybrid retrieval
 
-**Status:** Planned
+**Status:** Implemented in code; PostgreSQL recall measurement remains a release gate
 
 **Effort:** L
 
@@ -286,7 +250,7 @@ Do not duplicate private fields in metadata. Deleting, unpublishing, expiring, o
 
 ## 9. Milestone 3 — Staged Ask Life rollout
 
-**Status:** Blocked by Milestones 0–2
+**Status:** Implemented behind disabled rollout gates; external evaluation, privacy approval, and staged enablement remain
 
 **Effort:** M
 
@@ -319,7 +283,7 @@ Each stage uses an independent database setting plus an environment master switc
 
 ## 10. Milestone 4 — Editorial Intelligence
 
-**Status:** Planned after the public-assistant foundation
+**Status:** Implemented foundation; editorial workflow UI and accepted historical-outcome evaluation remain
 
 **Effort:** L
 
@@ -346,7 +310,7 @@ Key requirements:
 
 ## 11. Milestone 5 — Operator Assistant
 
-**Status:** Planned after shared audit/policy controls
+**Status:** Partial; governed runtime and first tools are implemented, while persistent conversation and the broader read-tool catalog remain
 
 **Effort:** L
 
@@ -433,8 +397,8 @@ Never log full secrets, raw financial data, or unnecessary private chat content.
 
 The first coding package is complete only when these reviewable slices land in order:
 
-1. PostgreSQL compatibility audit, complete table-classification manifest, restricted application-role design, and privileged Coolify pgvector provisioning.
-2. Selective SQLite-to-PostgreSQL import, sequence reset, reconciliation report, backup/restore runbook, and write-free production cutover/rollback plan.
+1. Clean PostgreSQL/pgvector provisioning, restricted application-role design, application configuration, migrations, and seed verification.
+2. PostgreSQL backup/restore runbook and removal of obsolete SQLite deployment assumptions.
 3. Ask Life behavior-lock tests and focused service interfaces.
 4. Compatibility-preserving extraction from `AskLifeService`.
 5. Knowledge document/chunk migrations, builders, and visibility rules.
@@ -443,17 +407,45 @@ The first coding package is complete only when these reviewable slices land in o
 8. The 50-question authenticated-beta evaluation and security report.
 9. A draft pull request for review; no automatic merge or deployment.
 
+### 16.1 Current implementation verification
+
+Verified locally on 2026-07-18:
+
+- full Laravel suite: 479 tests, 2,892 assertions;
+- focused AI suite: 46 tests, 277 assertions;
+- Vite production build completed;
+- Composer metadata validation completed with pre-existing package-metadata warnings only;
+- AI capability configuration validation completed;
+- versioned fixture shape: Ask Life 150, Editorial 50, Operator 100, with zero fixture-marked unauthorized executions;
+- PHP syntax and `git diff --check` completed.
+
+The JSONL counts prove fixture coverage and schema only. They do not yet prove the PostgreSQL retrieval recall@5, groundedness, editorial historical outcomes, or live operator authorization targets. Those metrics must be measured in the PostgreSQL CI/evaluation environment before rollout gates are enabled.
+
+The implementation deliberately does not include SQLite import, migration rehearsal, dual writes, or legacy-data rollback tooling because the database is disposable and the target is a clean PostgreSQL deployment.
+
+Remaining code scope after this implementation package:
+
+1. complete the focused-service extraction from the legacy `AskLifeService` compatibility engine;
+2. add the persistent Operator conversation UI and the broader authorized read/propose tool catalog;
+3. complete editor-facing dossier, contradiction, claim-map, and fact-check workflow screens;
+4. run accepted evaluations against seeded PostgreSQL/pgvector data and record measured results.
+
+Remaining external release gates:
+
+1. run the PostgreSQL workflow and verify clean migrations under the restricted application role;
+2. configure and verify the Coolify application, worker, scheduler, backups, health endpoints, and pgvector 0.8.2 service;
+3. obtain product-owner approval for privacy/subprocessor disclosures before anonymous access;
+4. enable authenticated and anonymous database gates only after their measured acceptance criteria pass.
+
 ## 17. Decision log
 
 | Date | Decision | Reason |
 |---|---|---|
 | 2026-07-18 | Use this file as the canonical AI roadmap. | Prevent three overlapping documents from becoming independent sources of truth. |
 | 2026-07-18 | Deliver Ask Life first. | It extends a working developer preview and establishes shared retrieval, safety, budget, and evaluation foundations. |
-| 2026-07-18 | Migrate production from SQLite to PostgreSQL before semantic retrieval. | pgvector keeps transactional public data and embeddings in one governed store. |
-| 2026-07-18 | Start with a clean PostgreSQL schema and selectively import business-critical data. | Preserve business, public, financial, and compliance history without carrying transient/test state forward. |
-| 2026-07-18 | Require an exhaustive per-table migration manifest. | Prevent unlisted schema families from being silently dropped during the selective import. |
+| 2026-07-18 | Use PostgreSQL instead of SQLite for deployment before semantic retrieval. | pgvector keeps transactional public data and embeddings in one governed store. |
+| 2026-07-18 | Start with an empty PostgreSQL schema and do not migrate SQLite data. | The site is not in production and existing data is disposable, so import rehearsal and rollback tooling add no value. |
 | 2026-07-18 | Provision pgvector through a privileged Coolify administrator step. | Keep extension-management privileges away from the Laravel application role and verify the pinned extension version explicitly. |
-| 2026-07-18 | Treat reopening production traffic as the database no-return gate. | Before reopening, rollback can safely restore the frozen SQLite database; afterward, new PostgreSQL writes must be preserved by a separate reverse-migration plan. |
 | 2026-07-18 | Use direct OpenAI `text-embedding-3-small` behind an embedding contract. | Establish a concrete first provider while keeping tests deterministic and the implementation replaceable. |
 | 2026-07-18 | Roll out developer preview, authenticated beta, then anonymous access. | Measure retrieval, privacy, abuse, and cost before opening public traffic. |
 | 2026-07-18 | Retain chat content for 30 days. | Provide a clear uniform limit while allowing earlier deletion and longer-lived redacted metrics. |

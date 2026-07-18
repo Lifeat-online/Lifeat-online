@@ -44,7 +44,7 @@ BACKUP_S3_SECRET_KEY="${BACKUP_S3_SECRET_KEY:-${AWS_SECRET_ACCESS_KEY:-}}"
 BACKUP_S3_MAX_BYTES="${BACKUP_S3_MAX_BYTES:-5368709120}"
 BACKUP_HEALTHCHECK_URL="${BACKUP_HEALTHCHECK_URL:-}"
 
-DB_CONNECTION="${DB_CONNECTION:-sqlite}"
+DB_CONNECTION="${DB_CONNECTION:-pgsql}"
 
 # ---------------------------------------------------------------------------
 # Logging – always line-buffered, never lost on a redirected stdout.

@@ -3,7 +3,7 @@ IS_LARAVEL = "true"
 NIXPACKS_PHP_ROOT_DIR = "/app/public"
 
 [phases.setup]
-nixPkgs = ["...", "curl", "python311Packages.supervisor"]
+nixPkgs = ["...", "curl", "postgresql_17", "python311Packages.supervisor"]
 
 [phases.build]
 cmds = [
@@ -35,27 +35,6 @@ fi
 
 chown -R www-data:www-data /app/storage /app/bootstrap/cache || true
 chmod -R 775 /app/storage /app/bootstrap/cache || true
-
-if [ "${DB_CONNECTION:-sqlite}" = "sqlite" ]; then
-    SQLITE_DATABASE="${DB_DATABASE:-/app/storage/database.sqlite}"
-
-    if [[ "$SQLITE_DATABASE" != /* ]]; then
-        SQLITE_DATABASE="/app/$SQLITE_DATABASE"
-    fi
-
-    export DB_DATABASE="$SQLITE_DATABASE"
-
-    mkdir -p "$(dirname "$SQLITE_DATABASE")"
-
-    if [ ! -f "$SQLITE_DATABASE" ] && [ -f /app/database/database.sqlite ]; then
-        cp /app/database/database.sqlite "$SQLITE_DATABASE"
-    fi
-
-    touch "$SQLITE_DATABASE"
-    chown -R www-data:www-data "$(dirname "$SQLITE_DATABASE")" "$SQLITE_DATABASE" || true
-    chmod 775 "$(dirname "$SQLITE_DATABASE")" || true
-    chmod 664 "$SQLITE_DATABASE" || true
-fi
 
 php /app/artisan storage:link --force || true
 php /app/artisan optimize || true

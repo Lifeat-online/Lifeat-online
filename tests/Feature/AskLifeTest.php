@@ -98,7 +98,7 @@ class AskLifeTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_ask_life_can_surface_signed_in_users_own_draft_listing(): void
+    public function test_ask_life_never_surfaces_signed_in_users_own_draft_listing(): void
     {
         config([
             'services.ai.provider' => 'openrouter',
@@ -122,9 +122,7 @@ class AskLifeTest extends TestCase
                 'question' => 'tyre repair in Bethlehem',
             ])
             ->assertOk()
-            ->assertJsonPath('sources.0.id', 'listing:'.$listing->id)
-            ->assertJsonPath('sources.0.type', 'business')
-            ->assertJsonPath('sources.0.actions.0.label', 'View');
+            ->assertJsonMissing(['id' => 'listing:'.$listing->id]);
 
         Http::assertNothingSent();
     }
@@ -195,7 +193,7 @@ class AskLifeTest extends TestCase
                     [
                         'message' => [
                             'content' => json_encode([
-                                'answer' => 'Ek is Jakobus. Ek kan jou help om die regte Life@ afdeling te vind.',
+                                'answer' => 'Ek is Ask Life. Ek kan jou help om die regte Life@ afdeling te vind.',
                                 'confidence' => 0.74,
                                 'source_ids' => ['guide:search'],
                                 'follow_up_questions' => ['In watter dorp moet ek soek?'],
@@ -217,10 +215,10 @@ class AskLifeTest extends TestCase
             ->assertOk()
             ->assertJsonPath('source', 'ai')
             ->assertJsonPath('locale', 'af')
-            ->assertJsonPath('answer', 'Ek is Jakobus. Ek kan jou help om die regte Life@ afdeling te vind.')
+            ->assertJsonPath('answer', 'Ek is Ask Life. Ek kan jou help om die regte Life@ afdeling te vind.')
             ->assertJsonPath('sources.0.id', 'guide:search')
             ->assertJsonPath('sources.0.label', 'Gids')
-            ->assertJsonPath('sources.0.title', 'Jakobus kan jou help om Life@ te gebruik')
+            ->assertJsonPath('sources.0.title', 'Ask Life kan jou help om Life@ te gebruik')
             ->assertJsonPath('answer_actions.0.label', 'Maak beste passing oop')
             ->assertJsonPath('answer_actions.1.label', 'Volledige soektog');
 
@@ -230,13 +228,13 @@ class AskLifeTest extends TestCase
 
             return data_get($input, 'target_locale') === 'af'
                 && data_get($input, 'target_language') === 'Afrikaans'
-                && str_contains((string) data_get($input, 'language_instruction'), 'Refer to the assistant as Jakobus')
-                && str_contains((string) data_get($payload, 'messages.0.content'), 'introduce or refer to yourself as Jakobus');
+                && str_contains((string) data_get($input, 'language_instruction'), 'Use the product name Ask Life')
+                && str_contains((string) data_get($payload, 'messages.0.content'), 'Use the product name Ask Life');
         });
 
         $this->assertDatabaseHas('ai_generations', [
             'feature_key' => 'ask_life',
-            'prompt_version' => 'ask_life_v8',
+            'prompt_version' => 'ask_life_v9',
             'output_language' => 'af',
         ]);
     }
@@ -261,10 +259,10 @@ class AskLifeTest extends TestCase
             ->assertJsonPath('locale', 'af')
             ->assertJsonPath('sources.0.id', 'guide:search')
             ->assertJsonPath('sources.0.label', 'Gids')
-            ->assertJsonPath('sources.0.title', 'Jakobus kan jou help om Life@ te gebruik')
+            ->assertJsonPath('sources.0.title', 'Ask Life kan jou help om Life@ te gebruik')
             ->assertJsonPath('answer_actions.0.label', 'Maak beste passing oop')
             ->assertJsonPath('answer_actions.1.label', 'Volledige soektog')
-            ->assertSee('Ek is Jakobus. Ek kan jou help uitwerk waarheen om op Life@ te gaan', false);
+            ->assertSee('Ek is Ask Life. Ek kan jou help uitwerk waarheen om op Life@ te gaan', false);
 
         Http::assertNothingSent();
     }
@@ -280,12 +278,12 @@ class AskLifeTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('data-locale="af"', false);
-        $response->assertSee('Vra vir Jakobus', false);
+        $response->assertSee('Vra vir Ask Life', false);
         $response->assertSee('Vind plaaslike antwoorde, aksies en die regte Life@ bladsy.', false);
-        $response->assertSee('Hallo, ek is Jakobus. Waarmee moet ek jou help?', false);
+        $response->assertSee('Hallo, ek is Ask Life. Waarmee moet ek jou help?', false);
         $response->assertSee('Probeer: bandherstelwerk in Bethlehem', false);
-        $response->assertDontSee('Vra vir Jimmy', false);
-        $response->assertDontSee('Hallo, ek is Jimmy', false);
+        $response->assertDontSee('Vra vir Jakobus', false);
+        $response->assertDontSee('Hallo, ek is Jakobus', false);
     }
 
     public function test_ask_life_is_hidden_and_blocked_for_non_dev_users(): void
@@ -464,7 +462,7 @@ class AskLifeTest extends TestCase
                     [
                         'message' => [
                             'content' => json_encode([
-                                'answer' => 'I am Jimmy. I can help you find your way around Life@, but I will not pretend we have a verified listing or event when we do not. Tell me the town and what you need, and I will point you to the best next step.',
+                                'answer' => 'I am Ask Life. I can help you find your way around Life@, but I will not pretend we have a verified listing or event when we do not. Tell me the town and what you need, and I will point you to the best next step.',
                                 'confidence' => 0.72,
                                 'source_ids' => ['guide:search', 'guide:directory'],
                                 'follow_up_questions' => ['Which town should I focus on?'],
@@ -482,7 +480,7 @@ class AskLifeTest extends TestCase
             ->assertJsonPath('source', 'ai')
             ->assertJsonPath('sources.0.id', 'guide:search')
             ->assertJsonPath('sources.1.id', 'guide:directory')
-            ->assertSee('I am Jimmy', false);
+            ->assertSee('I am Ask Life', false);
 
         Http::assertSent(function ($request): bool {
             $body = $request->body();

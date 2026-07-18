@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class ResearchItem extends Model
 {
@@ -58,4 +60,8 @@ class ResearchItem extends Model
     {
         return $this->hasOne(ArticleBrief::class);
     }
+
+    public function snapshots(): HasMany { return $this->hasMany(SourceSnapshot::class); }
+
+    public function storyClusters(): BelongsToMany { return $this->belongsToMany(StoryCluster::class); }
 }

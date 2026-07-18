@@ -3,8 +3,8 @@
 #
 # backup-db.sh
 # Dump the application database and (optionally) upload to S3-compatible
-# storage. Supports MySQL/MariaDB. For SQLite, archives the .sqlite file
-# directly.
+# storage. PostgreSQL is the Life@ deployment target; legacy MySQL and SQLite
+# branches remain usable for local compatibility.
 #
 # Usage:
 #   scripts/backup/backup-db.sh
@@ -26,7 +26,14 @@ ensure_dir "${OUT_DIR}"
 # ---------------------------------------------------------------------------
 # Pre-flight checks
 # ---------------------------------------------------------------------------
-if [[ "${DB_CONNECTION}" == "mysql" || "${DB_CONNECTION}" == "mariadb" ]]; then
+if [[ "${DB_CONNECTION}" == "pgsql" ]]; then
+    if ! command -v "${BACKUP_PGDUMP_BIN:-pg_dump}" > /dev/null 2>&1; then
+        die "pg_dump not found in PATH. Set BACKUP_PGDUMP_BIN or install postgresql-client."
+    fi
+    if [[ -z "${DB_DATABASE:-}" ]]; then
+        die "DB_DATABASE is not set in .env"
+    fi
+elif [[ "${DB_CONNECTION}" == "mysql" || "${DB_CONNECTION}" == "mariadb" ]]; then
     if ! command -v "${BACKUP_MYSQLDUMP_BIN:-mysqldump}" > /dev/null 2>&1; then
         die "mysqldump not found in PATH. Set BACKUP_MYSQLDUMP_BIN or install mariadb-client."
     fi
@@ -50,7 +57,18 @@ ARCHIVE="${OUT_DIR}/${FILENAME}.gz"
 
 log "Dumping ${DB_CONNECTION} database to ${ARCHIVE}"
 
-if [[ "${DB_CONNECTION}" == "mysql" || "${DB_CONNECTION}" == "mariadb" ]]; then
+if [[ "${DB_CONNECTION}" == "pgsql" ]]; then
+    PGPASSWORD="${DB_PASSWORD:-}" "${BACKUP_PGDUMP_BIN:-pg_dump}" \
+        --host="${DB_HOST:-127.0.0.1}" \
+        --port="${DB_PORT:-5432}" \
+        --username="${DB_USERNAME:-lifeat}" \
+        --dbname="${DB_DATABASE}" \
+        --clean \
+        --if-exists \
+        --no-owner \
+        --no-privileges \
+        | gzip -9 > "${ARCHIVE}"
+elif [[ "${DB_CONNECTION}" == "mysql" || "${DB_CONNECTION}" == "mariadb" ]]; then
     # --single-transaction avoids locking for InnoDB-only workloads.
     # --quick streams large tables row-by-row to avoid memory blowups.
     # --routines / --triggers / --events capture the full schema.

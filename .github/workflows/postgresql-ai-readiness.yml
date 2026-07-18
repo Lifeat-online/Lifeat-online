@@ -1,0 +1,66 @@
+name: PostgreSQL AI readiness
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  postgres-ai:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.2-pg17
+        env:
+          POSTGRES_DB: lifeat
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lifeat"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      APP_ENV: testing
+      APP_KEY: base64:dGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LXRlc3Q=
+      APP_DEBUG: false
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: lifeat
+      DB_USERNAME: lifeat_app
+      DB_PASSWORD: lifeat_test_password
+      DB_SSLMODE: disable
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      AI_EMBEDDING_PROVIDER: fake
+      AI_EMBEDDING_DIMENSIONS: 1536
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, openssl, fileinfo, gd, curl, pdo_pgsql, pgsql
+          coverage: none
+      - name: Provision pgvector and restricted application role
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h 127.0.0.1 -U postgres -d lifeat -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE EXTENSION vector;
+          CREATE ROLE lifeat_app LOGIN PASSWORD 'lifeat_test_password' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
+          GRANT CONNECT ON DATABASE lifeat TO lifeat_app;
+          GRANT USAGE, CREATE ON SCHEMA public TO lifeat_app;
+          GRANT USAGE ON TYPE vector TO lifeat_app;
+          SQL
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Build empty PostgreSQL schema
+        run: php artisan migrate:fresh --force
+      - name: Verify AI platform on PostgreSQL
+        run: |
+          php artisan test tests/Feature/AiPlatformFoundationTest.php tests/Feature/KnowledgeIndexingTest.php tests/Feature/KnowledgeRetrievalTest.php tests/Feature/PublicAssistantAccessTest.php tests/Feature/PublicAssistantConversationTest.php tests/Feature/EditorialEvidenceTest.php tests/Feature/OperatorAssistantTest.php tests/Feature/AiEvaluationFixtureTest.php
+          php artisan life:ai:evaluate
+          php artisan life:knowledge:audit --fail

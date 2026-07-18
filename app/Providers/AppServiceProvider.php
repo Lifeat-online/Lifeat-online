@@ -2,6 +2,11 @@
 
 namespace App\Providers;
 
+use App\Ai\Contracts\EmbeddingProvider;
+use App\Ai\Editorial\Contracts\HostResolver;
+use App\Ai\Editorial\DnsHostResolver;
+use App\Ai\Providers\FakeEmbeddingProvider;
+use App\Ai\Providers\OpenAiEmbeddingProvider;
 use App\Events\MallOrderPaid;
 use App\Events\PaymentPaid;
 use App\Events\PayoutPaid;
@@ -24,6 +29,8 @@ use App\Models\Subscription;
 use App\Models\Tag;
 use App\Models\Voucher;
 use App\Observers\QueueContentTranslations;
+use App\Observers\QueueArticleKnowledge;
+use App\Observers\QueuePublicKnowledge;
 use App\Policies\ListingPolicy;
 use App\Policies\NotificationLogPolicy;
 use App\Policies\OrderPolicy;
@@ -45,7 +52,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(HostResolver::class, DnsHostResolver::class);
+        $this->app->bind(EmbeddingProvider::class, function (): EmbeddingProvider {
+            $dimensions = (int) config('ai_platform.embeddings.dimensions', 1536);
+
+            if ($this->app->environment('testing') || config('ai_platform.embeddings.provider') === 'fake') {
+                return new FakeEmbeddingProvider($dimensions);
+            }
+
+            return new OpenAiEmbeddingProvider(
+                apiKey: (string) config('ai_platform.embeddings.key', ''),
+                modelName: (string) config('ai_platform.embeddings.model', 'text-embedding-3-small'),
+                vectorDimensions: $dimensions,
+                baseUrl: (string) config('ai_platform.embeddings.base_url', 'https://api.openai.com/v1'),
+            );
+        });
     }
 
     /**
@@ -68,13 +89,19 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(PushCampaignDispatched::class, RecordRevenueLifecycleEvent::class);
 
         Article::observe(QueueContentTranslations::class);
+        Article::observe(QueueArticleKnowledge::class);
         Category::observe(QueueContentTranslations::class);
         Classified::observe(QueueContentTranslations::class);
+        Classified::observe(QueuePublicKnowledge::class);
         LifeEvent::observe(QueueContentTranslations::class);
+        LifeEvent::observe(QueuePublicKnowledge::class);
         Listing::observe(QueueContentTranslations::class);
+        Listing::observe(QueuePublicKnowledge::class);
         LocationNode::observe(QueueContentTranslations::class);
         Tag::observe(QueueContentTranslations::class);
         Voucher::observe(QueueContentTranslations::class);
+        Voucher::observe(QueuePublicKnowledge::class);
+        \App\Models\CivicFaultReport::observe(QueuePublicKnowledge::class);
 
         $this->configureRateLimiters();
 
@@ -115,6 +142,16 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('public-tracking', function (Request $request) {
             return Limit::perMinute(120)->by($request->ip() ?: 'unknown');
+        });
+
+        RateLimiter::for('ask-life', function (Request $request) {
+            $identity = implode('|', [
+                (string) ($request->user()?->id ?: 'guest'),
+                (string) $request->input('session_id', 'new'),
+                $request->ip() ?: 'unknown',
+            ]);
+
+            return Limit::perMinute(20)->by(hash('sha256', $identity.'|'.(string) config('app.key')));
         });
     }
 

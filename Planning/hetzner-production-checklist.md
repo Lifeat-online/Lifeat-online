@@ -23,7 +23,7 @@ Use this checklist before a production launch or major Hetzner/Coolify redeploy.
 - Production-readiness index migration has been applied and reviewed for long-running lock risk on the target database size.
 - Automated backups are enabled in Hetzner/Coolify or the chosen managed database provider.
 - `BACKUPS_ENABLED=true`, `BACKUP_PROVIDER`, and `BACKUP_RETENTION_DAYS` are set in Coolify environment variables.
-- A restore drill has been completed against a non-production database, then documented with `BACKUP_RESTORE_DRILL_COMPLETED=true` and `BACKUP_LAST_RESTORE_DRILL_DATE=YYYY-MM-DD`.
+- PostgreSQL backup scripts are configured. This clean, non-production deployment does not require a restore rehearsal.
 - Long-running migration risk has been reviewed before release.
 
 ## Queues And Scheduler

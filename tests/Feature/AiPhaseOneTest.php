@@ -115,7 +115,7 @@ class AiPhaseOneTest extends TestCase
             ->assertSee('Voice Test')
             ->assertSee('Voice Providers')
             ->assertSee('Text Feature Routes')
-            ->assertSee('Jimmy public assistant')
+            ->assertSee('Ask Life public assistant')
             ->assertSee('NVIDIA Speech NIM')
             ->assertSee('NVIDIA Speech NIM testing expects a hosted or local endpoint', false)
             ->assertSee(route('ask-life.speak'), false)

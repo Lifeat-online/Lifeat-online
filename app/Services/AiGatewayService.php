@@ -215,6 +215,21 @@ class AiGatewayService
         return str_repeat('*', max(strlen($key) - 4, 8)).substr($key, -4);
     }
 
+    public function assertFeatureCapabilities(string $featureKey, string $provider): void
+    {
+        $required = (array) config("ai_features.routes.{$featureKey}.required_capabilities", ['structured_json']);
+        $missing = array_values(array_diff($required, $this->providerCapabilities($provider)));
+
+        if ($missing !== []) {
+            throw new \RuntimeException(sprintf(
+                'AI provider [%s] cannot serve feature [%s]; missing capabilities: %s.',
+                $provider,
+                $featureKey,
+                implode(', ', $missing),
+            ));
+        }
+    }
+
     public function generateStructured(
         string $featureKey,
         string $promptVersion,
@@ -225,6 +240,7 @@ class AiGatewayService
         ?string $outputLanguage = null,
     ): array {
         $primaryProvider = $this->providerForFeature($featureKey);
+        $this->assertFeatureCapabilities($featureKey, $primaryProvider);
         $primaryModel = $this->modelForFeature($featureKey, $primaryProvider);
         $encodedInput = $this->encode($input);
         $inputTokens = $this->estimateTokens($systemPrompt.' '.$encodedInput);
@@ -297,6 +313,7 @@ class AiGatewayService
                 $model,
             );
             $lastGeneration = $generation;
+            $startedAt = hrtime(true);
 
             try {
                 $responseText = $this->send($provider, $model, $systemPrompt, $input);
@@ -311,6 +328,8 @@ class AiGatewayService
                         'error_message' => $message.' Preview: '.Str::limit(trim($responseText), 220),
                         'token_output_estimate' => $outputTokens,
                         'cost_estimate' => $this->costs->estimateText($provider, $model, $inputTokens, $outputTokens),
+                        'latency_ms' => (int) round((hrtime(true) - $startedAt) / 1_000_000),
+                        'error_category' => 'malformed_output',
                     ]);
 
                     $failures[] = [
@@ -329,6 +348,8 @@ class AiGatewayService
                     'output_payload' => $payload,
                     'token_output_estimate' => $outputTokens,
                     'cost_estimate' => $this->costs->estimateText($provider, $model, $inputTokens, $outputTokens),
+                    'latency_ms' => (int) round((hrtime(true) - $startedAt) / 1_000_000),
+                    'finish_reason' => 'completed',
                 ]);
 
                 return [
@@ -350,6 +371,8 @@ class AiGatewayService
                 $generation->update([
                     'status' => AiGeneration::STATUS_FAILED,
                     'error_message' => Str::limit($message, 500, ''),
+                    'latency_ms' => (int) round((hrtime(true) - $startedAt) / 1_000_000),
+                    'error_category' => $this->errorCategory($exception),
                 ]);
 
                 $failures[] = [
@@ -516,7 +539,22 @@ class AiGatewayService
             'status' => AiGeneration::STATUS_DRAFT,
             'token_input_estimate' => $inputTokens,
             'cost_estimate' => 0,
+            'trace_id' => (string) Str::uuid(),
+            'cache_hit' => false,
         ]);
+    }
+
+    private function errorCategory(Throwable $exception): string
+    {
+        $message = Str::lower($exception->getMessage());
+
+        return match (true) {
+            Str::contains($message, ['timeout', 'timed out', 'curl error 28']) => 'timeout',
+            Str::contains($message, ['401', '403', 'unauthorized', 'forbidden']) => 'authentication',
+            Str::contains($message, ['429', 'rate limit']) => 'rate_limit',
+            Str::contains($message, ['validation', 'invalid']) => 'validation',
+            default => 'provider_error',
+        };
     }
 
     private function successMessage(array $primaryAttempt, array $successfulAttempt, array $failures): string

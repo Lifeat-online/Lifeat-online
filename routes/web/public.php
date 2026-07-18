@@ -49,9 +49,11 @@ Route::get('/articles/{article:slug}', [ArticleController::class, 'show'])->name
 
 Route::get('/search', [SearchController::class, 'index'])->name('search.index');
 
-Route::post('/ask-life', [AskLifeController::class, 'store'])->middleware('throttle:20,1')->name('ask-life.store');
-Route::post('/ask-life/feedback', [AskLifeController::class, 'feedback'])->middleware('throttle:30,1')->name('ask-life.feedback');
-Route::post('/ask-life/speak', [AskLifeController::class, 'speak'])->middleware('throttle:12,1')->name('ask-life.speak');
+Route::post('/ask-life', [AskLifeController::class, 'store'])->middleware('throttle:ask-life')->name('ask-life.store');
+Route::post('/ask-life/stream', [AskLifeController::class, 'stream'])->middleware('throttle:ask-life')->name('ask-life.stream');
+Route::post('/ask-life/feedback', [AskLifeController::class, 'feedback'])->middleware('throttle:ask-life')->name('ask-life.feedback');
+Route::post('/ask-life/speak', [AskLifeController::class, 'speak'])->middleware('throttle:ask-life')->name('ask-life.speak');
+Route::delete('/ask-life/sessions/{session}', [AskLifeController::class, 'destroySession'])->middleware('throttle:ask-life')->name('ask-life.sessions.destroy');
 
 Route::get('/classifieds', [ClassifiedController::class, 'index'])->name('classifieds.index');
 Route::get('/classifieds/{classified:slug}', [ClassifiedController::class, 'show'])->name('classifieds.show');

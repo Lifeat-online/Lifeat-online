@@ -12,9 +12,7 @@ use App\Models\User;
 use App\Support\Ai\AiPromptCatalog;
 use App\Support\Editorial\BriefFreshness;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Throwable;
 
 class JimmyWritingService
 {
@@ -28,7 +26,7 @@ class JimmyWritingService
         $limit = max(1, min(20, $limit));
 
         $briefs = ArticleBrief::query()
-            ->with(['researchItem.researchSource', 'suggestedCategory', 'article'])
+            ->with(['researchItem.researchSource', 'researchItem.snapshots', 'dossier.claims.evidence.snapshot', 'suggestedCategory', 'article'])
             ->where('status', ArticleBrief::STATUS_APPROVED)
             ->whereDoesntHave('article')
             ->when($briefIds !== [], fn ($query) => $query->whereIn('id', $briefIds))
@@ -74,7 +72,7 @@ class JimmyWritingService
 
     public function draftFromBrief(ArticleBrief $brief, ?User $user = null): array
     {
-        $brief->loadMissing(['researchItem.researchSource', 'suggestedCategory', 'article']);
+        $brief->loadMissing(['researchItem.researchSource', 'researchItem.snapshots', 'dossier.claims.evidence.snapshot', 'suggestedCategory', 'article']);
 
         if ($brief->status !== ArticleBrief::STATUS_APPROVED) {
             return ['ok' => false, 'skipped' => true, 'message' => 'Only approved briefs can be drafted by Jimmy.'];
@@ -96,6 +94,14 @@ class JimmyWritingService
                 'ok' => false,
                 'skipped' => true,
                 'message' => BriefFreshness::approvalMessage($freshness),
+            ];
+        }
+
+        if (config('ai_platform.editorial.evidence_writer_enabled') && ! $brief->dossier?->readyForWriting()) {
+            return [
+                'ok' => false,
+                'skipped' => true,
+                'message' => 'Jimmy requires an approved dossier with supporting evidence for every high-importance claim.',
             ];
         }
 
@@ -291,60 +297,46 @@ class JimmyWritingService
 
     private function sourceContexts(ArticleBrief $brief): array
     {
-        return collect($brief->source_urls ?: [])
-            ->push($brief->researchItem?->source_url)
-            ->filter(fn ($url): bool => is_string($url) && trim($url) !== '')
-            ->map(fn (string $url): string => trim($url))
-            ->unique()
-            ->take(5)
-            ->map(fn (string $url): array => $this->fetchSourceContext($url))
-            ->values()
-            ->all();
-    }
+        $evidence = collect($brief->dossier?->claims ?? [])
+            ->flatMap(fn ($claim) => $claim->evidence->map(fn ($link): array => [
+                'url' => $link->snapshot->url,
+                'ok' => true,
+                'status' => $link->snapshot->http_status,
+                'content_type' => $link->snapshot->content_type,
+                'content' => Str::limit($link->excerpt ?: $link->snapshot->content, 6000, ''),
+                'claim' => $claim->claim,
+                'stance' => $link->stance,
+                'authority_score' => $link->authority_score,
+                'snapshot_hash' => $link->snapshot->content_hash,
+            ]));
 
-    private function fetchSourceContext(string $url): array
-    {
-        if (! filter_var($url, FILTER_VALIDATE_URL)) {
-            return [
-                'url' => $url,
-                'ok' => false,
-                'status' => null,
-                'content' => '',
-                'error' => 'Invalid source URL.',
-            ];
+        if ($evidence->isNotEmpty()) {
+            return $evidence->unique(fn (array $item): string => $item['snapshot_hash'].'|'.$item['claim'])->take(12)->values()->all();
         }
 
-        try {
-            $response = Http::accept('*/*')
-                ->timeout(15)
-                ->get($url);
+        $snapshots = collect($brief->researchItem?->snapshots ?? [])->map(fn ($snapshot): array => [
+            'url' => $snapshot->url,
+            'ok' => $snapshot->fetch_error === null,
+            'status' => $snapshot->http_status,
+            'content_type' => $snapshot->content_type,
+            'content' => Str::limit($snapshot->content, 6000, ''),
+            'snapshot_hash' => $snapshot->content_hash,
+        ]);
 
-            return [
-                'url' => $url,
-                'ok' => $response->successful(),
-                'status' => $response->status(),
-                'content_type' => $response->header('Content-Type'),
-                'content' => $response->successful() ? $this->readableText($response->body()) : '',
-                'error' => $response->successful() ? null : 'Source returned HTTP '.$response->status().'.',
-            ];
-        } catch (Throwable $exception) {
-            return [
-                'url' => $url,
-                'ok' => false,
-                'status' => null,
-                'content' => '',
-                'error' => Str::limit($exception->getMessage(), 220, ''),
-            ];
+        if ($snapshots->isNotEmpty()) {
+            return $snapshots->take(5)->values()->all();
         }
-    }
 
-    private function readableText(string $body): string
-    {
-        $body = preg_replace('/<(script|style|noscript)\b[^>]*>.*?<\/\1>/is', ' ', $body) ?? $body;
-        $text = html_entity_decode(strip_tags($body), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $text = preg_replace('/\s+/', ' ', $text) ?? $text;
+        $item = $brief->researchItem;
 
-        return Str::limit(trim($text), 6000, '');
+        return $item ? [[
+            'url' => $item->source_url,
+            'ok' => true,
+            'status' => null,
+            'content_type' => 'text/plain',
+            'content' => trim($item->title."\n\n".$item->summary),
+            'snapshot_hash' => hash('sha256', trim($item->title."\n\n".$item->summary)),
+        ]] : [];
     }
 
     private function briefContext(ArticleBrief $brief): array

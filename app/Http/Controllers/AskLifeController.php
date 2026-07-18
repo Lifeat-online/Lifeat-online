@@ -2,18 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Ai\PublicAssistant\PublicAssistantAccess;
+use App\Ai\PublicAssistant\ChatSessionStore;
+use App\Ai\PublicAssistant\PublicAssistantService;
 use App\Models\AskLifeFeedback;
-use App\Services\AskLifeService;
 use App\Services\VoiceGatewayService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AskLifeController extends Controller
 {
-    public function store(Request $request, AskLifeService $askLife): JsonResponse
+    public function store(Request $request, PublicAssistantService $askLife, PublicAssistantAccess $access, ChatSessionStore $chats): JsonResponse
     {
-        $this->ensureDevOwner($request);
+        $this->ensureAvailable($request, $access);
 
         $validated = $request->validate([
             'question' => ['required', 'string', 'min:3', 'max:500'],
@@ -29,19 +32,27 @@ class AskLifeController extends Controller
             'context.timezone' => ['nullable', 'string', 'max:80'],
             'context.local_time' => ['nullable', 'string', 'max:80'],
             'context.locale' => ['nullable', 'string', 'max:20'],
+            'session_id' => ['nullable', 'uuid'],
         ]);
 
-        return response()->json($askLife->answer(
+        $locale = (string) data_get($validated, 'context.locale', app()->getLocale());
+        $session = $chats->resolve($request, $validated['session_id'] ?? null, $locale);
+        $history = $chats->history($session);
+        $answer = $askLife->answer(
             $validated['question'],
             $request->user(),
-            $validated['history'] ?? [],
+            $history ?: ($validated['history'] ?? []),
             $validated['context'] ?? [],
-        ));
+        );
+        $chats->record($session, $validated['question'], $answer);
+        $answer['session_id'] = $session->id;
+
+        return response()->json($answer);
     }
 
-    public function feedback(Request $request): JsonResponse
+    public function feedback(Request $request, PublicAssistantAccess $access): JsonResponse
     {
-        $this->ensureDevOwner($request);
+        $this->ensureAvailable($request, $access);
 
         $validated = $request->validate([
             'rating' => ['required', 'string', Rule::in(['helpful', 'not_helpful'])],
@@ -86,9 +97,9 @@ class AskLifeController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    public function speak(Request $request, VoiceGatewayService $voice): JsonResponse
+    public function speak(Request $request, VoiceGatewayService $voice, PublicAssistantAccess $access): JsonResponse
     {
-        $this->ensureDevOwner($request);
+        $this->ensureAvailable($request, $access);
 
         $validated = $request->validate([
             'text' => ['required', 'string', 'min:2', 'max:1000'],
@@ -104,8 +115,37 @@ class AskLifeController extends Controller
         return response()->json($result, ($result['ok'] ?? false) ? 200 : 422);
     }
 
-    private function ensureDevOwner(Request $request): void
+    public function destroySession(Request $request, string $session, PublicAssistantAccess $access, ChatSessionStore $chats): JsonResponse
     {
-        abort_unless($request->user()?->hasRole('dev', 'developer'), 403, 'AskLife is currently limited to platform developers.');
+        $this->ensureAvailable($request, $access);
+        abort_unless($chats->deleteOwned($request, $session), 404);
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function stream(Request $request, PublicAssistantService $askLife, PublicAssistantAccess $access, ChatSessionStore $chats): StreamedResponse
+    {
+        abort_unless(config('ai_platform.public_chat.streaming_enabled'), 404);
+        $payload = $this->store($request, $askLife, $access, $chats)->getData(true);
+
+        return response()->stream(function () use ($payload): void {
+            foreach (str_split((string) ($payload['answer'] ?? ''), 120) as $chunk) {
+                echo "event: delta\n".'data: '.json_encode(['text' => $chunk], JSON_UNESCAPED_UNICODE)."\n\n";
+                if (ob_get_level() > 0) {
+                    @ob_flush();
+                }
+                flush();
+            }
+            echo "event: done\n".'data: '.json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)."\n\n";
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache, no-transform',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    }
+
+    private function ensureAvailable(Request $request, PublicAssistantAccess $access): void
+    {
+        abort_unless($access->allowed($request->user()), 403, 'Ask Life is not enabled for this rollout stage.');
     }
 }

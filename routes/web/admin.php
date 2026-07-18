@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\AiAssistController as AdminAiAssistController;
 use App\Http\Controllers\Admin\AiManagerController as AdminAiManagerController;
 use App\Http\Controllers\Admin\AiOperationsController as AdminAiOperationsController;
 use App\Http\Controllers\Admin\AiSettingsController as AdminAiSettingsController;
+use App\Http\Controllers\Admin\AiOperatorController as AdminAiOperatorController;
 use App\Http\Controllers\Admin\ArticleBriefController as AdminArticleBriefController;
 use App\Http\Controllers\Admin\ArticleController as AdminArticleController;
 use App\Http\Controllers\Admin\ArticleImageController as AdminArticleImageController;
@@ -33,6 +34,14 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'role:admin,editor,staff,support,dev,developer'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', AdminDashboardController::class)->name('dashboard');
+    Route::post('/ai-operator/tools/{tool}', [AdminAiOperatorController::class, 'execute'])
+        ->middleware('role:admin,editor,support,dev,developer')
+        ->where('tool', '[A-Za-z0-9._-]+')
+        ->name('ai-operator.tools.execute');
+    Route::post('/ai-operator/tools/{tool}/approve', [AdminAiOperatorController::class, 'approve'])
+        ->middleware('role:admin,editor,dev,developer')
+        ->where('tool', '[A-Za-z0-9._-]+')
+        ->name('ai-operator.tools.approve');
 
     Route::get('/action-station', [AdminActionStationController::class, 'index'])->name('action-station.index');
     Route::post('/action-station/settings', [AdminActionStationController::class, 'updateSettings'])

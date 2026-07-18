@@ -33,6 +33,13 @@ class AiGeneration extends Model
         'output_payload',
         'status',
         'error_message',
+        'trace_id',
+        'latency_ms',
+        'finish_reason',
+        'token_input_actual',
+        'token_output_actual',
+        'cache_hit',
+        'error_category',
         'token_input_estimate',
         'token_output_estimate',
         'cost_estimate',
@@ -47,6 +54,7 @@ class AiGeneration extends Model
             'input_payload' => 'array',
             'cost_estimate' => 'decimal:6',
             'reviewed_at' => 'datetime',
+            'cache_hit' => 'boolean',
         ];
     }
 

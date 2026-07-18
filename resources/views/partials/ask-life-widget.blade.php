@@ -2,10 +2,10 @@
     $askLifeLocale = app()->getLocale() === 'af' ? 'af' : 'en';
     $askLifeTexts = [
         'en' => [
-            'assistantName' => 'Jimmy',
-            'askJimmy' => 'Ask Jimmy',
+            'assistantName' => 'Ask Life',
+            'askJimmy' => 'Ask Life',
             'headerSubtitle' => 'Find local answers, actions, and the right Life@ page.',
-            'greeting' => 'Hi, I am Jimmy. What should I help you do?',
+            'greeting' => 'Hi, I am Ask Life. What should I help you do?',
             'questionLabel' => 'Question',
             'placeholder' => 'Try: tyre repair in Bethlehem, events this weekend, improve my listing',
             'askTitle' => 'Ask',
@@ -13,8 +13,8 @@
             'muteVoice' => 'Mute voice',
             'enableVoice' => 'Enable voice',
             'clearConversation' => 'Clear conversation',
-            'closeJimmy' => 'Close Jimmy',
-            'thinking' => 'Jimmy is thinking',
+            'closeJimmy' => 'Close Ask Life',
+            'thinking' => 'Ask Life is thinking',
             'open' => 'Open',
             'source' => 'Source',
             'lifeSource' => 'Life@ source',
@@ -27,7 +27,7 @@
             'openSearch' => 'Open search',
             'listen' => 'Listen',
             'listenTitle' => 'Listen to this answer',
-            'listenAria' => 'Listen to Jimmy read this answer',
+            'listenAria' => 'Listen to Ask Life read this answer',
             'loading' => 'Loading',
             'playingSaved' => 'Playing saved',
             'playing' => 'Playing',
@@ -38,13 +38,14 @@
             'saved' => 'Saved',
             'feedbackFailed' => 'Could not save feedback',
             'fallbackAnswer' => 'I could not build an answer from Life@ sources yet.',
-            'unavailable' => 'Jimmy is unavailable right now. Try the full search page.',
+            'unavailable' => 'Ask Life is unavailable right now. Try the full search page.',
+            'privacy' => 'AI-generated answers can be wrong. Conversations are kept for up to 30 days and can be deleted with the trash button.',
         ],
         'af' => [
-            'assistantName' => 'Jakobus',
-            'askJimmy' => 'Vra vir Jakobus',
+            'assistantName' => 'Ask Life',
+            'askJimmy' => 'Vra vir Ask Life',
             'headerSubtitle' => 'Vind plaaslike antwoorde, aksies en die regte Life@ bladsy.',
-            'greeting' => 'Hallo, ek is Jakobus. Waarmee moet ek jou help?',
+            'greeting' => 'Hallo, ek is Ask Life. Waarmee moet ek jou help?',
             'questionLabel' => 'Vraag',
             'placeholder' => 'Probeer: bandherstelwerk in Bethlehem, geleenthede hierdie naweek, verbeter my listing',
             'askTitle' => 'Vra',
@@ -52,8 +53,8 @@
             'muteVoice' => 'Demp stem',
             'enableVoice' => 'Skakel stem aan',
             'clearConversation' => 'Maak gesprek skoon',
-            'closeJimmy' => 'Maak Jakobus toe',
-            'thinking' => 'Jakobus dink',
+            'closeJimmy' => 'Maak Ask Life toe',
+            'thinking' => 'Ask Life dink',
             'open' => 'Maak oop',
             'source' => 'Bron',
             'lifeSource' => 'Life@ bron',
@@ -66,7 +67,7 @@
             'openSearch' => 'Maak soektog oop',
             'listen' => 'Luister',
             'listenTitle' => 'Luister na hierdie antwoord',
-            'listenAria' => 'Luister hoe Jakobus hierdie antwoord lees',
+            'listenAria' => 'Luister hoe Ask Life hierdie antwoord lees',
             'loading' => 'Laai',
             'playingSaved' => 'Speel gestoorde klank',
             'playing' => 'Speel',
@@ -77,7 +78,8 @@
             'saved' => 'Gestoor',
             'feedbackFailed' => 'Kon nie terugvoer stoor nie',
             'fallbackAnswer' => 'Ek kon nog nie n antwoord uit Life@ bronne bou nie.',
-            'unavailable' => 'Jakobus is nou nie beskikbaar nie. Probeer die volledige soekbladsy.',
+            'unavailable' => 'Ask Life is nou nie beskikbaar nie. Probeer die volledige soekbladsy.',
+            'privacy' => 'KI-antwoorde kan verkeerd wees. Gesprekke word tot 30 dae gehou en kan met die asblikknoppie uitgevee word.',
         ],
     ][$askLifeLocale];
 @endphp
@@ -86,8 +88,10 @@
     class="ask-life-widget"
     data-ask-life
     data-endpoint="{{ route('ask-life.store') }}"
+    data-stream-endpoint="{{ config('ai_platform.public_chat.streaming_enabled') ? route('ask-life.stream') : '' }}"
     data-feedback-endpoint="{{ route('ask-life.feedback') }}"
     data-speak-endpoint="{{ route('ask-life.speak') }}"
+    data-session-endpoint="{{ url('/ask-life/sessions') }}"
     data-locale="{{ $askLifeLocale }}"
 >
     <button type="button" class="ask-life-fab" data-ask-life-toggle aria-expanded="false" aria-controls="ask-life-panel" title="{{ $askLifeTexts['askJimmy'] }}">
@@ -126,6 +130,7 @@
                 <x-icon name="arrow-right" class="w-5 h-5" />
             </button>
         </form>
+        <p class="px-4 pb-3 text-xs text-slate-500">{{ $askLifeTexts['privacy'] }} <a class="underline" href="{{ route('legal.privacy') }}">{{ $askLifeLocale === 'af' ? 'Privaatheidsbeleid' : 'Privacy policy' }}</a></p>
     </section>
 </div>
 
@@ -144,18 +149,22 @@
         const voiceOff = root.querySelector('[data-voice-off]');
         const clearBtn = root.querySelector('[data-ask-life-clear]');
         const endpoint = root.dataset.endpoint;
+        const streamEndpoint = root.dataset.streamEndpoint;
         const feedbackEndpoint = root.dataset.feedbackEndpoint;
         const speakEndpoint = root.dataset.speakEndpoint;
+        const sessionEndpoint = root.dataset.sessionEndpoint;
         const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
         const text = @json($askLifeTexts);
         const fallbackSearchUrl = @json(route('search.index'));
 
-        const STORAGE_KEY = 'jimmy_chat_v1';
-        const VOICE_KEY = 'jimmy_voice';
+        const STORAGE_KEY = 'ask_life_chat_v1';
+        const SESSION_KEY = 'ask_life_session_v1';
+        const VOICE_KEY = 'ask_life_voice';
         const MAX_HISTORY = 8;
 
         let activeAudio = null;
         let conversationHistory = [];
+        let sessionId = storageGet(SESSION_KEY);
         let voiceEnabled = storageGet(VOICE_KEY) !== 'false';
 
         function tr(key, fallback = '') {
@@ -263,10 +272,21 @@
             } catch (_) {}
         }
 
-        clearBtn?.addEventListener('click', () => {
+        clearBtn?.addEventListener('click', async () => {
+            const deleting = sessionId;
+            sessionId = null;
+            storageSet(SESSION_KEY, '');
             conversationHistory = [];
             saveHistory();
             resetGreeting();
+            if (deleting && sessionEndpoint) {
+                try {
+                    await fetch(`${sessionEndpoint}/${encodeURIComponent(deleting)}`, {
+                        method: 'DELETE',
+                        headers: jsonHeaders(),
+                    });
+                } catch (_) {}
+            }
         });
 
         function appendMessage(content, type) {
@@ -542,6 +562,39 @@
             };
         }
 
+        async function readSseResponse(response, typing) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let answer = '';
+            let data = {};
+
+            resolveTyping(typing, '');
+            typing.dataset.streaming = 'true';
+            while (true) {
+                const { value, done } = await reader.read();
+                buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+                const blocks = buffer.split('\n\n');
+                buffer = blocks.pop() || '';
+                for (const block of blocks) {
+                    const event = block.match(/^event:\s*(.+)$/m)?.[1];
+                    const raw = block.match(/^data:\s*(.+)$/m)?.[1];
+                    if (!raw) continue;
+                    const payload = JSON.parse(raw);
+                    if (event === 'delta') {
+                        answer += payload.text || '';
+                        typing.textContent = answer;
+                        messages.scrollTop = messages.scrollHeight;
+                    } else if (event === 'done') {
+                        data = payload;
+                    }
+                }
+                if (done) break;
+            }
+
+            return data;
+        }
+
         form?.addEventListener('submit', async event => {
             event.preventDefault();
 
@@ -560,16 +613,23 @@
             conversationHistory.push({ role: 'user', content: text });
 
             try {
-                const res = await fetch(endpoint, {
+                const res = await fetch(streamEndpoint || endpoint, {
                     method: 'POST',
                     headers: jsonHeaders(),
-                    body: JSON.stringify({ question: text, history: historyPayload, context }),
+                    body: JSON.stringify({ question: text, history: historyPayload, context, session_id: sessionId || null }),
                 });
 
-                const data = await res.json().catch(() => ({}));
+                const data = res.headers.get('content-type')?.includes('text/event-stream')
+                    ? await readSseResponse(res, typing)
+                    : await res.json().catch(() => ({}));
                 const answer = data.answer || tr('fallbackAnswer');
 
-                resolveTyping(typing, answer);
+                if (data.session_id) {
+                    sessionId = data.session_id;
+                    storageSet(SESSION_KEY, sessionId);
+                }
+
+                if (!typing.dataset.streaming) resolveTyping(typing, answer);
                 conversationHistory.push({ role: 'assistant', content: answer });
                 saveHistory();
 

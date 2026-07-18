@@ -409,7 +409,7 @@
             </div>
         @endif
     </footer>
-    @if (auth()->user()?->hasRole('dev', 'developer'))
+    @if (app(\App\Ai\PublicAssistant\PublicAssistantAccess::class)->allowed(auth()->user()))
         @include('partials.ask-life-widget')
     @endif
     @stack('scripts')

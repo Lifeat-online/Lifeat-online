@@ -82,7 +82,7 @@ if [[ "${ASSUME_YES}" != "true" ]]; then
 =========================================================
   DESTRUCTIVE OPERATION
 =========================================================
-  Target:   ${DB_CONNECTION}://${DB_HOST:-127.0.0.1}:${DB_PORT:-3306}/${DB_DATABASE:-<unset>}
+  Target:   ${DB_CONNECTION}://${DB_HOST:-127.0.0.1}:${DB_PORT:-5432}/${DB_DATABASE:-<unset>}
   Archive:  ${ARCHIVE}
   Size:     $(du -h "${ARCHIVE}" | cut -f1)
 =========================================================
@@ -94,7 +94,21 @@ fi
 # ---------------------------------------------------------------------------
 # Restore
 # ---------------------------------------------------------------------------
-if [[ "${DB_CONNECTION}" == "mysql" || "${DB_CONNECTION}" == "mariadb" ]]; then
+if [[ "${DB_CONNECTION}" == "pgsql" ]]; then
+    if ! command -v psql > /dev/null 2>&1; then
+        die "psql client not installed"
+    fi
+    if [[ -z "${DB_DATABASE:-}" ]]; then
+        die "DB_DATABASE is not set in .env"
+    fi
+    log "Restoring PostgreSQL objects into ${DB_DATABASE}"
+    gunzip -c "${ARCHIVE}" | PGPASSWORD="${DB_PASSWORD:-}" psql \
+        --host="${DB_HOST:-127.0.0.1}" \
+        --port="${DB_PORT:-5432}" \
+        --username="${DB_USERNAME:-lifeat}" \
+        --dbname="${DB_DATABASE}" \
+        --set ON_ERROR_STOP=on
+elif [[ "${DB_CONNECTION}" == "mysql" || "${DB_CONNECTION}" == "mariadb" ]]; then
     if ! command -v mysql > /dev/null 2>&1; then
         die "mysql client not installed"
     fi
