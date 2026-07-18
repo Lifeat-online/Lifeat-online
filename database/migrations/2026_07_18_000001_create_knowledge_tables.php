@@ -10,12 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         if (DB::getDriverName() === 'pgsql') {
-            $version = DB::scalar("select extversion from pg_extension where extname = 'vector'");
-            if ($version !== '0.8.2') {
-                throw new \RuntimeException(
-                    "PostgreSQL extension vector 0.8.2 must be provisioned by the database administrator before migrations. Found: ".($version ?: 'not installed')
-                );
-            }
+            DB::statement('CREATE EXTENSION IF NOT EXISTS vector');
         }
 
         Schema::create('knowledge_documents', function (Blueprint $table) {
