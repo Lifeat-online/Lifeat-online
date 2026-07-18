@@ -11,5 +11,7 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
 
         $this->withoutVite();
+        config()->set('ai_platform.knowledge.auto_index', false);
+        config()->set('localization.auto_translate_on_publish', false);
     }
 }

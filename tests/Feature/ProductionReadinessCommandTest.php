@@ -12,6 +12,7 @@ class ProductionReadinessCommandTest extends TestCase
 
     public function test_production_check_reports_non_production_runtime(): void
     {
+        config()->set('app.debug', true);
         Env::getRepository()->clear('UPLOAD_STORAGE_BACKEND');
         Env::getRepository()->clear('UPLOAD_STORAGE_MOUNT_PATH');
         putenv('UPLOAD_STORAGE_BACKEND');

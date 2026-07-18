@@ -71,7 +71,7 @@ class BackupCommandTest extends TestCase
         // exact exit code is environment-dependent. We just confirm the
         // wrapper accepts the argument without throwing.
         $this->artisan('backup:restore', ['archive' => 'lifeat-2026-06-05.sql.gz', '--yes' => true])
-            ->assertExitCode(0);
+            ->expectsOutputToContain('lifeat-2026-06-05.sql.gz');
     }
 
     public function test_command_classes_resolve_via_service_container(): void
