@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\CouncillorController as AdminCouncillorController
 use App\Http\Controllers\Admin\CustomerLookupController as AdminCustomerLookupController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\EventController as AdminEventController;
+use App\Http\Controllers\Admin\EditorialDossierController as AdminEditorialDossierController;
 use App\Http\Controllers\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\Admin\ListingController as AdminListingController;
 use App\Http\Controllers\Admin\MapIntegrationController as AdminMapIntegrationController;
@@ -34,6 +35,12 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'role:admin,editor,staff,support,dev,developer'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', AdminDashboardController::class)->name('dashboard');
+    Route::get('/ai-operator', [AdminAiOperatorController::class, 'index'])
+        ->middleware('role:admin,editor,support,dev,developer')
+        ->name('ai-operator.index');
+    Route::post('/ai-operator/messages', [AdminAiOperatorController::class, 'storeMessage'])
+        ->middleware('role:admin,editor,support,dev,developer')
+        ->name('ai-operator.messages.store');
     Route::post('/ai-operator/tools/{tool}', [AdminAiOperatorController::class, 'execute'])
         ->middleware('role:admin,editor,support,dev,developer')
         ->where('tool', '[A-Za-z0-9._-]+')
@@ -42,6 +49,22 @@ Route::middleware(['auth', 'role:admin,editor,staff,support,dev,developer'])->pr
         ->middleware('role:admin,editor,dev,developer')
         ->where('tool', '[A-Za-z0-9._-]+')
         ->name('ai-operator.tools.approve');
+
+    Route::get('/editorial-dossiers', [AdminEditorialDossierController::class, 'index'])
+        ->middleware('role:admin,editor,dev,developer')
+        ->name('editorial-dossiers.index');
+    Route::get('/editorial-dossiers/{editorialDossier}', [AdminEditorialDossierController::class, 'show'])
+        ->middleware('role:admin,editor,dev,developer')
+        ->name('editorial-dossiers.show');
+    Route::post('/editorial-dossiers/{editorialDossier}/approve', [AdminEditorialDossierController::class, 'approve'])
+        ->middleware('role:admin,editor,dev,developer')
+        ->name('editorial-dossiers.approve');
+    Route::put('/editorial-dossiers/{editorialDossier}/claims/{claim}', [AdminEditorialDossierController::class, 'updateClaim'])
+        ->middleware('role:admin,editor,dev,developer')
+        ->name('editorial-dossiers.claims.update');
+    Route::post('/editorial-dossiers/{editorialDossier}/claims/{claim}/evidence', [AdminEditorialDossierController::class, 'storeEvidence'])
+        ->middleware('role:admin,editor,dev,developer')
+        ->name('editorial-dossiers.evidence.store');
 
     Route::get('/action-station', [AdminActionStationController::class, 'index'])->name('action-station.index');
     Route::post('/action-station/settings', [AdminActionStationController::class, 'updateSettings'])

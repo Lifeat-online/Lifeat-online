@@ -6,13 +6,15 @@ use App\Ai\Contracts\EmbeddingProvider;
 use App\Ai\Knowledge\KnowledgeVisibility;
 use App\Ai\Providers\FakeEmbeddingProvider;
 use App\Ai\Providers\OpenAiEmbeddingProvider;
+use App\Ai\PublicAssistant\AskLifeEngine;
+use App\Ai\PublicAssistant\PublicAssistantService;
 use App\Models\KnowledgeChunk;
 use App\Models\KnowledgeDocument;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Http;
-use Tests\TestCase;
 use App\Services\AiGatewayService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
+use Tests\TestCase;
 
 class AiPlatformFoundationTest extends TestCase
 {
@@ -113,5 +115,13 @@ class AiPlatformFoundationTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('missing capabilities: structured_json');
         app(AiGatewayService::class)->assertFeatureCapabilities('ask_life', 'limited');
+    }
+
+    public function test_public_assistant_uses_the_extracted_engine(): void
+    {
+        $service = app(PublicAssistantService::class);
+
+        $this->assertInstanceOf(PublicAssistantService::class, $service);
+        $this->assertInstanceOf(AskLifeEngine::class, app(AskLifeEngine::class));
     }
 }

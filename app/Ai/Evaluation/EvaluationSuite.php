@@ -7,9 +7,14 @@ use RuntimeException;
 
 class EvaluationSuite
 {
+    public function askLifeCases(): Collection
+    {
+        return $this->load('ask_life.jsonl');
+    }
+
     public function summary(): array
     {
-        $ask = $this->load('ask_life.jsonl');
+        $ask = $this->askLifeCases();
         $editorial = $this->load('editorial.jsonl');
         $operator = $this->load('operator.jsonl');
 
@@ -47,6 +52,7 @@ class EvaluationSuite
             if (! is_array($record) || ! isset($record['id'], $record['version'], $record['accepted'])) {
                 throw new RuntimeException("Invalid evaluation record in {$file} at line ".($index + 1));
             }
+
             return $record;
         });
     }

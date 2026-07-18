@@ -4,9 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class OperatorToolRun extends Model
+class OperatorConversation extends Model
 {
     use HasUuids;
 
@@ -14,11 +15,16 @@ class OperatorToolRun extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['user_id', 'tool', 'risk', 'arguments', 'result', 'status', 'idempotency_key', 'operator_tool_approval_id', 'error'];
+    protected $fillable = ['user_id', 'title', 'last_activity_at'];
 
     protected function casts(): array
     {
-        return ['arguments' => 'array', 'result' => 'array'];
+        return ['last_activity_at' => 'datetime'];
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function messages(): HasMany

@@ -62,5 +62,5 @@ jobs:
       - name: Verify AI platform on PostgreSQL
         run: |
           php artisan test tests/Feature/AiPlatformFoundationTest.php tests/Feature/KnowledgeIndexingTest.php tests/Feature/KnowledgeRetrievalTest.php tests/Feature/PublicAssistantAccessTest.php tests/Feature/PublicAssistantConversationTest.php tests/Feature/EditorialEvidenceTest.php tests/Feature/OperatorAssistantTest.php tests/Feature/AiEvaluationFixtureTest.php
-          php artisan life:ai:evaluate
+          php artisan life:ai:evaluate --measure
           php artisan life:knowledge:audit --fail

@@ -26,6 +26,11 @@
                             {{ __('Finance') }}
                         </x-nav-link>
                     @endif
+                    @if (Auth::user()->hasRole('admin', 'editor', 'support', 'dev', 'developer'))
+                        <x-nav-link :href="route('admin.ai-operator.index')" :active="request()->routeIs('admin.ai-operator.*')">
+                            {{ __('Operator AI') }}
+                        </x-nav-link>
+                    @endif
                     @if (Auth::user()->hasRole('admin', 'editor', 'staff'))
                         <x-nav-link :href="route('admin.customers.index')" :active="request()->routeIs('admin.customers.*')">
                             {{ __('Customers') }}
@@ -162,6 +167,11 @@
             @if (Auth::user()->hasRole('admin', 'editor', 'support'))
                 <x-responsive-nav-link :href="route('admin.finance.index')" :active="request()->routeIs('admin.finance.*')">
                     {{ __('Finance') }}
+                </x-responsive-nav-link>
+            @endif
+            @if (Auth::user()->hasRole('admin', 'editor', 'support', 'dev', 'developer'))
+                <x-responsive-nav-link :href="route('admin.ai-operator.index')" :active="request()->routeIs('admin.ai-operator.*')">
+                    {{ __('Operator AI') }}
                 </x-responsive-nav-link>
             @endif
             @if (Auth::user()->hasRole('admin', 'editor', 'staff'))

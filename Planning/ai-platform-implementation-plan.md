@@ -4,7 +4,7 @@
 
 **Owner:** Life@ platform team
 
-**Last verified:** 2026-07-18 on `feature/ai-platform` at implementation commit `68a43b9`
+**Last verified:** 2026-07-18 on `feature/ai-platform` at implementation commit `b3dba88`
 
 **Target stack:** Laravel 13, PHP 8.4, Blade, Tailwind CSS, Alpine.js, Vite, queues, scheduler, Reverb, PostgreSQL 17, and pgvector 0.8.2
 
@@ -126,7 +126,7 @@ Continue using existing generation records, budgets, feature routing, fallbacks,
 
 ## 6. Milestone 0 — PostgreSQL and pgvector foundation
 
-**Status:** Implemented in code; PostgreSQL CI and Coolify runtime verification pending
+**Status:** Implemented and verified in PostgreSQL CI; Coolify runtime verification pending
 
 **Effort:** L
 
@@ -162,7 +162,7 @@ The site is not in production and existing SQLite data is disposable. Do not bui
 
 ## 7. Milestone 1 — Ask Life compatibility refactor
 
-**Status:** Partial; compatibility facade is active, but the remaining focused-service extraction is still required
+**Status:** Partial; the public engine now lives behind `PublicAssistantService` and `AskLifeService` is a thin compatibility facade, but the engine's remaining query/retrieval/formatting internals still require focused extraction
 
 **Effort:** L
 
@@ -283,7 +283,7 @@ Each stage uses an independent database setting plus an environment master switc
 
 ## 10. Milestone 4 — Editorial Intelligence
 
-**Status:** Implemented foundation; editorial workflow UI and accepted historical-outcome evaluation remain
+**Status:** Implemented foundation and editor workflow UI; accepted historical-outcome evaluation remains
 
 **Effort:** L
 
@@ -310,7 +310,7 @@ Key requirements:
 
 ## 11. Milestone 5 — Operator Assistant
 
-**Status:** Partial; governed runtime and first tools are implemented, while persistent conversation and the broader read-tool catalog remain
+**Status:** First read/propose release implemented with persistent conversations, governed runtime, and typed tools across content, research, users, listings, campaigns, finance, AI operations, audits, and health
 
 **Effort:** L
 
@@ -411,31 +411,32 @@ The first coding package is complete only when these reviewable slices land in o
 
 Verified locally on 2026-07-18:
 
-- full Laravel suite: 479 tests, 2,892 assertions;
+- full Laravel suite: 484 tests, 2,944 assertions;
 - focused AI suite: 46 tests, 277 assertions;
 - Vite production build completed;
 - Composer metadata validation completed with pre-existing package-metadata warnings only;
 - AI capability configuration validation completed;
 - versioned fixture shape: Ask Life 150, Editorial 50, Operator 100, with zero fixture-marked unauthorized executions;
 - PHP syntax and `git diff --check` completed.
+- GitHub PostgreSQL AI readiness workflow completed against PostgreSQL 17 plus pgvector 0.8.2 with clean migrations and a restricted application role;
+- GitHub frontend build, dependency vulnerability scan, and PHP/Laravel smoke checks completed;
+- Composer and npm security audits reported no known vulnerabilities.
 
-The JSONL counts prove fixture coverage and schema only. They do not yet prove the PostgreSQL retrieval recall@5, groundedness, editorial historical outcomes, or live operator authorization targets. Those metrics must be measured in the PostgreSQL CI/evaluation environment before rollout gates are enabled.
+The JSONL counts prove fixture coverage and schema only. An isolated measured-evaluation runner now seeds accepted public fixtures, exercises hybrid retrieval, checks recall@5, citation validity, locale coverage, and prohibited disclosure terms, and removes its temporary documents. PostgreSQL results must still be recorded from CI before rollout gates are enabled; editorial historical outcomes and live operator authorization remain external acceptance exercises.
 
 The implementation deliberately does not include SQLite import, migration rehearsal, dual writes, or legacy-data rollback tooling because the database is disposable and the target is a clean PostgreSQL deployment.
 
 Remaining code scope after this implementation package:
 
 1. complete the focused-service extraction from the legacy `AskLifeService` compatibility engine;
-2. add the persistent Operator conversation UI and the broader authorized read/propose tool catalog;
-3. complete editor-facing dossier, contradiction, claim-map, and fact-check workflow screens;
-4. run accepted evaluations against seeded PostgreSQL/pgvector data and record measured results.
+2. run the accepted measured evaluation against seeded PostgreSQL/pgvector data and record the CI results;
+3. record accepted editorial historical-outcome results when representative editorial history exists.
 
 Remaining external release gates:
 
-1. run the PostgreSQL workflow and verify clean migrations under the restricted application role;
-2. configure and verify the Coolify application, worker, scheduler, backups, health endpoints, and pgvector 0.8.2 service;
-3. obtain product-owner approval for privacy/subprocessor disclosures before anonymous access;
-4. enable authenticated and anonymous database gates only after their measured acceptance criteria pass.
+1. configure and verify the Coolify application, worker, scheduler, backups, health endpoints, and pgvector 0.8.2 service;
+2. obtain product-owner approval for privacy/subprocessor disclosures before anonymous access;
+3. enable authenticated and anonymous database gates only after their measured acceptance criteria pass.
 
 ## 17. Decision log
 

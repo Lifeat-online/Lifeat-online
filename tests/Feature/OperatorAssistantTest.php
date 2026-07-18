@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Article;
 use App\Models\AuditLog;
+use App\Models\OperatorConversation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -93,5 +94,55 @@ class OperatorAssistantTest extends TestCase
 
         $this->assertDatabaseHas('operator_tool_runs', ['tool' => 'content.apply_article_status', 'status' => 'failed']);
         $this->assertDatabaseHas('audit_logs', ['actor_user_id' => $editor->id, 'action' => 'ai_operator.tool.content.apply_article_status']);
+    }
+
+    public function test_operator_workspace_persists_a_tool_conversation(): void
+    {
+        config()->set('ai_platform.operator.enabled', true);
+        $editor = User::factory()->create(['role' => 'editor']);
+        Article::create(['title' => 'Pending story', 'slug' => 'pending-story', 'status' => 'pending_review']);
+
+        $this->actingAs($editor)->get(route('admin.ai-operator.index'))
+            ->assertOk()
+            ->assertSee('Operator Assistant')
+            ->assertSee('Content review queue')
+            ->assertSee('Listing review queue')
+            ->assertSee('Campaign summary');
+
+        $this->post(route('admin.ai-operator.messages.store'), [
+            'tool' => 'content.review_queue',
+            'arguments' => '{}',
+        ])->assertRedirect();
+
+        $conversation = OperatorConversation::query()->firstOrFail();
+        $this->assertSame($editor->id, $conversation->user_id);
+        $this->assertDatabaseHas('operator_messages', ['operator_conversation_id' => $conversation->id, 'role' => 'user']);
+        $this->assertDatabaseHas('operator_messages', ['operator_conversation_id' => $conversation->id, 'role' => 'assistant']);
+        $this->assertDatabaseHas('operator_tool_runs', ['tool' => 'content.review_queue', 'status' => 'succeeded']);
+    }
+
+    public function test_broader_read_catalog_executes_for_an_authorized_operator(): void
+    {
+        config()->set('ai_platform.operator.enabled', true);
+        $admin = User::factory()->create(['role' => 'admin']);
+        $tools = [
+            'content.review_queue',
+            'research.summary',
+            'users.summary',
+            'listings.review_queue',
+            'campaigns.summary',
+            'finance.summary',
+            'ai.operations_summary',
+            'audits.recent',
+        ];
+
+        foreach ($tools as $tool) {
+            $this->actingAs($admin)->postJson(route('admin.ai-operator.tools.execute', $tool), [
+                'arguments' => [],
+                'idempotency_key' => 'catalog-'.$tool,
+            ])->assertOk()->assertJsonPath('ok', true)->assertJsonPath('risk', 'R0');
+        }
+
+        $this->assertDatabaseCount('operator_tool_runs', count($tools));
     }
 }
