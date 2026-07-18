@@ -182,6 +182,11 @@ class OperatorContentToolsTest extends TestCase
         app(OperatorTaskOrchestrator::class)->run($task->id);
 
         $this->assertSame([$snapshot->id], $task->fresh()->sources);
+        $this->actingAs($dev)->getJson(route('admin.ai-operator.tasks.show', $task))
+            ->assertOk()
+            ->assertJsonPath('sources.0.id', $snapshot->id)
+            ->assertJsonPath('sources.0.url', 'https://acme.example/about')
+            ->assertJsonPath('sources.0.host', 'acme.example');
     }
 
     public function test_developer_editor_catalog_exposes_research_and_safe_content_management_tools(): void

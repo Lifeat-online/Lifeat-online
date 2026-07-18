@@ -10,6 +10,7 @@ use App\Jobs\RunOperatorTask;
 use App\Models\OperatorConversation;
 use App\Models\OperatorTask;
 use App\Models\OperatorToolRun;
+use App\Models\SourceSnapshot;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -70,7 +71,7 @@ class AiOperatorController extends Controller
             'goal' => $operatorTask->goal,
             'status' => $operatorTask->status,
             'plan' => $operatorTask->plan,
-            'sources' => $operatorTask->sources,
+            'sources' => $this->sourceCards($operatorTask->sources ?? []),
             'usage' => $operatorTask->usage,
             'result' => $operatorTask->result,
             'error' => $operatorTask->error,
@@ -182,6 +183,18 @@ class AiOperatorController extends Controller
         $task->update(['usage' => $usage]);
     }
 
+    private function sourceCards(array $ids): array
+    {
+        return SourceSnapshot::query()->whereIn('id', $ids)->get()->map(fn (SourceSnapshot $snapshot): array => [
+            'id' => $snapshot->id,
+            'url' => $snapshot->url,
+            'host' => strtolower((string) parse_url($snapshot->url, PHP_URL_HOST)),
+            'content_hash' => $snapshot->content_hash,
+            'fetched_at' => $snapshot->fetched_at?->toIso8601String(),
+            'fetch_error' => $snapshot->fetch_error,
+        ])->values()->all();
+    }
+
     public function index(Request $request, OperatorToolRegistry $registry): View
     {
         $conversations = OperatorConversation::query()
@@ -191,7 +204,14 @@ class AiOperatorController extends Controller
         $conversation = $request->filled('conversation')
             ? $conversations->firstWhere('id', $request->string('conversation')->toString())
             : $conversations->first();
-        $conversation?->load('messages.run');
+        $conversation?->load(['messages.run', 'tasks.steps']);
+        $sourceSnapshots = SourceSnapshot::query()
+            ->whereIn('id', collect($conversation?->tasks ?? [])->flatMap(fn (OperatorTask $task): array => $task->sources ?? [])->unique())
+            ->get()
+            ->keyBy('id');
+        $agentEnabled = config('ai_platform.operator.enabled')
+            && config('ai_platform.operator.agent_enabled')
+            && $request->user()->hasRole('dev', 'developer');
 
         $labels = [
             'platform.health' => ['Platform health', 'Read current application and dependency health.'],
@@ -205,6 +225,16 @@ class AiOperatorController extends Controller
             'audits.recent' => ['Recent audits', 'Read the latest redacted audit event metadata.'],
             'content.propose_article_status' => ['Propose article status', 'Create a reviewable status-change proposal without mutating content.'],
             'content.apply_article_status' => ['Apply article status', 'Apply a separately approved article status change.'],
+            'content.search' => ['Search content', 'Find existing articles and directory listings before changing content.'],
+            'directory.find_duplicates' => ['Find listing duplicates', 'Check business name, city, website, and email matches.'],
+            'directory.create_listing' => ['Create sourced listing', 'Create an unclaimed listing from retained public evidence.'],
+            'directory.update_listing' => ['Update listing', 'Update safe listing fields without changing ownership.'],
+            'research.web_search' => ['Search the web', 'Search current public sources through the configured grounded provider.'],
+            'research.snapshot_source' => ['Capture source', 'Securely fetch and retain a selected public source.'],
+            'research.compare_sources' => ['Compare sources', 'Review retained source excerpts and independent hosts.'],
+            'research.build_dossier' => ['Build dossier', 'Build a claim and evidence dossier from a retained source.'],
+            'editorial.create_event_article' => ['Create event article', 'Draft and publish an evidence-backed event article.'],
+            'editorial.update_article' => ['Update article', 'Update safe article fields and publication status.'],
         ];
 
         $tools = collect($registry->all())
@@ -217,7 +247,7 @@ class AiOperatorController extends Controller
                 'description' => $labels[$tool->name()][1] ?? '',
             ])->values();
 
-        return view('admin.ai-operator.index', compact('conversations', 'conversation', 'tools'));
+        return view('admin.ai-operator.index', compact('conversations', 'conversation', 'tools', 'sourceSnapshots', 'agentEnabled'));
     }
 
     public function storeMessage(Request $request, OperatorToolRuntime $runtime): RedirectResponse

@@ -211,6 +211,22 @@ class OperatorTaskTest extends TestCase
         ])->assertOk()->assertJsonPath('status', OperatorTask::STATUS_CANCELLED);
     }
 
+    public function test_developer_workspace_uses_chat_as_the_primary_task_interface(): void
+    {
+        config([
+            'ai_platform.operator.enabled' => true,
+            'ai_platform.operator.agent_enabled' => true,
+        ]);
+        $dev = User::factory()->create(['role' => 'dev']);
+
+        $this->actingAs($dev)->get(route('admin.ai-operator.index'))
+            ->assertOk()
+            ->assertSee('Developer task')
+            ->assertSee('What should I research, create, update, or inspect?')
+            ->assertSee('Manual tool runner')
+            ->assertSee(route('admin.ai-operator.tasks.store'), false);
+    }
+
     private function createTask(User $user, string $goal): OperatorTask
     {
         $conversation = OperatorConversation::create([
