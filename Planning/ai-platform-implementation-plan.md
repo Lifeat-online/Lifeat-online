@@ -4,7 +4,7 @@
 
 **Owner:** Life@ platform team
 
-**Last verified:** 2026-07-18 on `feature/ai-platform` at implementation commit `798ff45`
+**Last verified:** 2026-07-18 on `feature/ai-platform` at implementation commit `d56df85`
 
 **Target stack:** Laravel 13, PHP 8.4, Blade, Tailwind CSS, Alpine.js, Vite, queues, scheduler, Reverb, PostgreSQL 17, and pgvector 0.8.2
 
@@ -421,7 +421,7 @@ Verified locally on 2026-07-18:
 - GitHub PostgreSQL AI readiness workflow completed against PostgreSQL 17 plus pgvector 0.8.2 with clean migrations and a restricted application role;
 - GitHub frontend build, dependency vulnerability scan, and PHP/Laravel smoke checks completed;
 - Composer and npm security audits reported no known vulnerabilities.
-- PostgreSQL measured evaluation: 117 accepted retrieval cases, recall@5 100%, citation validity 100%, English/Afrikaans coverage, and zero prohibited disclosure matches; see `Planning/ai-evaluation-results.json` and GitHub Actions run `29646808075`.
+- PostgreSQL measured evaluation: 117 accepted retrieval cases, recall@5 100%, citation validity 100%, English/Afrikaans coverage, and zero prohibited disclosure matches; see `Planning/ai-evaluation-results.json` and GitHub Actions run `29647247802`.
 
 The JSONL counts prove fixture coverage and schema only. The isolated measured-evaluation runner seeds accepted public fixtures, exercises hybrid retrieval, checks recall@5, citation validity, locale coverage, and prohibited disclosure terms, and removes its temporary documents. Its PostgreSQL result is recorded in `Planning/ai-evaluation-results.json`. Editorial historical outcomes and live operator authorization remain external acceptance exercises rather than claims inferred from synthetic fixtures.
 
