@@ -4,7 +4,7 @@
 
 **Owner:** Life@ platform team
 
-**Last verified:** 2026-07-18 on `feature/ai-platform`; implementation commit recorded after publication
+**Last verified:** 2026-07-18 on `feature/ai-platform` at implementation commit `68a43b9`
 
 **Target stack:** Laravel 13, PHP 8.4, Blade, Tailwind CSS, Alpine.js, Vite, queues, scheduler, Reverb, PostgreSQL 17, and pgvector 0.8.2
 
