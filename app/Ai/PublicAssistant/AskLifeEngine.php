@@ -11,30 +11,32 @@ use App\Models\Listing;
 use App\Models\User;
 use App\Models\Voucher;
 use App\Services\AiGatewayService;
-use App\Support\Ai\AiPromptCatalog;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use Throwable;
 
 class AskLifeEngine
 {
     public function __construct(
         private readonly AiGatewayService $gateway,
-        private readonly AiPromptCatalog $prompts,
         private readonly KnowledgeRetriever $knowledge,
+        private readonly QueryUnderstandingService $queryUnderstanding,
+        private readonly GroundedAnswerService $groundedAnswers,
+        private readonly RetrievalRanker $retrievalRanker,
+        private readonly RelationalRetriever $relationalRetriever,
+        private readonly SourceCardFormatter $sourceCardFormatter,
     ) {
     }
 
     public function answer(string $question, ?User $user = null, array $history = [], array $context = []): array
     {
         $question = trim($question);
-        $context = $this->normalizeContext($context);
-        $targetLocale = $this->targetLocale($question, $user, $context);
-        $context['locale'] = $targetLocale;
+        $understanding = $this->queryUnderstanding->understand($question, $user, $context);
+        $context = $understanding['context'];
+        $targetLocale = $understanding['locale'];
         $intent = $this->detectIntent($question, $context, $user);
-        $search = $this->searchContext($question, $context);
+        $search = $understanding['search'];
 
         if ($guided = $this->guidedAnswer($question, $user, $context, $intent, $search, $targetLocale)) {
             return $guided;
@@ -74,84 +76,38 @@ class AskLifeEngine
             return $this->fallbackAnswer($question, $sources, 'AI provider is not configured yet.', $intent, $context, $search, $targetLocale);
         }
 
-        $prompt = $this->prompts->get('ask_life');
-
-        try {
-            $result = $this->gateway->generateStructured(
-                'ask_life',
-                $prompt['version'],
-                $prompt['system'],
-                [
-                    'question' => $question,
-                    'sources' => $sources->values()->all(),
-                    'schema' => $prompt['schema'],
-                    'conversation_history' => $this->formatHistory($history),
-                    'detected_intent' => $intent,
-                    'search_context' => $this->publicSearchContext($search),
-                    'page_context' => $context,
-                    'target_locale' => $targetLocale,
-                    'target_language' => $this->localeName($targetLocale),
-                    'language_instruction' => $this->languageInstruction($targetLocale),
-                    'current_date' => CarbonImmutable::now($search['timezone'])->toDateString(),
-                ],
-                null,
-                $user,
-                $targetLocale,
-            );
-
-            if (($result['ok'] ?? false) && filled(data_get($result, 'payload.answer'))) {
-                $usedIds = collect(data_get($result, 'payload.source_ids', []))
-                    ->filter(fn ($id) => is_string($id) && $id !== '')
-                    ->values();
-                $availableIds = $sources->pluck('id');
-                $unsupportedIds = $usedIds->diff($availableIds);
-
-                if ($usedIds->isEmpty() || $unsupportedIds->isNotEmpty()) {
-                    return $this->fallbackAnswer(
-                        $question,
-                        $sources,
-                        'The generated answer did not provide valid supporting Life@ sources.',
-                        $intent,
-                        $context,
-                        $search,
-                        $targetLocale,
-                    );
-                }
-
-                $rankedSources = $sources
-                    ->sortBy(fn (array $source) => $usedIds->search($source['id']) === false ? 999 : $usedIds->search($source['id']))
-                    ->values();
-
-                return [
-                    'ok' => true,
-                    'source' => 'ai',
-                    'answer' => (string) data_get($result, 'payload.answer'),
-                    'locale' => $targetLocale,
-                    'confidence' => (float) data_get($result, 'payload.confidence', 0.65),
-                    'intent' => $intent,
-                    'search_context' => $this->publicSearchContext($search),
-                    'page_context' => $context,
-                    'sources' => $this->sourceCards($rankedSources->take(8), $intent, $question, $context, $targetLocale)->values()->all(),
-                    'answer_actions' => $this->answerActions($intent, $rankedSources, $question, $context, $search, $targetLocale),
-                    'follow_up_questions' => collect(data_get($result, 'payload.follow_up_questions', []))->take(3)->values()->all(),
-                    'generation_id' => data_get($result, 'generation.id'),
-                    'search_url' => route('search.index', ['q' => $question]),
-                ];
-            }
-
-            return $this->fallbackAnswer($question, $sources, $result['message'] ?? 'AI provider did not return a usable answer.', $intent, $context, $search, $targetLocale);
-        } catch (Throwable $exception) {
-            return $this->fallbackAnswer($question, $sources, $exception->getMessage(), $intent, $context, $search, $targetLocale);
+        $generated = $this->groundedAnswers->generate($question, $sources, $user, $history, $context, $intent, $search, $targetLocale);
+        if (! $generated['ok']) {
+            return $this->fallbackAnswer($question, $sources, $generated['message'], $intent, $context, $search, $targetLocale);
         }
+
+        $usedIds = collect($generated['source_ids']);
+        $rankedSources = $sources->sortBy(fn (array $source) => $usedIds->search($source['id']) === false ? 999 : $usedIds->search($source['id']))->values();
+
+        return [
+            'ok' => true,
+            'source' => 'ai',
+            'answer' => $generated['answer'],
+            'locale' => $targetLocale,
+            'confidence' => $generated['confidence'],
+            'intent' => $intent,
+            'search_context' => $this->publicSearchContext($search),
+            'page_context' => $context,
+            'sources' => $this->sourceCards($rankedSources->take(8), $intent, $question, $context, $targetLocale)->values()->all(),
+            'answer_actions' => $this->answerActions($intent, $rankedSources, $question, $context, $search, $targetLocale),
+            'follow_up_questions' => $generated['follow_up_questions'],
+            'generation_id' => $generated['generation_id'],
+            'search_url' => route('search.index', ['q' => $question]),
+        ];
     }
 
     public function sourcesForQuestion(string $question, ?User $user = null, array $context = [], ?array $intent = null, ?array $search = null): Collection
     {
-        $context = $this->normalizeContext($context);
-        $locale = $this->targetLocale($question, $user, $context);
-        $context['locale'] = $locale;
+        $understanding = $this->queryUnderstanding->understand($question, $user, $context);
+        $context = $understanding['context'];
+        $locale = $understanding['locale'];
         $intent ??= $this->detectIntent($question, $context, $user);
-        $search ??= $this->searchContext($question, $context);
+        $search ??= $understanding['search'];
         $terms = $search['terms'];
 
         $dynamicSources = $terms === []
@@ -162,7 +118,7 @@ class AskLifeEngine
             ? $this->knowledgeSources($question, $locale)
             : collect();
 
-        return $this->rankSources($dynamicSources, $search, $intent)
+        return $this->retrievalRanker->rank($dynamicSources, $search, $intent)
             ->merge($hybridSources)
             ->merge($this->pageContextSources($context, $intent, $locale))
             ->merge($this->platformGuideSources($question, $terms, $intent, $context, $locale))
@@ -194,21 +150,13 @@ class AskLifeEngine
 
     private function dynamicSourcesFor(array $sourceTypes, array $terms, ?User $user, array $search, string $locale): Collection
     {
-        $dynamicSources = collect();
-
-        foreach ($sourceTypes as $sourceType) {
-            $dynamicSources = $dynamicSources->merge(match ($sourceType) {
-                'business' => $this->listingSources($terms, $user, $search, $locale),
-                'event' => $this->eventSources($terms, $user, $search, $locale),
-                'article' => $this->articleSources($terms, $user, $search, $locale),
-                'voucher' => $this->voucherSources($terms, $user, $search, $locale),
-                'classified' => $this->classifiedSources($terms, $user, $search, $locale),
-                'fault' => $this->faultSources($terms, $user, $search),
-                default => collect(),
-            });
-        }
-
-        return $dynamicSources->unique('id')->values();
+        return $this->relationalRetriever->retrieve(
+            $sourceTypes,
+            $terms,
+            $search,
+            $locale,
+            fn (string $key, string $language): string => $this->t($key, $language),
+        );
     }
 
     private function formatHistory(array $history): array
@@ -258,7 +206,7 @@ class AskLifeEngine
                 ->all(),
         ]);
 
-        $sources = $this->rankSources(
+        $sources = $this->retrievalRanker->rank(
             $this->dynamicSourcesFor($recommendation['source_types'], $recommendationSearch['terms'], $user, $recommendationSearch, $locale),
             $recommendationSearch,
             array_replace($intent, ['source_types' => $recommendation['source_types']])
@@ -1878,6 +1826,11 @@ class AskLifeEngine
 
     private function sourceCards(Collection $sources, array $intent, string $question, array $context, string $locale): Collection
     {
+        return $this->sourceCardFormatter->format($sources, $intent, $question, $context, $locale, fn (string $key, string $language): string => $this->t($key, $language));
+    }
+
+    private function legacySourceCards(Collection $sources, array $intent, string $question, array $context, string $locale): Collection
+    {
         return $sources->map(function (array $source) use ($intent, $question, $context, $locale): array {
             unset($source['keywords']);
 
@@ -1931,6 +1884,11 @@ class AskLifeEngine
     }
 
     private function answerActions(array $intent, Collection $sources, string $question, array $context, array $search, string $locale): array
+    {
+        return $this->sourceCardFormatter->answerActions($intent, $sources, $question, $context, $search, $locale, fn (string $key, string $language): string => $this->t($key, $language));
+    }
+
+    private function legacyAnswerActions(array $intent, Collection $sources, string $question, array $context, array $search, string $locale): array
     {
         $actions = [];
         $first = $sources->first();

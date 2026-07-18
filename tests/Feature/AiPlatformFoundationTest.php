@@ -8,6 +8,7 @@ use App\Ai\Providers\FakeEmbeddingProvider;
 use App\Ai\Providers\OpenAiEmbeddingProvider;
 use App\Ai\PublicAssistant\AskLifeEngine;
 use App\Ai\PublicAssistant\PublicAssistantService;
+use App\Ai\PublicAssistant\QueryUnderstandingService;
 use App\Models\KnowledgeChunk;
 use App\Models\KnowledgeDocument;
 use App\Services\AiGatewayService;
@@ -123,5 +124,19 @@ class AiPlatformFoundationTest extends TestCase
 
         $this->assertInstanceOf(PublicAssistantService::class, $service);
         $this->assertInstanceOf(AskLifeEngine::class, app(AskLifeEngine::class));
+    }
+
+    public function test_query_understanding_normalizes_locale_page_and_search_context(): void
+    {
+        $understanding = app(QueryUnderstandingService::class)->understand(
+            'Watter events is hierdie naweek in Clarens?',
+            null,
+            ['path' => '/events', 'timezone' => 'Africa/Johannesburg'],
+        );
+
+        $this->assertSame('af', $understanding['locale']);
+        $this->assertSame('events', $understanding['context']['page_type']);
+        $this->assertSame('Clarens', $understanding['search']['location']);
+        $this->assertSame('this weekend', $understanding['search']['time_window']['label']);
     }
 }

@@ -162,7 +162,7 @@ The site is not in production and existing SQLite data is disposable. Do not bui
 
 ## 7. Milestone 1 — Ask Life compatibility refactor
 
-**Status:** Partial; the public engine now lives behind `PublicAssistantService` and `AskLifeService` is a thin compatibility facade, but the engine's remaining query/retrieval/formatting internals still require focused extraction
+**Status:** Implemented; `PublicAssistantService` orchestrates an extracted engine, `AskLifeService` is a thin compatibility facade, and query understanding, relational retrieval, ranking, source-card formatting, and grounded generation/citation validation run through focused services
 
 **Effort:** L
 
@@ -411,7 +411,7 @@ The first coding package is complete only when these reviewable slices land in o
 
 Verified locally on 2026-07-18:
 
-- full Laravel suite: 484 tests, 2,944 assertions;
+- full Laravel suite: 485 tests, 2,948 assertions;
 - focused AI suite: 46 tests, 277 assertions;
 - Vite production build completed;
 - Composer metadata validation completed with pre-existing package-metadata warnings only;
@@ -427,10 +427,7 @@ The JSONL counts prove fixture coverage and schema only. The isolated measured-e
 
 The implementation deliberately does not include SQLite import, migration rehearsal, dual writes, or legacy-data rollback tooling because the database is disposable and the target is a clean PostgreSQL deployment.
 
-Remaining code scope after this implementation package:
-
-1. complete the focused-service extraction from the legacy `AskLifeService` compatibility engine;
-2. record accepted editorial historical-outcome results when representative editorial history exists.
+No buildable code item from the approved implementation package remains. The accepted editorial historical-outcome exercise must be recorded when representative editorial history exists; synthetic fixtures are not presented as historical evidence.
 
 Remaining external release gates:
 
