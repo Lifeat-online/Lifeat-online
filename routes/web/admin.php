@@ -70,6 +70,8 @@ Route::middleware(['auth', 'role:admin,editor,staff,support,dev,developer'])->pr
 
     Route::post('/jimmy/chat', [AdminAiOperatorController::class, 'jimmyChat'])
         ->name('jimmy.chat');
+    Route::get('/jimmy/tasks/{operatorTask}', [AdminAiOperatorController::class, 'jimmyTask'])
+        ->name('jimmy.task');
 
     Route::get('/editorial-dossiers', [AdminEditorialDossierController::class, 'index'])
         ->middleware('role:admin,editor,dev,developer')

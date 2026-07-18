@@ -12,6 +12,7 @@ use App\Models\OperatorTask;
 use App\Models\OperatorToolRun;
 use App\Models\SourceSnapshot;
 use App\Services\AiGatewayService;
+use App\Services\JimmyWritingService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -196,22 +197,60 @@ class AiOperatorController extends Controller
         ])->values()->all();
     }
 
-    public function jimmyChat(Request $request, AiGatewayService $ai): JsonResponse
+    public function jimmyChat(Request $request, AiGatewayService $ai, OperatorToolRegistry $registry, OperatorTaskOrchestrator $orchestrator): JsonResponse
     {
         $validated = $request->validate([
-            'message' => ['required', 'string', 'max:2000'],
-            'history' => ['nullable', 'array'],
+            'message' => ['required', 'string', 'max:5000'],
+            'conversation_id' => ['nullable', 'uuid', 'exists:operator_conversations,id'],
         ]);
 
-        $context = collect($validated['history'] ?? [])->map(fn ($turn) => ($turn['role'] ?? 'user').': '.($turn['content'] ?? ''))->implode("\n");
+        $conversation = isset($validated['conversation_id'])
+            ? OperatorConversation::query()->where('user_id', $request->user()->id)->findOrFail($validated['conversation_id'])
+            : OperatorConversation::create([
+                'user_id' => $request->user()->id,
+                'title' => Str::limit($validated['message'], 80, ''),
+                'last_activity_at' => now(),
+            ]);
 
-        $result = $ai->generateStructured('ask_life', 'jimmy_chat_v1', 'You are Jimmy, the Life@ editorial assistant. You help editors with article writing, research, source verification, and editorial tasks. Be helpful, concise, and accurate. Never invent facts.', [
-            'context' => "Conversation:\n{$context}",
-            'message' => $validated['message'],
-            'schema' => ['answer' => 'Your helpful response to the editor.'],
+        $conversation->messages()->create(['role' => 'user', 'content' => $validated['message']]);
+        $conversation->update(['last_activity_at' => now()]);
+
+        $task = $conversation->tasks()->create([
+            'user_id' => $request->user()->id,
+            'goal' => $validated['message'],
+            'status' => OperatorTask::STATUS_PLANNED,
+            'step_limit' => max(1, (int) config('ai_platform.operator.step_limit', 12)),
+            'usage' => ['steps' => 0, 'cost' => 0],
         ]);
 
-        return response()->json(['answer' => $result['ok'] ? ($result['payload']['answer'] ?? 'How can I help with editorial tasks?') : ($result['message'] ?? 'Jimmy is unavailable.')]);
+        try {
+            $orchestrator->run($task->id);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        $task->refresh();
+
+        return response()->json([
+            'answer' => $task->result['summary'] ?? $task->error ?? 'Task completed.',
+            'task_id' => $task->id,
+            'conversation_id' => $conversation->id,
+            'status' => $task->status,
+        ]);
+    }
+
+    public function jimmyTask(string $operatorTask, AiGatewayService $ai): JsonResponse
+    {
+        $task = OperatorTask::query()->with('steps')->findOrFail($operatorTask);
+        abort_unless($task->user_id === request()->user()->id, 404);
+
+        return response()->json([
+            'id' => $task->id,
+            'status' => $task->status,
+            'answer' => $task->result['summary'] ?? $task->error ?? null,
+            'plan' => $task->plan,
+            'steps' => $task->steps->map(fn ($s) => ['tool' => $s->tool, 'status' => $s->status, 'risk' => $s->risk]),
+        ]);
     }
 
     public function index(Request $request, OperatorToolRegistry $registry): View

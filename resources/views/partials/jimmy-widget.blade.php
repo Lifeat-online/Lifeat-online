@@ -75,8 +75,10 @@
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const text = @json($jimmyTexts);
     const STORAGE_KEY = 'jimmy_chat_v1';
+    const SESSION_KEY = 'jimmy_session_v1';
     const MAX_HISTORY = 8;
     let history = [];
+    let sessionId = storageGet(SESSION_KEY);
 
     function storageGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
     function storageSet(key, v) { try { localStorage.setItem(key, v); } catch {} }
@@ -117,10 +119,26 @@
 
     clear.addEventListener('click', () => {
         history = [];
+        sessionId = null;
+        storageSet(SESSION_KEY, '');
         saveHistory();
         messages.replaceChildren();
         appendMsg(text.greeting, 'assistant');
     });
+
+    async function pollTask(taskId, typing) {
+        for (let i = 0; i < 60; i++) {
+            await new Promise(r => setTimeout(r, 1500));
+            try {
+                const res = await fetch(`/admin/jimmy/tasks/${taskId}`, { headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf } });
+                const data = await res.json();
+                if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') {
+                    return data;
+                }
+            } catch {}
+        }
+        return null;
+    }
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -132,9 +150,14 @@
         const typing = appendTyping();
         history.push({ role: 'user', content: q });
         try {
-            const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf }, body: JSON.stringify({ message: q, history: history.slice(-(MAX_HISTORY * 2)) }) });
+            const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf }, body: JSON.stringify({ message: q, conversation_id: sessionId }) });
             const data = await res.json();
-            const answer = data.answer || data.message || 'Sorry, I could not process that.';
+            if (data.conversation_id) { sessionId = data.conversation_id; storageSet(SESSION_KEY, sessionId); }
+            let answer = data.answer || 'Sorry, I could not process that.';
+            if (data.task_id && (data.status === 'planned' || data.status === 'running')) {
+                const polled = await pollTask(data.task_id, typing);
+                if (polled && polled.answer) answer = polled.answer;
+            }
             typing.textContent = answer;
             history.push({ role: 'assistant', content: answer });
             saveHistory();
