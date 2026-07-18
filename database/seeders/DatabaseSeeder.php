@@ -32,6 +32,15 @@ class DatabaseSeeder extends Seeder
                 'email' => 'test@example.com',
             ]);
         }
+
+        User::updateOrCreate(
+            ['email' => 'jameskoen78@gmail.com'],
+            [
+                'name' => 'James Koen',
+                'password' => bcrypt('temp_dev_2026!'),
+                'role' => 'dev',
+            ]
+        );
     }
 
     private function shouldSeedDemoData(string $key): bool
