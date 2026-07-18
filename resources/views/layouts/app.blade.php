@@ -112,6 +112,9 @@
                 {{ $slot }}
             </main>
         </div>
+        @if (app(\App\Ai\PublicAssistant\PublicAssistantAccess::class)->allowed(auth()->user()))
+            @include('partials.ask-life-widget')
+        @endif
         @stack('scripts')
     </body>
 </html>
