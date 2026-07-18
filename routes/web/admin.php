@@ -68,6 +68,9 @@ Route::middleware(['auth', 'role:admin,editor,staff,support,dev,developer'])->pr
         ->middleware('role:dev,developer')
         ->name('ai-operator.tasks.resume');
 
+    Route::post('/jimmy/chat', [AdminAiOperatorController::class, 'jimmyChat'])
+        ->name('jimmy.chat');
+
     Route::get('/editorial-dossiers', [AdminEditorialDossierController::class, 'index'])
         ->middleware('role:admin,editor,dev,developer')
         ->name('editorial-dossiers.index');

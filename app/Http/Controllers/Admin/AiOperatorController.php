@@ -11,6 +11,7 @@ use App\Models\OperatorConversation;
 use App\Models\OperatorTask;
 use App\Models\OperatorToolRun;
 use App\Models\SourceSnapshot;
+use App\Services\AiGatewayService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -193,6 +194,24 @@ class AiOperatorController extends Controller
             'fetched_at' => $snapshot->fetched_at?->toIso8601String(),
             'fetch_error' => $snapshot->fetch_error,
         ])->values()->all();
+    }
+
+    public function jimmyChat(Request $request, AiGatewayService $ai): JsonResponse
+    {
+        $validated = $request->validate([
+            'message' => ['required', 'string', 'max:2000'],
+            'history' => ['nullable', 'array'],
+        ]);
+
+        $context = collect($validated['history'] ?? [])->map(fn ($turn) => ($turn['role'] ?? 'user').': '.($turn['content'] ?? ''))->implode("\n");
+
+        $result = $ai->generateStructured('ask_life', 'jimmy_chat_v1', 'You are Jimmy, the Life@ editorial assistant. You help editors with article writing, research, source verification, and editorial tasks. Be helpful, concise, and accurate. Never invent facts.', [
+            'context' => "Conversation:\n{$context}",
+            'message' => $validated['message'],
+            'schema' => ['answer' => 'Your helpful response to the editor.'],
+        ]);
+
+        return response()->json(['answer' => $result['ok'] ? ($result['payload']['answer'] ?? 'How can I help with editorial tasks?') : ($result['message'] ?? 'Jimmy is unavailable.')]);
     }
 
     public function index(Request $request, OperatorToolRegistry $registry): View

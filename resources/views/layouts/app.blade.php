@@ -112,9 +112,7 @@
                 {{ $slot }}
             </main>
         </div>
-        @if (app(\App\Ai\PublicAssistant\PublicAssistantAccess::class)->allowed(auth()->user()))
-            @include('partials.ask-life-widget')
-        @endif
+        @include('partials.jimmy-widget')
         @stack('scripts')
     </body>
 </html>
