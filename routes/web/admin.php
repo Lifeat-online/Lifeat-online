@@ -72,8 +72,7 @@ Route::middleware(['auth', 'role:admin,editor,staff,support,dev,developer'])->pr
         ->name('jimmy.chat');
     Route::get('/jimmy/tasks/{operatorTask}', [AdminAiOperatorController::class, 'jimmyTask'])
         ->name('jimmy.task');
-    Route::get('/jimmy/ping', [AdminAiOperatorController::class, 'jimmyPing'])
-        ->name('jimmy.ping');
+
 
     Route::get('/editorial-dossiers', [AdminEditorialDossierController::class, 'index'])
         ->middleware('role:admin,editor,dev,developer')
