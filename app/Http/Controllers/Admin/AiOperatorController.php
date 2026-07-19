@@ -197,56 +197,12 @@ class AiOperatorController extends Controller
         ])->values()->all();
     }
 
-    public function jimmyChat(Request $request, AiGatewayService $ai, OperatorToolRegistry $registry, OperatorTaskOrchestrator $orchestrator): JsonResponse
+    public function jimmyChat(Request $request): JsonResponse
     {
         try {
-            $validated = $request->validate([
-                'message' => ['required', 'string', 'max:5000'],
-                'conversation_id' => ['nullable', 'uuid', 'exists:operator_conversations,id'],
-            ]);
-
-            $conversation = isset($validated['conversation_id'])
-                ? OperatorConversation::query()->where('user_id', $request->user()->id)->findOrFail($validated['conversation_id'])
-                : OperatorConversation::create([
-                    'user_id' => $request->user()->id,
-                    'title' => Str::limit($validated['message'], 80, ''),
-                    'last_activity_at' => now(),
-                ]);
-
-            $conversation->messages()->create(['role' => 'user', 'content' => $validated['message']]);
-            $conversation->update(['last_activity_at' => now()]);
-
-            $task = $conversation->tasks()->create([
-                'user_id' => $request->user()->id,
-                'goal' => $validated['message'],
-                'status' => OperatorTask::STATUS_PLANNED,
-                'step_limit' => max(1, (int) config('ai_platform.operator.step_limit', 12)),
-                'usage' => ['steps' => 0, 'cost' => 0],
-            ]);
-
-            try {
-                $orchestrator->run($task->id);
-            } catch (\Throwable $e) {
-                report($e);
-            }
-
-            $task->refresh();
-
-            return response()->json([
-                'answer' => $task->result['summary'] ?? $task->error ?? 'Task completed.',
-                'task_id' => $task->id,
-                'conversation_id' => $conversation->id,
-                'status' => $task->status,
-            ]);
+            return response()->json(['test' => 'hello', 'user' => $request->user()?->id]);
         } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json([
-                'answer' => 'Sorry, I could not process that.',
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
+            return response()->json(['error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
         }
     }
 
