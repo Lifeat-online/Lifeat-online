@@ -197,10 +197,10 @@ class AiOperatorController extends Controller
         ])->values()->all();
     }
 
-    public function jimmyChat(Request $request): JsonResponse
+    public function jimmyChat(Request $request, OperatorTaskOrchestrator $orchestrator): JsonResponse
     {
         try {
-            return response()->json(['test' => 'hello', 'user' => $request->user()?->id]);
+            return response()->json(['test' => 'hello', 'user' => $request->user()?->id, 'orchestrator' => get_class($orchestrator)]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
         }
