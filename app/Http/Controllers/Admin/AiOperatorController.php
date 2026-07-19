@@ -250,6 +250,11 @@ class AiOperatorController extends Controller
         }
     }
 
+    public function jimmyPing(Request $request): JsonResponse
+    {
+        return response()->json(['ping' => 'pong', 'time' => now()->toIso8601String()]);
+    }
+
     public function jimmyTask(string $operatorTask, AiGatewayService $ai): JsonResponse
     {
         $task = OperatorTask::query()->with('steps')->findOrFail($operatorTask);
